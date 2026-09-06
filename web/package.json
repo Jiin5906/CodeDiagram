@@ -1,0 +1,22 @@
+{
+  "name": "code-diagram",
+  "version": "1.0.0",
+  "description": "Python code structure visualizer",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "test": "node test/runner.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.0",
+    "simple-git": "^3.27.0",
+    "tree-sitter": "^0.22.4",
+    "tree-sitter-python": "^0.23.6"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0"
+  }
+}

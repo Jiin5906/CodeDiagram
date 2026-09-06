@@ -1,0 +1,105 @@
+<!--메인 HTML페이지이다-->
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CodeDiagram</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script src="https://unpkg.com/cytoscape@3.30.4/dist/cytoscape.min.js"></script>
+  <script src="https://unpkg.com/layout-base@2.0.1/layout-base.js"></script>
+  <script src="https://unpkg.com/cose-base@2.2.0/cose-base.js"></script>
+  <script src="https://unpkg.com/cytoscape-fcose@2.2.0/cytoscape-fcose.js"></script>
+</head>
+<body>
+  <div id="top-bar">
+    <span class="logo">CodeDiagram</span>
+    <form id="analyze-form">
+      <input
+        type="text"
+        id="source-input"
+        placeholder="Git URL 또는 로컬 경로를 입력하세요"
+        autocomplete="off"
+      />
+      <button type="submit" id="analyze-btn">분석</button>
+    </form>
+    <div id="toolbar">
+      <input
+        type="text"
+        id="search-input"
+        class="toolbar-search hidden"
+        placeholder="함수/파일 검색..."
+        autocomplete="off"
+      />
+      <button id="toggle-edges-btn" class="toolbar-btn hidden" title="엣지 표시/숨김 토글">그래프 보기</button>
+      <button id="view-toggle-btn" class="toolbar-btn hidden" title="뷰 전환">함수 뷰</button>
+      <button id="diagnostics-btn" class="toolbar-btn hidden" title="진단 실행">진단</button>
+      <button id="collapse-all-btn" class="toolbar-btn hidden" title="전체 접기/펼치기">전체 접기</button>
+    </div>
+    <div id="status"></div>
+  </div>
+
+  <!--미리보기 배너-->
+  <div id="preview-banner" class="hidden">
+    <span id="preview-banner-text">미리보기 모드</span>
+    <button id="preview-restore-btn">원래대로</button>
+  </div>
+
+  <div id="legend">
+    <div class="legend-item"><span class="legend-swatch tier"></span> 참조 횟수 그룹</div>
+    <div class="legend-item"><span class="legend-swatch file"></span> 파일</div>
+    <div class="legend-item"><span class="legend-swatch function"></span> 함수</div>
+    <div class="legend-item"><span class="legend-swatch method"></span> 클래스 메서드</div>
+    <div class="legend-item"><span class="legend-swatch edge-swatch"></span> 호출 관계</div>
+    <div class="legend-item"><span class="legend-swatch inheritance-swatch"></span> 상속 관계</div>
+    <div class="legend-item"><span class="legend-swatch cycle-swatch"></span> 순환 참조</div>
+    <div class="legend-item"><span class="legend-swatch package-swatch"></span> 패키지</div>
+    <div class="legend-item coupling-legend"><span class="legend-swatch coupling-swatch"></span> 결합도 (테두리 두께)</div>
+  </div>
+
+  <div id="graph-container">
+    <div id="cy"></div>
+  </div>
+
+  <!--엣지 참조 위치 팝업-->
+  <div id="ref-popup" class="popup hidden">
+    <div class="popup-header">
+      <span id="ref-popup-title">참조 위치</span>
+      <button id="ref-popup-close">&times;</button>
+    </div>
+    <div id="ref-popup-content"></div>
+  </div>
+
+  <!--AI 설명 오버레이-->
+  <div id="explain-overlay" class="overlay hidden">
+    <div class="overlay-header">
+      <span id="explain-title">함수 설명</span>
+      <button id="explain-close">&times;</button>
+    </div>
+    <div id="explain-content"></div>
+    <div id="explain-code-section" class="hidden">
+      <button id="toggle-code-btn">전체 코드 보기</button>
+      <pre id="explain-code"></pre>
+    </div>
+  </div>
+
+  <!--진단 패널-->
+  <div id="diagnostics-panel" class="overlay hidden">
+    <div class="overlay-header">
+      <span id="diagnostics-title">코드 진단 결과</span>
+      <button id="diagnostics-close">&times;</button>
+    </div>
+    <div id="diagnostics-content"></div>
+    <div id="suggestions-section">
+      <div class="suggestions-header">리팩토링 제안</div>
+      <div id="suggestions-content"></div>
+    </div>
+  </div>
+
+  <script src="js/graph.js"></script>
+  <script src="js/interactions.js"></script>
+  <script src="js/diffPreview.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
