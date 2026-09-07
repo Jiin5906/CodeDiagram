@@ -6,6 +6,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CodeDiagram</title>
+  <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
   <link rel="stylesheet" href="css/style.css">
   <script src="https://unpkg.com/cytoscape@3.30.4/dist/cytoscape.min.js"></script>
   <script src="https://unpkg.com/layout-base@2.0.1/layout-base.js"></script>
@@ -23,21 +24,31 @@
         autocomplete="off"
       />
       <button type="submit" id="analyze-btn">분석</button>
+      <div id="status"></div>
     </form>
     <div id="toolbar">
-      <input
-        type="text"
-        id="search-input"
-        class="toolbar-search hidden"
-        placeholder="함수/파일 검색..."
-        autocomplete="off"
-      />
-      <button id="toggle-edges-btn" class="toolbar-btn hidden" title="엣지 표시/숨김 토글">그래프 보기</button>
-      <button id="view-toggle-btn" class="toolbar-btn hidden" title="뷰 전환">함수 뷰</button>
-      <button id="diagnostics-btn" class="toolbar-btn hidden" title="진단 실행">진단</button>
-      <button id="collapse-all-btn" class="toolbar-btn hidden" title="전체 접기/펼치기">전체 접기</button>
+      <div class="toolbar-group">
+        <input
+          type="text"
+          id="search-input"
+          class="toolbar-search hidden"
+          placeholder="함수/파일 검색..."
+          autocomplete="off"
+        />
+      </div>
+      <span class="toolbar-divider hidden" id="divider-1"></span>
+      <div class="toolbar-group">
+        <button id="toggle-edges-btn" class="toolbar-btn hidden" title="엣지 표시/숨김 토글">그래프 보기</button>
+        <button id="view-toggle-btn" class="toolbar-btn hidden" title="뷰 전환">함수 뷰</button>
+      </div>
+      <span class="toolbar-divider hidden" id="divider-2"></span>
+      <div class="toolbar-group">
+        <button id="diagnostics-btn" class="toolbar-btn hidden" title="진단 실행">진단</button>
+        <button id="collapse-all-btn" class="toolbar-btn hidden" title="전체 접기/펼치기">전체 접기</button>
+        <button id="file-tree-toggle" class="toolbar-btn hidden" title="파일 트리">파일 트리</button>
+      </div>
+      <button id="back-to-package-btn" class="toolbar-btn hidden" title="패키지 뷰로 복귀">뒤로가기</button>
     </div>
-    <div id="status"></div>
   </div>
 
   <!--미리보기 배너-->
@@ -51,6 +62,8 @@
     <div class="legend-item"><span class="legend-swatch file"></span> 파일</div>
     <div class="legend-item"><span class="legend-swatch function"></span> 함수</div>
     <div class="legend-item"><span class="legend-swatch method"></span> 클래스 메서드</div>
+    <div class="legend-item"><span class="legend-swatch variable-swatch"></span> 변수/필드</div>
+    <div class="legend-item"><span class="legend-swatch varref-swatch"></span> 변수 참조</div>
     <div class="legend-item"><span class="legend-swatch edge-swatch"></span> 호출 관계</div>
     <div class="legend-item"><span class="legend-swatch inheritance-swatch"></span> 상속 관계</div>
     <div class="legend-item"><span class="legend-swatch cycle-swatch"></span> 순환 참조</div>
@@ -58,8 +71,17 @@
     <div class="legend-item coupling-legend"><span class="legend-swatch coupling-swatch"></span> 결합도 (테두리 두께)</div>
   </div>
 
-  <div id="graph-container">
-    <div id="cy"></div>
+  <div id="main-content">
+    <div id="file-tree-panel" class="collapsed">
+      <div class="file-tree-header">
+        <span>파일 탐색기</span>
+        <button id="file-tree-close">&times;</button>
+      </div>
+      <div id="file-tree-content"></div>
+    </div>
+    <div id="graph-container">
+      <div id="cy"></div>
+    </div>
   </div>
 
   <!--엣지 참조 위치 팝업-->
@@ -97,9 +119,22 @@
     </div>
   </div>
 
+  <!--Diff 비교 오버레이-->
+  <div id="diff-overlay" class="hidden">
+    <div class="diff-overlay-inner">
+      <div class="overlay-header">
+        <span id="diff-title">구조 변경 Diff</span>
+        <button id="diff-close" onclick="hideDiffView()">&times;</button>
+      </div>
+      <div id="diff-content"></div>
+    </div>
+  </div>
+
   <script src="js/graph.js"></script>
+
   <script src="js/interactions.js"></script>
   <script src="js/diffPreview.js"></script>
+  <script src="js/fileTree.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

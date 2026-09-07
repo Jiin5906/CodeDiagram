@@ -1,11 +1,11 @@
-//parser가 추출한 "함수 A가 funcB를 호출한다"라는 원시 데이터를 실제 어떤 파일의 어떤 함수인지 매칭한다.
+//paser가 추출한 "함수 A가 funcB를 호출한다"라는 원시 데이터를 실제 어떤 파일의 어떤 함수인지 매칭한다.
 /*
 3단계 우선순위로 해석한다.
     1. 같은 파일 내 일치하는 함수가 있으면 그것으로 연결
     2. import 기반: import문을 참고해서 해당 모듈의 함수를 찾음
     3. 전역 탐색: 전체 프로젝트에서 이름이 같은 함수를 찾음
 */
-@
+
 function resolveCalls(allFunctions, allCalls, allImports) {
   //함수 이름으로 빠르게 찾기 위한 조회 맵 생성
   const funcByQName = new Map(); //함수 이름 → [함수 정보들]
@@ -27,16 +27,8 @@ function resolveCalls(allFunctions, allCalls, allImports) {
     funcByFile.get(func.filePath).push(entry);
   }
 
-  //import 조회 맵 생성: 파일 경로 → { import된 이름 → 모듈 경로 }
-  const importMap = new Map();
-  for (const fileImports of allImports) {
-    const map = {};
-    for (const imp of fileImports.imports) {
-      const effectiveName = imp.alias || imp.name;
-      map[effectiveName] = imp.module;
-    }
-    importMap.set(fileImports.filePath, map);
-  }
+  //import 조회 맵 생성
+  const importMap = buildImportMap(allImports);
 
   //호출자-피호출자 쌍으로 묶어서 참조 목록을 만듦
   const edgeMap = new Map(); //"출발 -> 도착" → { source, target, references }
@@ -133,4 +125,109 @@ function resolveInheritance(allClasses) {
   return edges;
 }
 
-module.exports = { resolveCalls, resolveInheritance };
+//import 조회 맵 생성 헬퍼: 파일 경로 → { import된 이름 → 모듈 경로 }
+function buildImportMap(allImports) {
+  const importMap = new Map();
+  for (const fileImports of allImports) {
+    const map = {};
+    for (const imp of fileImports.imports) {
+      const effectiveName = imp.alias || imp.name;
+      map[effectiveName] = imp.module;
+    }
+    importMap.set(fileImports.filePath, map);
+  }
+  return importMap;
+}
+
+//변수 참조를 해석하여 엣지 배열로 반환한다.
+//3단계 우선순위: 같은 파일 → import → 전역
+function resolveVariableRefs(allVariables, allVariableRefs, allImports) {
+  //변수 이름 → [변수 정보] 맵 생성
+  const varByName = new Map();
+  const varByFile = new Map();
+
+  for (const v of allVariables) {
+    const nodeId = `${v.filePath}::${v.name}`;
+    const entry = { ...v, nodeId };
+
+    const simpleName = v.name.split('.').pop();
+    if (!varByName.has(simpleName)) varByName.set(simpleName, []);
+    varByName.get(simpleName).push(entry);
+
+    if (!varByName.has(v.name)) varByName.set(v.name, []);
+    if (!varByName.get(v.name).includes(entry)) {
+      varByName.get(v.name).push(entry);
+    }
+
+    if (!varByFile.has(v.filePath)) varByFile.set(v.filePath, []);
+    varByFile.get(v.filePath).push(entry);
+  }
+
+  const importMap = buildImportMap(allImports);
+  const edgeMap = new Map();
+
+  for (const ref of allVariableRefs) {
+    const callerNodeId = `${ref.filePath}::${ref.caller}`;
+    const varName = ref.variable;
+
+    //self.x 참조 → className.x로 변환하여 찾기
+    let target = null;
+
+    //1. 같은 파일에서 찾기
+    const fileVars = varByFile.get(ref.filePath) || [];
+
+    if (varName.startsWith('self.')) {
+      //self.x → 같은 파일의 ClassName.x 변수
+      const attrName = varName.substring(5);
+      target = fileVars.find(v => v.name.endsWith('.' + attrName) && v.className);
+    } else {
+      target = fileVars.find(v => v.name === varName || v.name.split('.').pop() === varName);
+    }
+
+    //2. import 기반
+    if (!target) {
+      const fileImports = importMap.get(ref.filePath) || {};
+      const importModule = fileImports[varName];
+      if (importModule) {
+        const candidates = varByName.get(varName) || [];
+        target = candidates.find(v => {
+          const fileBase = v.filePath.replace(/\.py$/, '').replace(/\//g, '.');
+          return fileBase === importModule || fileBase.endsWith('.' + importModule);
+        });
+      }
+    }
+
+    //3. 전역 탐색
+    if (!target) {
+      const simpleName = varName.startsWith('self.') ? varName.substring(5) : varName;
+      const candidates = varByName.get(simpleName) || varByName.get(varName) || [];
+      if (candidates.length > 0) {
+        target = candidates.find(v => v.filePath !== ref.filePath) || candidates[0];
+      }
+    }
+
+    if (!target) continue;
+
+    //자기 자신 참조 방지
+    if (callerNodeId === target.nodeId) continue;
+
+    const edgeKey = `${callerNodeId}→${target.nodeId}`;
+    if (!edgeMap.has(edgeKey)) {
+      edgeMap.set(edgeKey, {
+        source: callerNodeId,
+        target: target.nodeId,
+        type: 'variable-ref',
+        references: [],
+      });
+    }
+    edgeMap.get(edgeKey).references.push({
+      file: ref.filePath,
+      line: ref.line,
+      caller: ref.caller,
+    });
+  }
+
+  return Array.from(edgeMap.values());
+}
+
+module.exports = { resolveCalls, resolveInheritance, resolveVariableRefs };

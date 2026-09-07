@@ -12,7 +12,7 @@
 
 const fs = require('fs');
 const { parseFile } = require('./parser');
-const { resolveCalls, resolveInheritance } = require('./resolver');
+const { resolveCalls, resolveInheritance, resolveVariableRefs } = require('./resolver');
 const { findPythonFiles } = require('./gitService');
 const { computeFileCoupling, normalizeCoupling } = require('./metricsService');
 const { runDiagnostics } = require('./diagnosticsService');
@@ -38,6 +38,8 @@ async function buildGraph(projectPath) {
   const allCalls = [];
   const allImports = [];
   const allClasses = [];
+  const allVariables = [];
+  const allVariableRefs = [];
 
   /* ── 청크 단위 파싱 ── */
   for (let i = 0; i < files.length; i += CHUNK_SIZE) {
@@ -69,6 +71,12 @@ async function buildGraph(projectPath) {
       if (result.classes) {
         allClasses.push(...result.classes);
       }
+      if (result.variables) {
+        allVariables.push(...result.variables);
+      }
+      if (result.variableRefs) {
+        allVariableRefs.push(...result.variableRefs);
+      }
     }
 
     //청크 사이에 이벤트 루프 양보
@@ -82,6 +90,9 @@ async function buildGraph(projectPath) {
 
   //상속 관계를 엣지로 변환
   const inheritanceEdges = resolveInheritance(allClasses);
+
+  //변수 참조를 엣지로 변환
+  const variableEdges = resolveVariableRefs(allVariables, allVariableRefs, allImports);
 
   //결합도 계산
   const { fileCounts } = computeFileCoupling(callEdges);
@@ -103,8 +114,8 @@ async function buildGraph(projectPath) {
     inboundCountMap[targetId] += edge.references.length;
   }
 
-  //3단계 노드 생성 (tier → file → function)
-  const { nodes, tiers } = buildTieredNodes(allFunctions, files, inboundCountMap, couplingScores);
+  //3단계 노드 생성 (tier → file → function + variable)
+  const { nodes, tiers } = buildTieredNodes(allFunctions, files, inboundCountMap, couplingScores, allVariables);
 
   //패키지 노드 생성
   const packageNodes = buildPackageNodes(files);
@@ -116,6 +127,7 @@ async function buildGraph(projectPath) {
     nodes,
     edges: callEdges,
     inheritanceEdges,
+    variableEdges,
     packageNodes,
     tiers,
     warnings,
@@ -129,7 +141,7 @@ async function buildGraph(projectPath) {
 //3단계 Cytoscape 호환 노드 목록 생성 함수다.
 //tier 노드 → file 노드 → function 노드의 3단계 중첩 구조를 만든다.
 //같은 파일이라도 함수의 참조 횟수가 다르면 별도 파일 노드로 분할된다.
-function buildTieredNodes(functions, files, inboundCountMap, couplingScores) {
+function buildTieredNodes(functions, files, inboundCountMap, couplingScores, allVariables) {
   const nodes = [];
 
   //각 함수의 참조 횟수 결정
@@ -223,6 +235,49 @@ function buildTieredNodes(functions, files, inboundCountMap, couplingScores) {
           docstring: func.docstring,
           comment: func.comment,
           inboundRefCount: tierValue,
+        },
+      });
+    }
+  }
+
+  //변수 노드를 파일 노드 자식으로 추가
+  if (allVariables && allVariables.length > 0) {
+    //변수를 파일별로 그룹핑하여 0회 참조 티어에 배치
+    const addedVarIds = new Set();
+    for (const v of allVariables) {
+      const varNodeId = `${v.filePath}::${v.name}`;
+      if (addedVarIds.has(varNodeId)) continue;
+      addedVarIds.add(varNodeId);
+
+      //해당 파일의 0회 참조 티어에 있는 파일 노드를 찾음
+      const fileNodeId = `${v.filePath}__tier0`;
+      const hasFileNode = createdFileNodes.has(fileNodeId);
+
+      //파일 노드가 없으면 생성
+      if (!hasFileNode) {
+        createdFileNodes.add(fileNodeId);
+        nodes.push({
+          data: {
+            id: fileNodeId,
+            label: v.filePath.split('/').pop(),
+            type: 'file',
+            fullPath: v.filePath,
+            parent: 'tier__0',
+            couplingScore: couplingScores[v.filePath] || 0,
+          },
+        });
+      }
+
+      nodes.push({
+        data: {
+          id: varNodeId,
+          label: v.name,
+          type: 'variable',
+          parent: fileNodeId,
+          filePath: v.filePath,
+          name: v.name,
+          className: v.className,
+          line: v.line,
         },
       });
     }

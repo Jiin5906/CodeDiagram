@@ -7,9 +7,14 @@ const collapsedNodes = new Set();
 let allCollapsed = false;
 //엣지 토글 상태 (true = 모든 엣지 표시 중)
 let edgesVisible = false;
+//DOM 이벤트 리스너 중복 등록 방지 플래그
+let domListenersBound = false;
 
 function setupInteractions() {
   if (!cy) return;
+
+  //기존 cytoscape 이벤트 리스너를 모두 제거하여 중복 방지
+  cy.removeAllListeners();
 
   //엣지 클릭 → 참조 위치 팝업 표시
   cy.on('tap', 'edge', function (evt) {
@@ -38,6 +43,18 @@ function setupInteractions() {
     evt.stopPropagation();
   });
 
+  //패키지 뷰에서 파일 노드 클릭 → 파일 상세 뷰
+  cy.on('tap', 'node[type="file"]', function (evt) {
+    if (currentViewMode !== 'package') return;
+    const node = evt.target;
+    const filePath = node.data('fullPath');
+    if (filePath && graphData) {
+      renderFileDetailView(graphData, filePath);
+      setupInteractions();
+    }
+    evt.stopPropagation();
+  });
+
   //빈 배경 클릭 → 팝업 닫기
   cy.on('tap', function (evt) {
     if (evt.target === cy) {
@@ -47,60 +64,78 @@ function setupInteractions() {
     }
   });
 
-  //닫기 버튼
-  document.getElementById('ref-popup-close').addEventListener('click', hideRefPopup);
-  document.getElementById('explain-close').addEventListener('click', () => {
-    hideExplanation();
-    clearHighlights();
-  });
+  //DOM 이벤트 리스너는 한 번만 등록
+  if (!domListenersBound) {
+    domListenersBound = true;
 
-  //코드 보기/숨기기 토글
-  document.getElementById('toggle-code-btn').addEventListener('click', () => {
-    const codeEl = document.getElementById('explain-code');
-    codeEl.classList.toggle('visible');
-    document.getElementById('toggle-code-btn').textContent =
-      codeEl.classList.contains('visible') ? '코드 숨기기' : '전체 코드 보기';
-  });
+    //뒤로가기 버튼 핸들러
+    document.getElementById('back-to-package-btn').addEventListener('click', () => {
+      if (!graphData) return;
+      if (currentViewMode === 'file-detail') {
+        renderPackageView(graphData);
+        setupInteractions();
+        document.getElementById('back-to-package-btn').classList.add('hidden');
+        document.getElementById('view-toggle-btn').textContent = '패키지 뷰';
+        document.getElementById('view-toggle-btn').classList.add('active');
+      }
+    });
 
-  //진단 패널 닫기
-  document.getElementById('diagnostics-close').addEventListener('click', () => {
-    document.getElementById('diagnostics-panel').classList.add('hidden');
-  });
+    //닫기 버튼
+    document.getElementById('ref-popup-close').addEventListener('click', hideRefPopup);
+    document.getElementById('explain-close').addEventListener('click', () => {
+      hideExplanation();
+      clearHighlights();
+    });
 
-  //뷰 모드 토글 버튼
-  document.getElementById('view-toggle-btn').addEventListener('click', () => {
-    if (!graphData) return;
-    if (currentViewMode === 'function') {
-      renderPackageView(graphData);
-      document.getElementById('view-toggle-btn').textContent = '패키지 뷰';
-      document.getElementById('view-toggle-btn').classList.add('active');
-    } else {
-      renderGraph(graphData);
-      setupInteractions();
-      document.getElementById('view-toggle-btn').textContent = '함수 뷰';
-      document.getElementById('view-toggle-btn').classList.remove('active');
-    }
-  });
+    //코드 보기/숨기기 토글
+    document.getElementById('toggle-code-btn').addEventListener('click', () => {
+      const codeEl = document.getElementById('explain-code');
+      codeEl.classList.toggle('visible');
+      document.getElementById('toggle-code-btn').textContent =
+        codeEl.classList.contains('visible') ? '코드 숨기기' : '전체 코드 보기';
+    });
 
-  //전체 접기/펼치기 버튼
-  document.getElementById('collapse-all-btn').addEventListener('click', () => {
-    if (!cy) return;
-    const fileNodes = cy.nodes('[type="file"]');
-    if (allCollapsed) {
-      //전체 펼치기
-      fileNodes.forEach(node => expandNode(node));
-      allCollapsed = false;
-      document.getElementById('collapse-all-btn').textContent = '전체 접기';
-    } else {
-      //전체 접기
-      fileNodes.forEach(node => collapseNode(node));
-      allCollapsed = true;
-      document.getElementById('collapse-all-btn').textContent = '전체 펼치기';
-    }
-  });
+    //진단 패널 닫기
+    document.getElementById('diagnostics-close').addEventListener('click', () => {
+      document.getElementById('diagnostics-panel').classList.add('hidden');
+    });
 
-  setupSearch();
-  setupEdgeToggle();
+    //뷰 모드 토글 버튼
+    document.getElementById('view-toggle-btn').addEventListener('click', () => {
+      if (!graphData) return;
+      if (currentViewMode === 'function') {
+        renderPackageView(graphData);
+        document.getElementById('view-toggle-btn').textContent = '패키지 뷰';
+        document.getElementById('view-toggle-btn').classList.add('active');
+      } else {
+        renderGraph(graphData);
+        setupInteractions();
+        document.getElementById('view-toggle-btn').textContent = '함수 뷰';
+        document.getElementById('view-toggle-btn').classList.remove('active');
+        document.getElementById('back-to-package-btn').classList.add('hidden');
+      }
+    });
+
+    //전체 접기/펼치기 버튼
+    document.getElementById('collapse-all-btn').addEventListener('click', () => {
+      if (!cy) return;
+      const fileNodes = cy.nodes('[type="file"]');
+      if (allCollapsed) {
+        //전체 펼치기
+        fileNodes.forEach(node => expandNode(node));
+        allCollapsed = false;
+        document.getElementById('collapse-all-btn').textContent = '전체 접기';
+      } else {
+        //전체 접기
+        fileNodes.forEach(node => collapseNode(node));
+        allCollapsed = true;
+        document.getElementById('collapse-all-btn').textContent = '전체 펼치기';
+      }
+    });
+
+    setupSearch();
+    setupEdgeToggle();
+  }
 }
 
 /* ── 접기/펼치기 (드릴다운) ── */
@@ -267,10 +302,12 @@ function showDiagnosticsPanel(diagnostics, suggestions) {
       text.textContent = sug.suggestion;
       item.appendChild(text);
 
+      //액션 버튼 영역
+      const actions = document.createElement('div');
+      actions.className = 'suggestion-actions';
+
       //순환 참조 제안에 미리보기 버튼 추가
       if (sug.type === 'cycle' && sug.relatedNodes && sug.relatedNodes.length > 1) {
-        const actions = document.createElement('div');
-        actions.className = 'suggestion-actions';
         const previewBtn = document.createElement('button');
         previewBtn.className = 'suggestion-preview-btn';
         previewBtn.textContent = '미리보기';
@@ -280,8 +317,19 @@ function showDiagnosticsPanel(diagnostics, suggestions) {
           }
         });
         actions.appendChild(previewBtn);
-        item.appendChild(actions);
       }
+
+      //모든 제안에 Diff 보기 버튼 추가
+      const diffBtn = document.createElement('button');
+      diffBtn.className = 'suggestion-preview-btn';
+      diffBtn.textContent = 'Diff 보기';
+      diffBtn.addEventListener('click', () => {
+        if (typeof showDiffView === 'function') {
+          showDiffView(sug);
+        }
+      });
+      actions.appendChild(diffBtn);
+      item.appendChild(actions);
 
       suggestionsContent.appendChild(item);
     }

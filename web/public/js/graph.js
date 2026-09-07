@@ -24,7 +24,7 @@ function initGraph(container) {
           'label': 'data(label)',
           'text-valign': 'top',
           'text-halign': 'center',
-          'font-size': '30px',
+          'font-size': '39px',
           'color': '#fbbf24',
           'padding': '30px',
           'text-margin-y': '-6px',
@@ -51,7 +51,7 @@ function initGraph(container) {
           'label': 'data(label)',
           'text-valign': 'top',
           'text-halign': 'center',
-          'font-size': '18px',
+          'font-size': '23px',
           'color': '#4ade80',
           'padding': '40px',
           'text-margin-y': '-4px',
@@ -74,7 +74,7 @@ function initGraph(container) {
           'label': 'data(label)',
           'text-valign': 'top',
           'text-halign': 'center',
-          'font-size': '19px',
+          'font-size': '25px',
           'color': '#93c5fd',
           'padding': '18px',
           'text-margin-y': '-2px',
@@ -107,7 +107,7 @@ function initGraph(container) {
           'label': 'data(label)',
           'text-valign': 'center',
           'text-halign': 'center',
-          'font-size': '19px',
+          'font-size': '25px',
           'color': '#e2e8f0',
           'width': 'label',
           'height': '40px',
@@ -117,9 +117,38 @@ function initGraph(container) {
           'z-compound-depth': 'top',
         },
       },
+      //변수 노드 — 다이아몬드 모양, 청록색
+      {
+        selector: 'node[type="variable"]',
+        style: {
+          'shape': 'diamond',
+          'background-color': '#134e4a',
+          'border-color': '#14b8a6',
+          'border-width': 1.5,
+          'label': 'data(label)',
+          'text-valign': 'center',
+          'text-halign': 'center',
+          'font-size': '21px',
+          'color': '#5eead4',
+          'width': 'label',
+          'height': '36px',
+          'padding': '14px',
+          'font-family': '"Cascadia Code", "Fira Code", Consolas, monospace',
+          'text-wrap': 'none',
+          'z-compound-depth': 'top',
+        },
+      },
+      //클래스 필드 변수 — 보라색 강조
+      {
+        selector: 'node[type="variable"][className]',
+        style: {
+          'border-color': '#a78bfa',
+          'color': '#c4b5fd',
+        },
+      },
       //클래스 메서드 노드 — 보라색 강조
       {
-        selector: 'node[className]',
+        selector: 'node[type="function"][className]',
         style: {
           'border-color': '#7c3aed',
           'color': '#c4b5fd',
@@ -172,13 +201,25 @@ function initGraph(container) {
         selector: 'edge[refCount > 1]',
         style: {
           'label': 'data(refCount)',
-          'font-size': '12px',
+          'font-size': '36px',
           'color': '#94a3b8',
           'text-background-color': '#0a0e17',
           'text-background-opacity': 1,
           'text-background-padding': '3px',
           'text-background-shape': 'roundrectangle',
           'font-weight': 'bold',
+        },
+      },
+      //변수 참조 엣지 — 청록색 점선
+      {
+        selector: 'edge[edgeType="variable-ref"]',
+        style: {
+          'line-color': '#14b8a6',
+          'line-style': 'dashed',
+          'target-arrow-color': '#14b8a6',
+          'target-arrow-shape': 'triangle',
+          'width': 1.5,
+          'line-opacity': 0.6,
         },
       },
       //상속 엣지 — 보라색 점선
@@ -269,12 +310,18 @@ function renderGraph(data) {
       connectedIds.add(edge.target);
     }
   }
+  if (data.variableEdges) {
+    for (const edge of data.variableEdges) {
+      connectedIds.add(edge.source);
+      connectedIds.add(edge.target);
+    }
+  }
 
-  //유지할 함수/파일/티어 결정
+  //유지할 함수/변수/파일/티어 결정
   const keptFiles = new Set();
   const keptTiers = new Set();
   for (const node of data.nodes) {
-    if (node.data.type === 'function' && connectedIds.has(node.data.id)) {
+    if ((node.data.type === 'function' || node.data.type === 'variable') && connectedIds.has(node.data.id)) {
       keptFiles.add(node.data.parent);
     }
   }
@@ -284,10 +331,11 @@ function renderGraph(data) {
     }
   }
 
-  //노드 추가 (엣지 없는 고립 함수와 빈 컨테이너 제외)
+  //노드 추가 (엣지 없는 고립 함수/변수와 빈 컨테이너 제외)
   const elements = [];
   for (const node of data.nodes) {
     if (node.data.type === 'function' && !connectedIds.has(node.data.id)) continue;
+    if (node.data.type === 'variable' && !connectedIds.has(node.data.id)) continue;
     if (node.data.type === 'file' && !keptFiles.has(node.data.id)) continue;
     if (node.data.type === 'tier' && !keptTiers.has(node.data.id)) continue;
     elements.push(node);
@@ -319,6 +367,24 @@ function renderGraph(data) {
             source: edge.source,
             target: edge.target,
             edgeType: 'inheritance',
+          },
+        });
+      }
+    }
+  }
+
+  //변수 참조 엣지 추가
+  if (data.variableEdges) {
+    for (const edge of data.variableEdges) {
+      if (addedNodeIds.has(edge.source) && addedNodeIds.has(edge.target)) {
+        elements.push({
+          data: {
+            id: `varref__${edge.source}->${edge.target}`,
+            source: edge.source,
+            target: edge.target,
+            edgeType: 'variable-ref',
+            refCount: edge.references.length,
+            references: edge.references,
           },
         });
       }
@@ -578,6 +644,145 @@ function arrangeTiers(sortedTiers) {
 
   console.log(`[layout] rows: ${tierRows.length}, rowSizes: [${tierRows.map(r => r.length).join(',')}], targetWidth: ${targetWidth}`);
   cy.fit(undefined, 20);
+
+  //초기 줌: 노드 수에 따라 동적 조정 후 첫 함수 노드 중심으로 패닝
+  const leafNodes = cy.nodes('[type="function"], [type="variable"]');
+  const nodeCount = leafNodes.length;
+  //노드가 적으면 약간 확대, 많으면 전체가 보이도록 축소
+  const zoomLevel = nodeCount <= 10 ? 1.2
+    : nodeCount <= 30 ? 0.9
+    : nodeCount <= 80 ? 0.7
+    : 0.5;
+  const firstFunc = cy.nodes('[type="function"]')[0];
+  if (firstFunc) {
+    cy.zoom({ level: zoomLevel, position: firstFunc.position() });
+    cy.center(firstFunc);
+  }
+}
+
+//파일 상세 뷰: 해당 파일의 함수 노드만 + 외부 연결 스텁 노드 표시
+function renderFileDetailView(data, filePath) {
+  if (!cy || !data) return;
+  currentViewMode = 'file-detail';
+
+  cy.elements().remove();
+  const elements = [];
+
+  //해당 파일의 함수/변수 노드 수집
+  const fileNodeIds = new Set();
+  for (const node of data.nodes) {
+    if ((node.data.type === 'function' || node.data.type === 'variable') && node.data.filePath === filePath) {
+      fileNodeIds.add(node.data.id);
+      elements.push({
+        data: {
+          ...node.data,
+          parent: undefined, //부모 없이 자유 배치
+        },
+      });
+    }
+  }
+
+  //외부 연결 스텁 노드 수집
+  const stubIds = new Set();
+  const allEdges = [...(data.edges || []), ...(data.variableEdges || [])];
+
+  for (const edge of allEdges) {
+    const srcIn = fileNodeIds.has(edge.source);
+    const tgtIn = fileNodeIds.has(edge.target);
+
+    if (srcIn && !tgtIn && !stubIds.has(edge.target)) {
+      stubIds.add(edge.target);
+      const name = edge.target.split('::').pop();
+      const file = edge.target.split('::')[0];
+      elements.push({
+        data: {
+          id: edge.target,
+          label: name,
+          type: 'function',
+          filePath: file,
+          qualifiedName: name,
+          isStub: true,
+        },
+      });
+    }
+
+    if (tgtIn && !srcIn && !stubIds.has(edge.source)) {
+      stubIds.add(edge.source);
+      const name = edge.source.split('::').pop();
+      const file = edge.source.split('::')[0];
+      elements.push({
+        data: {
+          id: edge.source,
+          label: name,
+          type: 'function',
+          filePath: file,
+          qualifiedName: name,
+          isStub: true,
+        },
+      });
+    }
+  }
+
+  //관련 엣지 추가
+  const allNodeIds = new Set([...fileNodeIds, ...stubIds]);
+  for (const edge of data.edges) {
+    if (allNodeIds.has(edge.source) && allNodeIds.has(edge.target)) {
+      elements.push({
+        data: {
+          id: `${edge.source}->${edge.target}`,
+          source: edge.source,
+          target: edge.target,
+          refCount: edge.references.length,
+          references: edge.references,
+          edgeType: 'call',
+        },
+      });
+    }
+  }
+
+  if (data.variableEdges) {
+    for (const edge of data.variableEdges) {
+      if (allNodeIds.has(edge.source) && allNodeIds.has(edge.target)) {
+        elements.push({
+          data: {
+            id: `varref__${edge.source}->${edge.target}`,
+            source: edge.source,
+            target: edge.target,
+            edgeType: 'variable-ref',
+            refCount: edge.references.length,
+            references: edge.references,
+          },
+        });
+      }
+    }
+  }
+
+  cy.add(elements);
+
+  //스텁 노드에 특수 스타일 적용
+  cy.nodes('[?isStub]').style({
+    'opacity': 0.5,
+    'border-style': 'dashed',
+  });
+
+  //모든 엣지 표시
+  cy.edges().style({ 'display': 'element', 'line-opacity': 0.6 });
+
+  cy.layout({
+    name: 'fcose',
+    animate: false,
+    fit: true,
+    padding: 60,
+    nodeDimensionsIncludeLabels: true,
+    idealEdgeLength: 80,
+    nodeRepulsion: 5000,
+    quality: 'default',
+    randomize: true,
+    numIter: 1000,
+  }).run();
+
+  //뒤로가기 버튼 표시
+  document.getElementById('back-to-package-btn').classList.remove('hidden');
 }
 
 function highlightNode(nodeId) {

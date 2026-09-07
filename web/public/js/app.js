@@ -52,13 +52,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
       renderGraph(data);
       setupInteractions();
+      buildFileTree(data);
+      setupFileTree();
 
-      //툴바 버튼 표시
+      //툴바 버튼 및 구분선 표시
       document.getElementById('search-input').classList.remove('hidden');
       document.getElementById('toggle-edges-btn').classList.remove('hidden');
       document.getElementById('view-toggle-btn').classList.remove('hidden');
       document.getElementById('diagnostics-btn').classList.remove('hidden');
       document.getElementById('collapse-all-btn').classList.remove('hidden');
+      document.getElementById('file-tree-toggle').classList.remove('hidden');
+      document.getElementById('divider-1').classList.remove('hidden');
+      document.getElementById('divider-2').classList.remove('hidden');
 
       //엣지 토글 상태 초기화
       edgesVisible = false;
