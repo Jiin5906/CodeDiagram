@@ -99,4 +99,81 @@ function findPythonFiles(dirPath) {
   return { files, warnings };
 }
 
-module.exports = { getProjectPath, findPythonFiles };
+//디렉토리에서 지원하는 모든 파일(.py, .html, .css, .js)을 재귀적으로 찾는 함수다.
+//반환값에 language 필드를 포함한다.
+const SUPPORTED_EXTENSIONS = {
+  '.py': 'python',
+  '.html': 'html',
+  '.htm': 'html',
+  '.css': 'css',
+  '.js': 'javascript',
+  '.cpp': 'cpp',
+  '.cc': 'cpp',
+  '.cxx': 'cpp',
+  '.h': 'cpp',
+  '.hpp': 'cpp',
+  '.cs': 'csharp',
+};
+
+function findFiles(dirPath) {
+  const files = [];
+  const warnings = [];
+  const MAX_FILES = 200;
+  const MAX_SIZE = 100 * 1024; // 100KB
+
+  function walk(dir) {
+    if (files.length >= MAX_FILES) return;
+
+    let entries;
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+
+    for (const entry of entries) {
+      if (files.length >= MAX_FILES) break;
+
+      const fullPath = path.join(dir, entry.name);
+
+      if (entry.isDirectory()) {
+        if (entry.name.startsWith('.') || entry.name === '__pycache__' ||
+            entry.name === 'venv' || entry.name === 'node_modules' ||
+            entry.name === '.git' || entry.name === 'env' ||
+            entry.name === 'dist' || entry.name === 'build' ||
+            entry.name === 'vendor' || entry.name === 'bower_components' ||
+            entry.name === 'bin' || entry.name === 'obj' ||
+            entry.name === 'Debug' || entry.name === 'Release' ||
+            entry.name === 'cmake-build-debug' || entry.name === 'cmake-build-release') {
+          continue;
+        }
+        walk(fullPath);
+      } else {
+        const ext = path.extname(entry.name).toLowerCase();
+        const language = SUPPORTED_EXTENSIONS[ext];
+        if (!language) continue;
+
+        const stat = fs.statSync(fullPath);
+        if (stat.size > MAX_SIZE) {
+          warnings.push(`Skipped ${path.relative(dirPath, fullPath)}: file too large (${Math.round(stat.size / 1024)}KB)`);
+          continue;
+        }
+        files.push({
+          path: fullPath,
+          relativePath: path.relative(dirPath, fullPath).replace(/\\/g, '/'),
+          language,
+        });
+      }
+    }
+  }
+
+  walk(dirPath);
+
+  if (files.length >= MAX_FILES) {
+    warnings.push(`Stopped after ${MAX_FILES} files`);
+  }
+
+  return { files, warnings };
+}
+
+module.exports = { getProjectPath, findPythonFiles, findFiles };

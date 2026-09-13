@@ -92,25 +92,138 @@ for (const edge of edges) {
 // --- GraphBuilder Tests ---
 console.log('\n=== GraphBuilder Tests ===');
 
-const graph = buildGraph(fixturesDir);
+(async () => {
+  const graph = await buildGraph(fixturesDir);
 
-assert(Array.isArray(graph.nodes), 'graph has nodes array');
-assert(Array.isArray(graph.edges), 'graph has edges array');
+  assert(Array.isArray(graph.nodes), 'graph has nodes array');
+  assert(Array.isArray(graph.edges), 'graph has edges array');
 
-const fileNodes = graph.nodes.filter(n => n.data.type === 'file');
-assert(fileNodes.length >= 3, 'at least 3 file nodes');
-assertContains(fileNodes.map(n => n.data.id), 'main.py', 'has main.py file node');
+  const fileNodes = graph.nodes.filter(n => n.data.type === 'file');
+  assert(fileNodes.length >= 3, 'at least 3 file nodes');
 
-const funcNodes = graph.nodes.filter(n => n.data.type === 'function');
-assert(funcNodes.length > 0, 'has function nodes');
+  const funcNodes = graph.nodes.filter(n => n.data.type === 'function');
+  assert(funcNodes.length > 0, 'has function nodes');
 
-for (const node of funcNodes) {
-  assertDefined(node.data.parent, `function ${node.data.id} has parent`);
-  assertDefined(node.data.code, `function ${node.data.id} has code`);
-}
+  for (const node of funcNodes) {
+    assertDefined(node.data.parent, `function ${node.data.id} has parent`);
+    assertDefined(node.data.code, `function ${node.data.id} has code`);
+  }
 
-assert(graph.edges.length > 0, 'has edges');
+  assert(graph.edges.length > 0, 'has edges');
 
-// --- Summary ---
-console.log(`\n=== Results: ${passed} passed, ${failed} failed ===`);
-process.exit(failed > 0 ? 1 : 0);
+  //다중 언어 지원 확인
+  assertDefined(graph.fileCounts, 'graph has fileCounts');
+  assertDefined(graph.webEdges, 'graph has webEdges');
+
+  // --- C++ Parser Tests ---
+  console.log('\n=== C++ Parser Tests ===');
+
+  const cppFixturesDir = path.join(__dirname, 'fixtures', 'cpp_project');
+
+  const cppMainCode = fs.readFileSync(path.join(cppFixturesDir, 'main.cpp'), 'utf-8');
+  const cppMainResult = parseFile(cppMainCode, 'main.cpp', 'cpp');
+
+  assertContains(cppMainResult.functions.map(f => f.name), 'main', '[C++] extracts main function');
+  assert(cppMainResult.imports.length >= 2, '[C++] extracts #include directives');
+  assertContains(cppMainResult.imports.map(i => i.name), 'calculator.h', '[C++] includes calculator.h');
+  assertContains(cppMainResult.imports.map(i => i.name), 'utils.h', '[C++] includes utils.h');
+
+  const cppMainCalls = cppMainResult.calls.filter(c => c.caller === 'main');
+  assert(cppMainCalls.length > 0, '[C++] main has function calls');
+  assert(cppMainCalls.some(c => c.callee.includes('add')), '[C++] main calls add');
+  assert(cppMainCalls.some(c => c.callee === 'parse_number'), '[C++] main calls parse_number');
+
+  const cppCalcCode = fs.readFileSync(path.join(cppFixturesDir, 'calculator.cpp'), 'utf-8');
+  const cppCalcResult = parseFile(cppCalcCode, 'calculator.cpp', 'cpp');
+
+  //클래스 메서드 추출 확인 (Calculator::add → Calculator.add)
+  assertContains(cppCalcResult.functions.map(f => f.qualifiedName), 'Calculator.add', '[C++] extracts Calculator.add');
+  assertContains(cppCalcResult.functions.map(f => f.qualifiedName), 'Calculator.multiply', '[C++] extracts Calculator.multiply');
+  assertContains(cppCalcResult.functions.map(f => f.qualifiedName), 'ScientificCalculator.power', '[C++] extracts ScientificCalculator.power');
+
+  //클래스 및 상속
+  const cppCalcHCode = fs.readFileSync(path.join(cppFixturesDir, 'calculator.h'), 'utf-8');
+  const cppCalcHResult = parseFile(cppCalcHCode, 'calculator.h', 'cpp');
+
+  assert(cppCalcHResult.classes.length >= 2, '[C++] extracts classes from header');
+  const cppSciClass = cppCalcHResult.classes.find(c => c.name === 'ScientificCalculator');
+  assertDefined(cppSciClass, '[C++] extracts ScientificCalculator class');
+  assert(cppSciClass && cppSciClass.superclasses.includes('Calculator'), '[C++] ScientificCalculator inherits Calculator');
+
+  //변수 추출
+  const cppCalcClass = cppCalcHResult.classes.find(c => c.name === 'Calculator');
+  assertDefined(cppCalcClass, '[C++] extracts Calculator class');
+  assert(cppCalcHResult.variables.some(v => v.name === 'Calculator.value'), '[C++] extracts Calculator.value field');
+
+  //utils.cpp 함수-호출 관계
+  const cppUtilsCode = fs.readFileSync(path.join(cppFixturesDir, 'utils.cpp'), 'utf-8');
+  const cppUtilsResult = parseFile(cppUtilsCode, 'utils.cpp', 'cpp');
+
+  assertContains(cppUtilsResult.functions.map(f => f.name), 'trim', '[C++] extracts trim function');
+  assertContains(cppUtilsResult.functions.map(f => f.name), 'parse_number', '[C++] extracts parse_number function');
+  const cppParseNumCalls = cppUtilsResult.calls.filter(c => c.caller === 'parse_number');
+  assert(cppParseNumCalls.some(c => c.callee === 'trim'), '[C++] parse_number calls trim');
+
+  // --- C++ GraphBuilder Test ---
+  console.log('\n=== C++ GraphBuilder Tests ===');
+
+  const cppGraph = await buildGraph(cppFixturesDir);
+  assert(Array.isArray(cppGraph.nodes), '[C++] graph has nodes');
+  assert(cppGraph.nodes.filter(n => n.data.type === 'function').length > 0, '[C++] graph has function nodes');
+  assert(cppGraph.fileCounts.cpp > 0, '[C++] fileCounts has cpp');
+
+  // --- C# Parser Tests ---
+  console.log('\n=== C# Parser Tests ===');
+
+  const csFixturesDir = path.join(__dirname, 'fixtures', 'csharp_project');
+
+  const csProgramCode = fs.readFileSync(path.join(csFixturesDir, 'Program.cs'), 'utf-8');
+  const csProgramResult = parseFile(csProgramCode, 'Program.cs', 'csharp');
+
+  assertContains(csProgramResult.functions.map(f => f.name), 'Main', '[C#] extracts Main method');
+  assert(csProgramResult.imports.length >= 1, '[C#] extracts using directives');
+
+  const csMainCalls = csProgramResult.calls.filter(c => c.caller === 'Program.Main');
+  assert(csMainCalls.length > 0, '[C#] Main has method calls');
+
+  const csCalcCode = fs.readFileSync(path.join(csFixturesDir, 'Calculator.cs'), 'utf-8');
+  const csCalcResult = parseFile(csCalcCode, 'Calculator.cs', 'csharp');
+
+  //클래스 메서드 추출
+  assertContains(csCalcResult.functions.map(f => f.qualifiedName), 'Calculator.Add', '[C#] extracts Calculator.Add');
+  assertContains(csCalcResult.functions.map(f => f.qualifiedName), 'Calculator.Multiply', '[C#] extracts Calculator.Multiply');
+  assertContains(csCalcResult.functions.map(f => f.qualifiedName), 'ScientificCalculator.Power', '[C#] extracts ScientificCalculator.Power');
+
+  //클래스 및 상속
+  assert(csCalcResult.classes.length >= 2, '[C#] extracts classes');
+  const csSciClass = csCalcResult.classes.find(c => c.name === 'ScientificCalculator');
+  assertDefined(csSciClass, '[C#] extracts ScientificCalculator class');
+  assert(csSciClass && csSciClass.superclasses.includes('Calculator'), '[C#] ScientificCalculator inherits Calculator');
+
+  //프로퍼티를 변수로 추출
+  assert(csCalcResult.variables.some(v => v.name === 'Calculator.Value'), '[C#] extracts Calculator.Value property');
+
+  //생성자 추출
+  assertContains(csCalcResult.functions.map(f => f.qualifiedName), 'Calculator.Calculator', '[C#] extracts Calculator constructor');
+
+  //Utils.cs
+  const csUtilsCode = fs.readFileSync(path.join(csFixturesDir, 'Utils.cs'), 'utf-8');
+  const csUtilsResult = parseFile(csUtilsCode, 'Utils.cs', 'csharp');
+
+  assertContains(csUtilsResult.functions.map(f => f.name), 'Trim', '[C#] extracts Trim method');
+  assertContains(csUtilsResult.functions.map(f => f.name), 'ParseNumber', '[C#] extracts ParseNumber method');
+  const csParseNumCalls = csUtilsResult.calls.filter(c => c.caller === 'Utils.ParseNumber');
+  assert(csParseNumCalls.some(c => c.callee === 'Trim'), '[C#] ParseNumber calls Trim');
+
+  // --- C# GraphBuilder Test ---
+  console.log('\n=== C# GraphBuilder Tests ===');
+
+  const csGraph = await buildGraph(csFixturesDir);
+  assert(Array.isArray(csGraph.nodes), '[C#] graph has nodes');
+  assert(csGraph.nodes.filter(n => n.data.type === 'function').length > 0, '[C#] graph has function nodes');
+  assert(csGraph.fileCounts.csharp > 0, '[C#] fileCounts has csharp');
+
+  // --- Summary ---
+  console.log(`\n=== Results: ${passed} passed, ${failed} failed ===`);
+  process.exit(failed > 0 ? 1 : 0);
+})();

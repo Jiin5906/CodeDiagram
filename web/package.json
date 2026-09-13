@@ -1,7 +1,7 @@
 {
   "name": "code-diagram",
   "version": "1.0.0",
-  "description": "Python code structure visualizer",
+  "description": "Code structure visualizer (Python, HTML, CSS, JS)",
   "main": "server/index.js",
   "scripts": {
     "start": "node server/index.js",
@@ -14,6 +14,11 @@
     "express": "^4.21.0",
     "simple-git": "^3.27.0",
     "tree-sitter": "^0.22.4",
+    "tree-sitter-c-sharp": "^0.21.3",
+    "tree-sitter-cpp": "^0.23.4",
+    "tree-sitter-css": "^0.23.2",
+    "tree-sitter-html": "^0.23.2",
+    "tree-sitter-javascript": "^0.23.1",
     "tree-sitter-python": "^0.23.6"
   },
   "devDependencies": {

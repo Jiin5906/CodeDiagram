@@ -157,12 +157,150 @@ function detectAntiPatterns(functions, classes) {
   return issues;
 }
 
+/* ── 웹 전용 안티패턴 탐지 ── */
+
+//웹 파일에서 안티패턴을 탐지한다.
+const INLINE_STYLE_THRESHOLD = 10;
+const LARGE_JS_LINES = 300;
+const EVENT_LISTENER_THRESHOLD = 10;
+
+function detectWebAntiPatterns(webParsedFiles) {
+  if (!webParsedFiles || webParsedFiles.length === 0) return [];
+
+  const issues = [];
+
+  //HTML 요소 인덱스 (미사용 셀렉터/함수 탐지용)
+  const htmlIds = new Set();
+  const htmlClasses = new Set();
+  const allHtmlElements = [];
+
+  //JS 함수 정의/호출 인덱스
+  const jsDefinedFuncs = new Set();
+  const jsCalledFuncs = new Set();
+
+  //CSS 셀렉터 인덱스
+  const allSelectors = [];
+
+  for (const pf of webParsedFiles) {
+    if (pf.language === 'html') {
+      //인라인 스타일 과다 탐지
+      let inlineStyleCount = 0;
+      for (const elem of (pf.parsed.elements || [])) {
+        if (elem.id) htmlIds.add(elem.id);
+        for (const cls of elem.classes) htmlClasses.add(cls);
+        allHtmlElements.push(elem);
+
+        //인라인 style 속성 카운트 (dataAttrs에 포함되지 않으므로 elements에서 직접 체크 불가)
+        //HTML 파서가 style 속성을 별도로 추출하지 않으므로 raw 텍스트로 체크
+      }
+
+      //인라인 스크립트/스타일 개수로 인라인 스타일 과다 판단
+      if (pf.parsed.inlineStyles && pf.parsed.inlineStyles.length > 3) {
+        issues.push({
+          type: 'excessive_inline_style',
+          nodeId: pf.filePath,
+          message: `${pf.filePath}: 인라인 <style> 태그 ${pf.parsed.inlineStyles.length}개 — 외부 CSS 파일 사용을 권장합니다`,
+          severity: 'info',
+        });
+      }
+    }
+
+    if (pf.language === 'css') {
+      for (const sel of (pf.parsed.selectors || [])) {
+        allSelectors.push({ ...sel, sourceFile: pf.filePath });
+      }
+    }
+
+    if (pf.language === 'javascript') {
+      //거대 JS 파일 탐지
+      for (const func of (pf.parsed.functions || [])) {
+        jsDefinedFuncs.add(func.name);
+        const lineCount = func.endLine - func.startLine + 1;
+        if (lineCount >= GOD_FUNCTION_LINES) {
+          issues.push({
+            type: 'god_function',
+            nodeId: `${pf.filePath}::${func.qualifiedName}`,
+            message: `${func.qualifiedName}은 ${lineCount}줄 — 함수 분리를 권장합니다`,
+            severity: 'info',
+          });
+        }
+      }
+
+      for (const call of (pf.parsed.calls || [])) {
+        jsCalledFuncs.add(call.callee.split('.').pop());
+      }
+
+      //이벤트 리스너 과다 탐지
+      const eventBindings = pf.parsed.eventBindings || [];
+      if (eventBindings.length >= EVENT_LISTENER_THRESHOLD) {
+        issues.push({
+          type: 'excessive_event_listeners',
+          nodeId: pf.filePath,
+          message: `${pf.filePath}: 이벤트 리스너 ${eventBindings.length}개 — 이벤트 위임 패턴 사용을 권장합니다`,
+          severity: 'warning',
+        });
+      }
+    }
+  }
+
+  //미사용 CSS 셀렉터 탐지
+  for (const sel of allSelectors) {
+    let isUsed = false;
+    for (const id of sel.ids) {
+      if (htmlIds.has(id)) { isUsed = true; break; }
+    }
+    if (!isUsed) {
+      for (const cls of sel.classes) {
+        if (htmlClasses.has(cls)) { isUsed = true; break; }
+      }
+    }
+    if (!isUsed && sel.tags.length > 0) {
+      isUsed = true; //태그 셀렉터는 항상 사용 가능성 있음
+    }
+    if (!isUsed && sel.ids.length === 0 && sel.classes.length === 0 && sel.tags.length === 0) {
+      isUsed = true; //파싱 불가 셀렉터는 무시
+    }
+
+    if (!isUsed) {
+      issues.push({
+        type: 'unused_css_selector',
+        nodeId: `${sel.sourceFile}::${sel.raw}`,
+        message: `미사용 CSS 셀렉터: ${sel.raw} (${sel.sourceFile}:${sel.line})`,
+        severity: 'info',
+      });
+    }
+  }
+
+  //미사용 JS 함수 탐지
+  for (const pf of webParsedFiles) {
+    if (pf.language === 'javascript') {
+      for (const func of (pf.parsed.functions || [])) {
+        if (!jsCalledFuncs.has(func.name) && func.name !== 'anonymous' &&
+            !func.name.startsWith('_') && func.name !== 'constructor') {
+          issues.push({
+            type: 'unused_js_function',
+            nodeId: `${pf.filePath}::${func.qualifiedName}`,
+            message: `미사용 JS 함수: ${func.qualifiedName} (${pf.filePath}:${func.startLine})`,
+            severity: 'info',
+          });
+        }
+      }
+    }
+  }
+
+  return issues;
+}
+
 //전체 진단을 실행하고 결과를 반환한다.
-function runDiagnostics(edges, functions, classes) {
+function runDiagnostics(edges, functions, classes, webParsedFiles) {
   const funcCycles = detectCycles(edges);
   const fileCycles = detectFileCycles(edges);
   const couplingIssues = detectCouplingIssues(edges);
   const antiPatterns = detectAntiPatterns(functions, classes || []);
+
+  //웹 전용 안티패턴 추가
+  const webAntiPatterns = detectWebAntiPatterns(webParsedFiles);
+  antiPatterns.push(...webAntiPatterns);
 
   return {
     cycles: {

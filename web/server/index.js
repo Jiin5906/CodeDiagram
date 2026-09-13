@@ -18,8 +18,17 @@ app.use(express.static(path.join(__dirname, '..', 'public')));
 app.use('/api/analyze', analyzeRouter);
 app.use('/api/explain', explainRouter);
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
+});
+
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`포트 ${PORT}이(가) 이미 사용 중입니다. 기존 프로세스를 종료하거나 다른 포트를 사용하세요.`);
+    console.error(`다른 포트 사용: PORT=3001 node server/index.js`);
+    process.exit(1);
+  }
+  throw err;
 });
 
 module.exports = app;

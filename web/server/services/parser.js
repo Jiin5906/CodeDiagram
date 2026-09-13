@@ -1,8 +1,13 @@
-//파이썬 파일을 파싱하는 코드
-//tree-sitter를 사용하여 파이썬 파일을 파싱한다.
+//코드 파일을 파싱하는 코드
+//tree-sitter를 사용하여 Python, HTML, CSS, JS 파일을 파싱한다.
 
 const Parser = require('tree-sitter');
 const Python = require('tree-sitter-python');
+const { parseHtml } = require('./parsers/htmlParser');
+const { parseCss } = require('./parsers/cssParser');
+const { parseJs } = require('./parsers/jsParser');
+const { parseCpp } = require('./parsers/cppParser');
+const { parseCsharp } = require('./parsers/csharpParser');
 
 function createParser() {
   const p = new Parser();
@@ -10,8 +15,23 @@ function createParser() {
   return p;
 }
 
+//언어별 파서 팩토리. language를 지정하면 해당 파서를, 생략하면 Python 파서를 사용한다.
+function parseFile(code, filePath, language) {
+  if (language && language !== 'python') {
+    switch (language) {
+      case 'html': return parseHtml(code, filePath);
+      case 'css':  return parseCss(code, filePath);
+      case 'javascript': return parseJs(code, filePath);
+      case 'cpp': return parseCpp(code, filePath);
+      case 'csharp': return parseCsharp(code, filePath);
+      default: return null;
+    }
+  }
+  return parsePython(code, filePath);
+}
+
 //파이썬 파일 하나를 파싱해서 함수, 호출, import, 클래스 정보를 추출하는 함수다.
-function parseFile(code, filePath) {
+function parsePython(code, filePath) {
   const parser = createParser();
   const tree = parser.parse(code);
   const root = tree.rootNode;

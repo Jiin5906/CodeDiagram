@@ -38,6 +38,58 @@ function initGraph(container) {
           'text-background-shape': 'roundrectangle',
         },
       },
+      //언어 컨테이너 노드 — 웹 언어별 그룹 (HTML/CSS/JS)
+      {
+        selector: 'node[type="lang"]',
+        style: {
+          'shape': 'roundrectangle',
+          'background-color': '#0f1419',
+          'background-opacity': 0.6,
+          'border-color': '#6b7280',
+          'border-width': 2,
+          'border-opacity': 0.7,
+          'border-style': 'dashed',
+          'label': 'data(label)',
+          'text-valign': 'top',
+          'text-halign': 'center',
+          'font-size': '39px',
+          'color': '#9ca3af',
+          'padding': '30px',
+          'text-margin-y': '-6px',
+          'font-weight': 'bold',
+          'min-width': '240px',
+          'min-height': '140px',
+          'z-compound-depth': 'bottom',
+          'text-background-color': '#0f1419',
+          'text-background-opacity': 1,
+          'text-background-padding': '6px',
+          'text-background-shape': 'roundrectangle',
+        },
+      },
+      //HTML 언어 컨테이너 — 초록 테두리
+      {
+        selector: 'node[type="lang"][language="html"]',
+        style: {
+          'border-color': '#16a34a',
+          'color': '#4ade80',
+        },
+      },
+      //CSS 언어 컨테이너 — 보라 테두리
+      {
+        selector: 'node[type="lang"][language="css"]',
+        style: {
+          'border-color': '#7c3aed',
+          'color': '#a78bfa',
+        },
+      },
+      //JS 언어 컨테이너 — 노란 테두리
+      {
+        selector: 'node[type="lang"][language="javascript"]',
+        style: {
+          'border-color': '#d97706',
+          'color': '#fbbf24',
+        },
+      },
       //패키지 노드 — 초록 테두리 컨테이너
       {
         selector: 'node[type="package"]',
@@ -155,6 +207,123 @@ function initGraph(container) {
           'border-width': 1.5,
         },
       },
+      //JS 함수 노드 — 노란색 계열
+      {
+        selector: 'node[type="js-function"]',
+        style: {
+          'shape': 'roundrectangle',
+          'background-color': '#422006',
+          'border-color': '#d97706',
+          'border-width': 1.5,
+          'label': 'data(label)',
+          'text-valign': 'center',
+          'text-halign': 'center',
+          'font-size': '25px',
+          'color': '#fbbf24',
+          'width': 'label',
+          'height': '40px',
+          'padding': '14px',
+          'font-family': '"Cascadia Code", "Fira Code", Consolas, monospace',
+          'text-wrap': 'none',
+          'z-compound-depth': 'top',
+        },
+      },
+      //JS 클래스 메서드 — 주황 강조
+      {
+        selector: 'node[type="js-function"][className]',
+        style: {
+          'border-color': '#ea580c',
+          'color': '#fdba74',
+          'border-width': 1.5,
+        },
+      },
+      //HTML 요소 노드 — 초록색 계열
+      {
+        selector: 'node[type="html-element"]',
+        style: {
+          'shape': 'roundrectangle',
+          'background-color': '#052e16',
+          'border-color': '#16a34a',
+          'border-width': 1.5,
+          'label': 'data(label)',
+          'text-valign': 'center',
+          'text-halign': 'center',
+          'font-size': '21px',
+          'color': '#4ade80',
+          'width': 'label',
+          'height': '36px',
+          'padding': '14px',
+          'font-family': '"Cascadia Code", "Fira Code", Consolas, monospace',
+          'text-wrap': 'none',
+          'z-compound-depth': 'top',
+        },
+      },
+      //CSS 셀렉터 노드 — 보라색 계열
+      {
+        selector: 'node[type="css-selector"]',
+        style: {
+          'shape': 'roundrectangle',
+          'background-color': '#2e1065',
+          'border-color': '#7c3aed',
+          'border-width': 1.5,
+          'label': 'data(label)',
+          'text-valign': 'center',
+          'text-halign': 'center',
+          'font-size': '21px',
+          'color': '#a78bfa',
+          'width': 'label',
+          'height': '36px',
+          'padding': '14px',
+          'font-family': '"Cascadia Code", "Fira Code", Consolas, monospace',
+          'text-wrap': 'none',
+          'z-compound-depth': 'top',
+        },
+      },
+      //CSS 변수 노드 — 분홍색 계열 다이아몬드
+      {
+        selector: 'node[type="css-variable"]',
+        style: {
+          'shape': 'diamond',
+          'background-color': '#4a044e',
+          'border-color': '#c026d3',
+          'border-width': 1.5,
+          'label': 'data(label)',
+          'text-valign': 'center',
+          'text-halign': 'center',
+          'font-size': '21px',
+          'color': '#e879f9',
+          'width': 'label',
+          'height': '36px',
+          'padding': '14px',
+          'font-family': '"Cascadia Code", "Fira Code", Consolas, monospace',
+          'text-wrap': 'none',
+          'z-compound-depth': 'top',
+        },
+      },
+      //HTML 파일 노드 — 초록 테두리
+      {
+        selector: 'node[type="file"][language="html"]',
+        style: {
+          'border-color': '#16a34a',
+          'color': '#4ade80',
+        },
+      },
+      //CSS 파일 노드 — 보라 테두리
+      {
+        selector: 'node[type="file"][language="css"]',
+        style: {
+          'border-color': '#7c3aed',
+          'color': '#a78bfa',
+        },
+      },
+      //JS 파일 노드 — 노란 테두리
+      {
+        selector: 'node[type="file"][language="javascript"]',
+        style: {
+          'border-color': '#d97706',
+          'color': '#fbbf24',
+        },
+      },
       //접힌 노드 — 점선 테두리
       {
         selector: 'node.collapsed',
@@ -234,6 +403,78 @@ function initGraph(container) {
           'line-opacity': 0.7,
         },
       },
+      //웹 관계 엣지 — script-ref, style-ref (초록 점선)
+      {
+        selector: 'edge[edgeType="script-ref"], edge[edgeType="style-ref"]',
+        style: {
+          'line-color': '#22c55e',
+          'line-style': 'dashed',
+          'target-arrow-color': '#22c55e',
+          'target-arrow-shape': 'triangle',
+          'width': 1.5,
+          'line-opacity': 0.6,
+        },
+      },
+      //DOM 접근 엣지 — 주황 점선
+      {
+        selector: 'edge[edgeType="dom-access"]',
+        style: {
+          'line-color': '#f97316',
+          'line-style': 'dashed',
+          'target-arrow-color': '#f97316',
+          'target-arrow-shape': 'triangle',
+          'width': 1.5,
+          'line-opacity': 0.6,
+        },
+      },
+      //CSS 타겟 엣지 — 보라 점선
+      {
+        selector: 'edge[edgeType="css-target"]',
+        style: {
+          'line-color': '#a78bfa',
+          'line-style': 'dashed',
+          'target-arrow-color': '#a78bfa',
+          'target-arrow-shape': 'triangle',
+          'width': 1.5,
+          'line-opacity': 0.5,
+        },
+      },
+      //이벤트 바인딩 엣지 — 분홍색 점선
+      {
+        selector: 'edge[edgeType="event-binding"]',
+        style: {
+          'line-color': '#ec4899',
+          'line-style': 'dashed',
+          'target-arrow-color': '#ec4899',
+          'target-arrow-shape': 'triangle',
+          'width': 1.5,
+          'line-opacity': 0.6,
+        },
+      },
+      //JS import 엣지 — 노란 점선
+      {
+        selector: 'edge[edgeType="js-import"], edge[edgeType="css-import"]',
+        style: {
+          'line-color': '#eab308',
+          'line-style': 'dashed',
+          'target-arrow-color': '#eab308',
+          'target-arrow-shape': 'triangle',
+          'width': 1.5,
+          'line-opacity': 0.5,
+        },
+      },
+      //CSS 변수 참조 엣지 — 분홍 점선
+      {
+        selector: 'edge[edgeType="css-var"]',
+        style: {
+          'line-color': '#c026d3',
+          'line-style': 'dashed',
+          'target-arrow-color': '#c026d3',
+          'target-arrow-shape': 'triangle',
+          'width': 1.5,
+          'line-opacity': 0.5,
+        },
+      },
       //순환 참조 엣지 — 빨간 하이라이트
       {
         selector: 'edge.cycle-edge',
@@ -298,6 +539,9 @@ function renderGraph(data) {
 
   cy.elements().remove();
 
+  //리프 노드 타입 목록
+  const leafTypes = new Set(['function', 'js-function', 'variable', 'css-variable', 'html-element', 'css-selector']);
+
   //엣지에 연결된 함수 노드 ID 수집 (고립 함수 필터링용)
   const connectedIds = new Set();
   for (const edge of data.edges) {
@@ -316,28 +560,35 @@ function renderGraph(data) {
       connectedIds.add(edge.target);
     }
   }
-
-  //유지할 함수/변수/파일/티어 결정
-  const keptFiles = new Set();
-  const keptTiers = new Set();
-  for (const node of data.nodes) {
-    if ((node.data.type === 'function' || node.data.type === 'variable') && connectedIds.has(node.data.id)) {
-      keptFiles.add(node.data.parent);
-    }
-  }
-  for (const node of data.nodes) {
-    if (node.data.type === 'file' && keptFiles.has(node.data.id)) {
-      keptTiers.add(node.data.parent);
+  if (data.webEdges) {
+    for (const edge of data.webEdges) {
+      connectedIds.add(edge.source);
+      connectedIds.add(edge.target);
     }
   }
 
-  //노드 추가 (엣지 없는 고립 함수/변수와 빈 컨테이너 제외)
+  //유지할 노드 ID 결정 (4단계 계층 대응: leaf → file → tier → lang)
+  const keptIds = new Set();
+  for (const node of data.nodes) {
+    if (leafTypes.has(node.data.type) && connectedIds.has(node.data.id)) {
+      keptIds.add(node.data.id);
+    }
+  }
+  //부모 방향으로 전파 (3회 반복으로 file → tier → lang 까지 도달)
+  for (let pass = 0; pass < 3; pass++) {
+    for (const node of data.nodes) {
+      if (keptIds.has(node.data.id) && node.data.parent) {
+        keptIds.add(node.data.parent);
+      }
+    }
+  }
+
+  //노드 추가 (엣지 없는 고립 리프와 빈 컨테이너 제외)
+  const containerTypes = new Set(['file', 'tier', 'lang']);
   const elements = [];
   for (const node of data.nodes) {
-    if (node.data.type === 'function' && !connectedIds.has(node.data.id)) continue;
-    if (node.data.type === 'variable' && !connectedIds.has(node.data.id)) continue;
-    if (node.data.type === 'file' && !keptFiles.has(node.data.id)) continue;
-    if (node.data.type === 'tier' && !keptTiers.has(node.data.id)) continue;
+    if (leafTypes.has(node.data.type) && !connectedIds.has(node.data.id)) continue;
+    if (containerTypes.has(node.data.type) && !keptIds.has(node.data.id)) continue;
     elements.push(node);
   }
 
@@ -391,6 +642,25 @@ function renderGraph(data) {
     }
   }
 
+  //웹 관계 엣지 추가
+  if (data.webEdges) {
+    for (const edge of data.webEdges) {
+      if (addedNodeIds.has(edge.source) && addedNodeIds.has(edge.target)) {
+        const edgeId = `web__${edge.source}->${edge.target}__${edge.type}`;
+        elements.push({
+          data: {
+            id: edgeId,
+            source: edge.source,
+            target: edge.target,
+            edgeType: edge.type,
+            refCount: edge.references ? edge.references.length : 1,
+            references: edge.references,
+          },
+        });
+      }
+    }
+  }
+
   cy.add(elements);
 
   //순환 참조 엣지에 클래스 추가
@@ -401,10 +671,20 @@ function renderGraph(data) {
     }
   }
 
-  //티어 목록을 오름차순 정렬 (0부터 N까지 좌→우 배치)
+  //최상위 컨테이너 ID 목록 생성 (tier + lang)
   const sortedTiers = data.tiers ? [...data.tiers].sort((a, b) => a - b) : [];
+  const containerIds = sortedTiers.map(t => `tier__${t}`);
+  //언어 컨테이너를 고정 순서로 추가 (HTML → CSS → JS)
+  if (data.langs) {
+    const langOrder = ['html', 'css', 'javascript'];
+    for (const lang of langOrder) {
+      if (data.langs.includes(lang)) {
+        containerIds.push(`lang__${lang}`);
+      }
+    }
+  }
 
-  //1단계: fcose로 내부 노드 자동 배치 (완료 후 티어 재배치)
+  //1단계: fcose로 내부 노드 자동 배치 (완료 후 컨테이너 재배치)
   cy.layout({
     name: 'fcose',
     animate: false,
@@ -421,8 +701,8 @@ function renderGraph(data) {
     randomize: true,
     numIter: 500,
     stop: function () {
-      //2단계: 레이아웃 완료 후 티어 박스를 좌→우로 겹치지 않게 재배치
-      arrangeTiers(sortedTiers);
+      //2단계: 레이아웃 완료 후 컨테이너 박스를 좌→우로 겹치지 않게 재배치
+      arrangeContainers(containerIds);
     },
   }).run();
 
@@ -504,126 +784,148 @@ function renderPackageView(data) {
   }).run();
 }
 
-//티어 박스들을 0부터 N까지 좌→우 순서로 재배치하는 함수다.
-//완전 결정적 3단계 레이아웃:
-//  1) 파일 내부: 함수들을 행 기반 컴팩트 배치 (fcose 결과 덮어씀)
-//  2) 티어 내부: 파일들을 그리드 배치
-//  3) 티어 간: 좌→우 순서 배치
-function arrangeTiers(sortedTiers) {
-  if (!sortedTiers || sortedTiers.length === 0) return;
+//최상위 컨테이너 박스들을 좌→우 순서로 재배치하는 함수다.
+//tier 컨테이너와 lang 컨테이너 모두 처리한다.
+//재귀적으로 내부 계층을 정리한 뒤 최상위 컨테이너를 좌→우 배치한다.
+//  - Python tier: tier → file → leaf (3단계)
+//  - Web lang: lang → tier → file → leaf (4단계)
+function arrangeContainers(containerIds) {
+  if (!containerIds || containerIds.length === 0) return;
 
-  //compound 노드 패딩 보정: 리프 bbox 기준으로 계산하므로
-  //시각적 간격 = gap - 2*padding 이 되어야 겹치지 않는다
-  //tier padding: 30px, file padding: 18px
-  //tierGap: 시각적 간격 20px + 2*(30+18) = 116 + 라벨 여유 50px = 166
-  //fileGap: 시각적 간격 12px → 12 + 2*18 = 48 + 라벨 여유 32px = 80
-  const tierGap = 166;
+  //compound 노드 패딩 보정값
+  const containerGap = 166;
+  const subTierGap = 120;
   const fileGap = 80;
   const fnGap = 8;
 
-  const tierInfo = [];
-  for (const tierValue of sortedTiers) {
-    const tierNode = cy.getElementById(`tier__${tierValue}`);
-    if (!tierNode.length) continue;
+  //파일 노드 내부의 리프 노드를 행 기반으로 컴팩트하게 배치한다.
+  function arrangeLeafNodes(fileNode) {
+    const leafNodes = fileNode.children();
+    if (leafNodes.length === 0) return null;
 
-    const descendants = tierNode.descendants();
-    if (descendants.length === 0) continue;
-
-    const fileNodes = tierNode.children();
-    const files = [];
-    //모든 함수(리프) 노드를 별도로 수집 — compound 노드의 stale bbox 문제 회피
-    let allFuncNodes = cy.collection();
-
-    fileNodes.forEach(fileNode => {
-      const funcNodes = fileNode.children();
-      if (funcNodes.length === 0) return;
-
-      //1단계: 파일 내부 함수를 가로 우선 흐름 배치 (엑셀 느낌)
-      //가로로 나열하다 칸이 없으면 다음 줄로 넘어감
-      const funcs = [];
-      funcNodes.forEach(n => {
-        const bb = n.boundingBox();
-        funcs.push({ node: n, w: bb.w, h: bb.h });
-      });
-
-      //행 최대 너비: sqrt(개수)개 열 기준으로 계산
-      const targetCols = Math.max(1, Math.ceil(Math.sqrt(funcs.length)));
-      const widthsSorted = funcs.map(f => f.w).sort((a, b) => b - a);
-      let maxRowW = 0;
-      for (let i = 0; i < Math.min(targetCols, widthsSorted.length); i++) {
-        maxRowW += widthsSorted[i] + fnGap;
-      }
-
-      let rowX = 0, rowY = 0, rowMaxH = 0;
-      for (const item of funcs) {
-        if (rowX > 0 && rowX + item.w > maxRowW) {
-          rowX = 0;
-          rowY += rowMaxH + fnGap;
-          rowMaxH = 0;
-        }
-        item.node.position({ x: rowX + item.w / 2, y: rowY + item.h / 2 });
-        rowX += item.w + fnGap;
-        rowMaxH = Math.max(rowMaxH, item.h);
-      }
-
-      const newBb = funcNodes.boundingBox();
-      files.push({ desc: funcNodes, bb: newBb, w: newBb.w, h: newBb.h });
-      allFuncNodes = allFuncNodes.union(funcNodes);
+    const items = [];
+    leafNodes.forEach(n => {
+      const bb = n.boundingBox();
+      items.push({ node: n, w: bb.w, h: bb.h });
     });
 
-    if (files.length === 0) continue;
+    const targetCols = Math.max(1, Math.ceil(Math.sqrt(items.length)));
+    const widthsSorted = items.map(f => f.w).sort((a, b) => b - a);
+    let maxRowW = 0;
+    for (let i = 0; i < Math.min(targetCols, widthsSorted.length); i++) {
+      maxRowW += widthsSorted[i] + fnGap;
+    }
 
-    //2단계: 파일들을 그리드 배치
-    const cols = Math.max(1, Math.ceil(Math.cbrt(files.length)));
-    files.sort((a, b) => b.h - a.h);
+    let rowX = 0, rowY = 0, rowMaxH = 0;
+    for (const item of items) {
+      if (rowX > 0 && rowX + item.w > maxRowW) {
+        rowX = 0;
+        rowY += rowMaxH + fnGap;
+        rowMaxH = 0;
+      }
+      item.node.position({ x: rowX + item.w / 2, y: rowY + item.h / 2 });
+      rowX += item.w + fnGap;
+      rowMaxH = Math.max(rowMaxH, item.h);
+    }
+
+    const bb = leafNodes.boundingBox();
+    return { leafNodes, bb, w: bb.w, h: bb.h };
+  }
+
+  //블록 목록을 그리드 배치한다. 각 블록의 leafNodes를 이동시킨다.
+  function gridLayout(blocks, gap) {
+    if (blocks.length === 0) return null;
+
+    let allLeafNodes = cy.collection();
+    const cols = Math.max(1, Math.ceil(Math.cbrt(blocks.length)));
+    blocks.sort((a, b) => b.h - a.h);
 
     let gridX = 0, gridY = 0, rowMaxH = 0, col = 0;
-    for (const file of files) {
-      const dx = gridX - file.bb.x1;
-      const dy = gridY - file.bb.y1;
-      file.desc.forEach(child => {
-        const pos = child.position();
-        child.position({ x: pos.x + dx, y: pos.y + dy });
+    for (const block of blocks) {
+      const dx = gridX - block.bb.x1;
+      const dy = gridY - block.bb.y1;
+      block.leafNodes.forEach(node => {
+        const pos = node.position();
+        node.position({ x: pos.x + dx, y: pos.y + dy });
       });
+      allLeafNodes = allLeafNodes.union(block.leafNodes);
 
-      rowMaxH = Math.max(rowMaxH, file.h);
-      gridX += file.w + fileGap;
+      rowMaxH = Math.max(rowMaxH, block.h);
+      gridX += block.w + gap;
       col++;
-
       if (col >= cols) {
         gridX = 0;
-        gridY += rowMaxH + fileGap;
+        gridY += rowMaxH + gap;
         rowMaxH = 0;
         col = 0;
       }
     }
 
-    //핵심 수정: 리프 노드(함수)만으로 바운딩 박스 계산
-    //compound 노드(파일)의 stale bbox가 포함되면 크기가 부풀려짐
-    const newBb = allFuncNodes.boundingBox();
-    console.log(`[layout] tier ${tierValue}: ${files.length} files, ${allFuncNodes.length} funcs, bbox ${Math.round(newBb.w)}×${Math.round(newBb.h)}, fileCols ${cols}`);
-    tierInfo.push({ tierValue, leafNodes: allFuncNodes, bb: newBb });
+    const bb = allLeafNodes.boundingBox();
+    return { leafNodes: allLeafNodes, bb, w: bb.w, h: bb.h };
   }
 
-  //3단계: 티어들을 자동 줄바꿈으로 배치
-  const maxTierW = Math.max(...tierInfo.map(t => t.bb.w));
-  const targetWidth = Math.max(maxTierW + tierGap, 2500);
+  //컨테이너 내부를 재귀적으로 정리한다.
+  //반환: { leafNodes, bb, w, h } 또는 null
+  function arrangeInternals(containerNode) {
+    const children = containerNode.children();
+    if (children.length === 0) return null;
 
-  //티어들을 행에 분배
-  const tierRows = [[]];
+    const firstChildType = children[0].data('type');
+
+    if (firstChildType === 'tier') {
+      //자식이 서브 티어 (lang → tier 구조) — 재귀 처리
+      const subBlocks = [];
+      children.forEach(subTier => {
+        const result = arrangeInternals(subTier);
+        if (result) subBlocks.push(result);
+      });
+      return gridLayout(subBlocks, subTierGap);
+
+    } else {
+      //자식이 파일 노드 — 리프 배치 후 파일 그리드 배치
+      const fileBlocks = [];
+      children.forEach(fileNode => {
+        const result = arrangeLeafNodes(fileNode);
+        if (result) fileBlocks.push(result);
+      });
+      return gridLayout(fileBlocks, fileGap);
+    }
+  }
+
+  //모든 최상위 컨테이너 내부 정리
+  const containerInfo = [];
+  for (const containerId of containerIds) {
+    const containerNode = cy.getElementById(containerId);
+    if (!containerNode.length) continue;
+    if (containerNode.descendants().length === 0) continue;
+
+    const result = arrangeInternals(containerNode);
+    if (!result) continue;
+
+    console.log(`[layout] ${containerId}: ${result.leafNodes.length} leaves, bbox ${Math.round(result.w)}×${Math.round(result.h)}`);
+    containerInfo.push({ containerId, leafNodes: result.leafNodes, bb: result.bb });
+  }
+
+  if (containerInfo.length === 0) return;
+
+  //최상위 컨테이너들을 자동 줄바꿈으로 배치
+  const maxW = Math.max(...containerInfo.map(t => t.bb.w));
+  const targetWidth = Math.max(maxW + containerGap, 2500);
+
+  const rows = [[]];
   let rowW = 0;
-  for (const info of tierInfo) {
+  for (const info of containerInfo) {
     if (rowW > 0 && rowW + info.bb.w > targetWidth) {
-      tierRows.push([]);
+      rows.push([]);
       rowW = 0;
     }
-    tierRows[tierRows.length - 1].push(info);
-    rowW += info.bb.w + tierGap;
+    rows[rows.length - 1].push(info);
+    rowW += info.bb.w + containerGap;
   }
 
-  //각 행 내에서 좌→우 배치, 행 간에는 위→아래 배치
   let rowY = 0;
-  for (const row of tierRows) {
+  for (const row of rows) {
     const rowH = Math.max(...row.map(r => r.bb.h));
     let x = 0;
 
@@ -631,32 +933,30 @@ function arrangeTiers(sortedTiers) {
       const { leafNodes, bb } = info;
       const offsetX = x - bb.x1;
       const offsetY = rowY + (rowH - bb.h) / 2 - bb.y1;
-      //리프 노드만 이동 — compound 노드는 자동으로 따라감
       leafNodes.forEach(node => {
         const pos = node.position();
         node.position({ x: pos.x + offsetX, y: pos.y + offsetY });
       });
-      x += bb.w + tierGap;
+      x += bb.w + containerGap;
     }
 
-    rowY += rowH + tierGap;
+    rowY += rowH + containerGap;
   }
 
-  console.log(`[layout] rows: ${tierRows.length}, rowSizes: [${tierRows.map(r => r.length).join(',')}], targetWidth: ${targetWidth}`);
+  console.log(`[layout] rows: ${rows.length}, rowSizes: [${rows.map(r => r.length).join(',')}], targetWidth: ${targetWidth}`);
   cy.fit(undefined, 20);
 
-  //초기 줌: 노드 수에 따라 동적 조정 후 첫 함수 노드 중심으로 패닝
-  const leafNodes = cy.nodes('[type="function"], [type="variable"]');
-  const nodeCount = leafNodes.length;
-  //노드가 적으면 약간 확대, 많으면 전체가 보이도록 축소
+  //초기 줌: 노드 수에 따라 동적 조정 후 첫 리프 노드 중심으로 패닝
+  const allLeaves = cy.nodes('[type="function"], [type="variable"], [type="js-function"], [type="css-variable"], [type="html-element"], [type="css-selector"]');
+  const nodeCount = allLeaves.length;
   const zoomLevel = nodeCount <= 10 ? 1.2
     : nodeCount <= 30 ? 0.9
     : nodeCount <= 80 ? 0.7
     : 0.5;
-  const firstFunc = cy.nodes('[type="function"]')[0];
-  if (firstFunc) {
-    cy.zoom({ level: zoomLevel, position: firstFunc.position() });
-    cy.center(firstFunc);
+  const firstLeaf = cy.nodes('[type="function"], [type="js-function"]')[0];
+  if (firstLeaf) {
+    cy.zoom({ level: zoomLevel, position: firstLeaf.position() });
+    cy.center(firstLeaf);
   }
 }
 
@@ -811,18 +1111,14 @@ function highlightNode(nodeId) {
     connectedEdges.style('display', 'element');
     connectedEdges.addClass('highlighted');
 
-    //부모 파일 노드와 조부모 티어 노드도 흐려지지 않도록 처리
-    const parentFile = node.parent();
-    const parentTier = parentFile.parent();
-    const keepVisible = node.union(neighborNodes).union(parentFile).union(parentTier);
+    //모든 조상 노드(file, tier, lang)도 흐려지지 않도록 처리
+    const ancestors = node.ancestors();
+    const keepVisible = node.union(neighborNodes).union(ancestors);
 
-    //이웃 노드의 부모(파일, 티어)도 흐려지지 않도록 처리
+    //이웃 노드의 모든 조상도 흐려지지 않도록 처리
     let neighborAncestors = cy.collection();
     neighborNodes.forEach(n => {
-      neighborAncestors = neighborAncestors.union(n.parent());
-      if (n.parent().length) {
-        neighborAncestors = neighborAncestors.union(n.parent().parent());
-      }
+      neighborAncestors = neighborAncestors.union(n.ancestors());
     });
 
     //나머지는 전부 흐리게

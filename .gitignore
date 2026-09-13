@@ -19,5 +19,31 @@ local.properties
 
 # 스크린샷 / 문서
 *.png
+*.jpg
+*.jpeg
+*.gif
+*.bmp
+*.svg
 *.pdf
 *.md
+*.pptx
+*.ppt
+*.docx
+*.doc
+*.xlsx
+*.xls
+*.hwp
+*.hwpx
+
+# Node
+node_modules/
+
+# IDE
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 환경변수
+.env

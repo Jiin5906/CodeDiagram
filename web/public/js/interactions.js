@@ -36,6 +36,21 @@ function setupInteractions() {
     evt.stopPropagation();
   });
 
+  //웹 노드 클릭 → 하이라이트 + 줌 + 엣지 애니메이션
+  cy.on('tap', 'node[type="js-function"], node[type="html-element"], node[type="css-selector"], node[type="css-variable"]', function (evt) {
+    const node = evt.target;
+    const nodeId = node.id();
+
+    highlightNode(nodeId);
+
+    //JS 함수이면서 코드가 있으면 AI 설명 표시
+    if (node.data('type') === 'js-function' && node.data('code')) {
+      showExplanation(node.data());
+    }
+
+    evt.stopPropagation();
+  });
+
   //파일/티어 노드 더블클릭 → 접기/펼치기
   cy.on('dbltap', 'node[type="file"], node[type="tier"]', function (evt) {
     const node = evt.target;

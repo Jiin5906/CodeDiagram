@@ -40,10 +40,26 @@ document.addEventListener('DOMContentLoaded', () => {
       lastAnalysisData = data;
 
       const funcCount = data.nodes.filter(n => n.data.type === 'function').length;
+      const jsFuncCount = data.nodes.filter(n => n.data.type === 'js-function').length;
       const fileCount = data.nodes.filter(n => n.data.type === 'file').length;
       const tierCount = data.tiers ? data.tiers.length : 0;
 
-      status.textContent = `${tierCount}개 참조 그룹, ${fileCount}개 파일, ${funcCount}개 함수, ${data.edges.length}개 호출 관계 발견`;
+      //언어별 파일 카운트
+      let fileDetail = '';
+      if (data.fileCounts) {
+        const parts = [];
+        if (data.fileCounts.python > 0) parts.push(`Python ${data.fileCounts.python}`);
+        if (data.fileCounts.html > 0) parts.push(`HTML ${data.fileCounts.html}`);
+        if (data.fileCounts.css > 0) parts.push(`CSS ${data.fileCounts.css}`);
+        if (data.fileCounts.javascript > 0) parts.push(`JS ${data.fileCounts.javascript}`);
+        fileDetail = parts.join(', ');
+      }
+
+      const totalFuncs = funcCount + jsFuncCount;
+      const webEdgeCount = data.webEdges ? data.webEdges.length : 0;
+      const totalEdges = data.edges.length + webEdgeCount;
+      const fileLabel = fileDetail ? `${fileCount}개 파일 (${fileDetail})` : `${fileCount}개 파일`;
+      status.textContent = `${tierCount}개 참조 그룹, ${fileLabel}, ${totalFuncs}개 함수, ${totalEdges}개 관계 발견`;
       status.className = 'success';
 
       if (data.warnings && data.warnings.length > 0) {
