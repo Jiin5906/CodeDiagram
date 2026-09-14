@@ -1,5 +1,5 @@
 //코드 파일을 파싱하는 코드
-//tree-sitter를 사용하여 Python, HTML, CSS, JS 파일을 파싱한다.
+//tree-sitter를 사용하여 7개 언어(Python, JS, HTML, CSS, C++, C#, TypeScript)를 파싱한다.
 
 const Parser = require('tree-sitter');
 const Python = require('tree-sitter-python');
@@ -8,6 +8,7 @@ const { parseCss } = require('./parsers/cssParser');
 const { parseJs } = require('./parsers/jsParser');
 const { parseCpp } = require('./parsers/cppParser');
 const { parseCsharp } = require('./parsers/csharpParser');
+const { parseTs } = require('./parsers/tsParser');
 
 function createParser() {
   const p = new Parser();
@@ -24,6 +25,7 @@ function parseFile(code, filePath, language) {
       case 'javascript': return parseJs(code, filePath);
       case 'cpp': return parseCpp(code, filePath);
       case 'csharp': return parseCsharp(code, filePath);
+      case 'typescript': return parseTs(code, filePath);
       default: return null;
     }
   }
@@ -131,6 +133,9 @@ function collectDefinitions(node, code, filePath, functions, calls, classes, cla
       if (body) {
         collectDefinitions(body, code, filePath, functions, calls, classes, clsName);
       }
+    } else if (child.type === 'decorated_definition') {
+      //데코레이터가 붙은 함수/클래스 정의를 내부 정의로 재귀 처리
+      collectDefinitions(child, code, filePath, functions, calls, classes, className);
     } else if (child.type === 'function_definition') {
       const funcInfo = extractFunction(child, code, filePath, className);
       functions.push(funcInfo);

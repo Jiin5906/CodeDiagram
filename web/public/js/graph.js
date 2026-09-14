@@ -169,6 +169,88 @@ function initGraph(container) {
           'z-compound-depth': 'top',
         },
       },
+      //inbound 참조 횟수에 따른 함수 노드 테두리 두께 + 배경색 (호출당한 횟수)
+      {
+        selector: 'node[type="function"][inboundRefCount > 0]',
+        style: {
+          'border-width': 'mapData(inboundRefCount, 0, 10, 1.5, 5)',
+          'border-color': 'mapData(inboundRefCount, 0, 10, #475569, #f59e0b)',
+          'background-color': 'mapData(inboundRefCount, 0, 10, #1e293b, #422006)',
+        },
+      },
+      {
+        selector: 'node[type="js-function"][inboundRefCount > 0]',
+        style: {
+          'border-width': 'mapData(inboundRefCount, 0, 10, 1.5, 5)',
+          'border-color': 'mapData(inboundRefCount, 0, 10, #d97706, #f59e0b)',
+          'background-color': 'mapData(inboundRefCount, 0, 10, #422006, #78350f)',
+        },
+      },
+      {
+        selector: 'node[type="ts-function"][inboundRefCount > 0]',
+        style: {
+          'border-width': 'mapData(inboundRefCount, 0, 10, 1.5, 5)',
+          'border-color': 'mapData(inboundRefCount, 0, 10, #3b82f6, #f59e0b)',
+          'background-color': 'mapData(inboundRefCount, 0, 10, #1e3a5f, #422006)',
+        },
+      },
+      {
+        selector: 'node[type="cpp-function"][inboundRefCount > 0]',
+        style: {
+          'border-width': 'mapData(inboundRefCount, 0, 10, 1.5, 5)',
+          'border-color': 'mapData(inboundRefCount, 0, 10, #06b6d4, #f59e0b)',
+          'background-color': 'mapData(inboundRefCount, 0, 10, #164e63, #422006)',
+        },
+      },
+      {
+        selector: 'node[type="csharp-function"][inboundRefCount > 0]',
+        style: {
+          'border-width': 'mapData(inboundRefCount, 0, 10, 1.5, 5)',
+          'border-color': 'mapData(inboundRefCount, 0, 10, #22c55e, #f59e0b)',
+          'background-color': 'mapData(inboundRefCount, 0, 10, #14532d, #422006)',
+        },
+      },
+      //outbound 참조 횟수에 따른 함수 노드 스타일 (호출한 횟수 — inbound가 0인 경우만)
+      {
+        selector: 'node[type="function"][outboundRefCount > 0][inboundRefCount = 0]',
+        style: {
+          'border-width': 'mapData(outboundRefCount, 0, 10, 1.5, 5)',
+          'border-color': 'mapData(outboundRefCount, 0, 10, #475569, #60a5fa)',
+          'background-color': 'mapData(outboundRefCount, 0, 10, #1e293b, #172554)',
+        },
+      },
+      {
+        selector: 'node[type="js-function"][outboundRefCount > 0][inboundRefCount = 0]',
+        style: {
+          'border-width': 'mapData(outboundRefCount, 0, 10, 1.5, 5)',
+          'border-color': 'mapData(outboundRefCount, 0, 10, #d97706, #60a5fa)',
+          'background-color': 'mapData(outboundRefCount, 0, 10, #422006, #172554)',
+        },
+      },
+      {
+        selector: 'node[type="ts-function"][outboundRefCount > 0][inboundRefCount = 0]',
+        style: {
+          'border-width': 'mapData(outboundRefCount, 0, 10, 1.5, 5)',
+          'border-color': 'mapData(outboundRefCount, 0, 10, #3b82f6, #60a5fa)',
+          'background-color': 'mapData(outboundRefCount, 0, 10, #1e3a5f, #172554)',
+        },
+      },
+      {
+        selector: 'node[type="cpp-function"][outboundRefCount > 0][inboundRefCount = 0]',
+        style: {
+          'border-width': 'mapData(outboundRefCount, 0, 10, 1.5, 5)',
+          'border-color': 'mapData(outboundRefCount, 0, 10, #06b6d4, #60a5fa)',
+          'background-color': 'mapData(outboundRefCount, 0, 10, #164e63, #172554)',
+        },
+      },
+      {
+        selector: 'node[type="csharp-function"][outboundRefCount > 0][inboundRefCount = 0]',
+        style: {
+          'border-width': 'mapData(outboundRefCount, 0, 10, 1.5, 5)',
+          'border-color': 'mapData(outboundRefCount, 0, 10, #22c55e, #60a5fa)',
+          'background-color': 'mapData(outboundRefCount, 0, 10, #14532d, #172554)',
+        },
+      },
       //변수 노드 — 다이아몬드 모양, 청록색
       {
         selector: 'node[type="variable"]',
@@ -277,6 +359,120 @@ function initGraph(container) {
           'font-family': '"Cascadia Code", "Fira Code", Consolas, monospace',
           'text-wrap': 'none',
           'z-compound-depth': 'top',
+        },
+      },
+      //TypeScript 함수 노드 — 파란색 계열
+      {
+        selector: 'node[type="ts-function"]',
+        style: {
+          'shape': 'roundrectangle',
+          'background-color': '#1e3a5f',
+          'border-color': '#3b82f6',
+          'border-width': 1.5,
+          'label': 'data(label)',
+          'text-valign': 'center',
+          'text-halign': 'center',
+          'font-size': '25px',
+          'color': '#93c5fd',
+          'width': 'label',
+          'height': '40px',
+          'padding': '14px',
+          'font-family': '"Cascadia Code", "Fira Code", Consolas, monospace',
+          'text-wrap': 'none',
+          'z-compound-depth': 'top',
+        },
+      },
+      //TS 클래스 메서드 — 남색 강조
+      {
+        selector: 'node[type="ts-function"][className]',
+        style: {
+          'border-color': '#2563eb',
+          'color': '#bfdbfe',
+          'border-width': 1.5,
+        },
+      },
+      //C++ 함수 노드 — 청록색 계열
+      {
+        selector: 'node[type="cpp-function"]',
+        style: {
+          'shape': 'roundrectangle',
+          'background-color': '#164e63',
+          'border-color': '#06b6d4',
+          'border-width': 1.5,
+          'label': 'data(label)',
+          'text-valign': 'center',
+          'text-halign': 'center',
+          'font-size': '25px',
+          'color': '#67e8f9',
+          'width': 'label',
+          'height': '40px',
+          'padding': '14px',
+          'font-family': '"Cascadia Code", "Fira Code", Consolas, monospace',
+          'text-wrap': 'none',
+          'z-compound-depth': 'top',
+        },
+      },
+      //C++ 클래스 메서드 — 시안 강조
+      {
+        selector: 'node[type="cpp-function"][className]',
+        style: {
+          'border-color': '#0891b2',
+          'color': '#a5f3fc',
+          'border-width': 1.5,
+        },
+      },
+      //C# 함수 노드 — 녹색 계열
+      {
+        selector: 'node[type="csharp-function"]',
+        style: {
+          'shape': 'roundrectangle',
+          'background-color': '#14532d',
+          'border-color': '#22c55e',
+          'border-width': 1.5,
+          'label': 'data(label)',
+          'text-valign': 'center',
+          'text-halign': 'center',
+          'font-size': '25px',
+          'color': '#86efac',
+          'width': 'label',
+          'height': '40px',
+          'padding': '14px',
+          'font-family': '"Cascadia Code", "Fira Code", Consolas, monospace',
+          'text-wrap': 'none',
+          'z-compound-depth': 'top',
+        },
+      },
+      //C# 클래스 메서드 — 에메랄드 강조
+      {
+        selector: 'node[type="csharp-function"][className]',
+        style: {
+          'border-color': '#16a34a',
+          'color': '#bbf7d0',
+          'border-width': 1.5,
+        },
+      },
+      //TypeScript 파일 노드 — 파란 테두리
+      {
+        selector: 'node[type="file"][language="typescript"]',
+        style: {
+          'border-color': '#3b82f6',
+          'color': '#93c5fd',
+        },
+      },
+      //C++ 파일 노드 — 시안 테두리
+      {
+        selector: 'node[type="file"][language="cpp"]',
+        style: {
+          'border-color': '#06b6d4',
+          'color': '#67e8f9',
+        },
+      },
+      //C# 파일 노드 — 녹색 테두리
+      {
+        selector: 'node[type="file"][language="csharp"]',
+        style: {
+          'border-color': '#22c55e',
+          'color': '#86efac',
         },
       },
       //CSS 변수 노드 — 분홍색 계열 다이아몬드
@@ -540,7 +736,7 @@ function renderGraph(data) {
   cy.elements().remove();
 
   //리프 노드 타입 목록
-  const leafTypes = new Set(['function', 'js-function', 'variable', 'css-variable', 'html-element', 'css-selector']);
+  const leafTypes = new Set(['function', 'js-function', 'ts-function', 'cpp-function', 'csharp-function', 'variable', 'css-variable', 'html-element', 'css-selector']);
 
   //엣지에 연결된 함수 노드 ID 수집 (고립 함수 필터링용)
   const connectedIds = new Set();
@@ -689,17 +885,19 @@ function renderGraph(data) {
     name: 'fcose',
     animate: false,
     fit: false,
-    padding: 20,
+    padding: 30,
     nodeDimensionsIncludeLabels: true,
-    idealEdgeLength: 60,
-    nodeRepulsion: 4000,
-    edgeElasticity: 0.4,
-    nestingFactor: 0.5,
-    gravity: 0.4,
-    gravityRange: 1.5,
+    idealEdgeLength: 80,
+    nodeRepulsion: 6000,
+    edgeElasticity: 0.3,
+    nestingFactor: 0.4,
+    gravity: 0.3,
+    gravityRange: 2.0,
     quality: 'default',
     randomize: true,
-    numIter: 500,
+    numIter: 800,
+    nodeSeparation: 120,
+    avoidOverlap: true,
     stop: function () {
       //2단계: 레이아웃 완료 후 컨테이너 박스를 좌→우로 겹치지 않게 재배치
       arrangeContainers(containerIds);
@@ -947,13 +1145,13 @@ function arrangeContainers(containerIds) {
   cy.fit(undefined, 20);
 
   //초기 줌: 노드 수에 따라 동적 조정 후 첫 리프 노드 중심으로 패닝
-  const allLeaves = cy.nodes('[type="function"], [type="variable"], [type="js-function"], [type="css-variable"], [type="html-element"], [type="css-selector"]');
+  const allLeaves = cy.nodes('[type="function"], [type="variable"], [type="js-function"], [type="ts-function"], [type="cpp-function"], [type="csharp-function"], [type="css-variable"], [type="html-element"], [type="css-selector"]');
   const nodeCount = allLeaves.length;
   const zoomLevel = nodeCount <= 10 ? 1.2
     : nodeCount <= 30 ? 0.9
     : nodeCount <= 80 ? 0.7
     : 0.5;
-  const firstLeaf = cy.nodes('[type="function"], [type="js-function"]')[0];
+  const firstLeaf = cy.nodes('[type="function"], [type="js-function"], [type="ts-function"], [type="cpp-function"], [type="csharp-function"]')[0];
   if (firstLeaf) {
     cy.zoom({ level: zoomLevel, position: firstLeaf.position() });
     cy.center(firstLeaf);

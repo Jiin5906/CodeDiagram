@@ -11,9 +11,13 @@ document.addEventListener('DOMContentLoaded', () => {
   const btn = document.getElementById('analyze-btn');
   const status = document.getElementById('status');
   const container = document.getElementById('cy');
+  const emptyState = document.getElementById('empty-state');
 
   //Cytoscape 초기화
   initGraph(container);
+
+  //빈 상태 표시
+  if (emptyState) emptyState.classList.add('visible');
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -21,15 +25,24 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!source) return;
 
     btn.disabled = true;
-    status.textContent = '분석 중...';
-    status.className = '';
+    input.disabled = true;
+
+    //빈 상태 숨기기
+    if (emptyState) emptyState.classList.remove('visible');
+
+    //로딩 스피너 표시
+    showLoadingState(status, 'Git 클론 중...');
 
     try {
+      updateLoadingStep(status, '서버에 분석 요청 중...');
+
       const response = await fetch('/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ source }),
       });
+
+      updateLoadingStep(status, '응답 파싱 중...');
 
       const data = await response.json();
 
@@ -37,10 +50,15 @@ document.addEventListener('DOMContentLoaded', () => {
         throw new Error(data.error || '서버 오류');
       }
 
+      updateLoadingStep(status, '그래프 구성 중...');
+
       lastAnalysisData = data;
 
       const funcCount = data.nodes.filter(n => n.data.type === 'function').length;
       const jsFuncCount = data.nodes.filter(n => n.data.type === 'js-function').length;
+      const tsFuncCount = data.nodes.filter(n => n.data.type === 'ts-function').length;
+      const cppFuncCount = data.nodes.filter(n => n.data.type === 'cpp-function').length;
+      const csFuncCount = data.nodes.filter(n => n.data.type === 'csharp-function').length;
       const fileCount = data.nodes.filter(n => n.data.type === 'file').length;
       const tierCount = data.tiers ? data.tiers.length : 0;
 
@@ -52,13 +70,17 @@ document.addEventListener('DOMContentLoaded', () => {
         if (data.fileCounts.html > 0) parts.push(`HTML ${data.fileCounts.html}`);
         if (data.fileCounts.css > 0) parts.push(`CSS ${data.fileCounts.css}`);
         if (data.fileCounts.javascript > 0) parts.push(`JS ${data.fileCounts.javascript}`);
+        if (data.fileCounts.typescript > 0) parts.push(`TS ${data.fileCounts.typescript}`);
+        if (data.fileCounts.cpp > 0) parts.push(`C++ ${data.fileCounts.cpp}`);
+        if (data.fileCounts.csharp > 0) parts.push(`C# ${data.fileCounts.csharp}`);
         fileDetail = parts.join(', ');
       }
 
-      const totalFuncs = funcCount + jsFuncCount;
+      const totalFuncs = funcCount + jsFuncCount + tsFuncCount + cppFuncCount + csFuncCount;
       const webEdgeCount = data.webEdges ? data.webEdges.length : 0;
       const totalEdges = data.edges.length + webEdgeCount;
       const fileLabel = fileDetail ? `${fileCount}개 파일 (${fileDetail})` : `${fileCount}개 파일`;
+      hideLoadingState(status);
       status.textContent = `${tierCount}개 참조 그룹, ${fileLabel}, ${totalFuncs}개 함수, ${totalEdges}개 관계 발견`;
       status.className = 'success';
 
@@ -78,6 +100,7 @@ document.addEventListener('DOMContentLoaded', () => {
       document.getElementById('diagnostics-btn').classList.remove('hidden');
       document.getElementById('collapse-all-btn').classList.remove('hidden');
       document.getElementById('file-tree-toggle').classList.remove('hidden');
+      document.getElementById('layout-select').classList.remove('hidden');
       document.getElementById('divider-1').classList.remove('hidden');
       document.getElementById('divider-2').classList.remove('hidden');
 
@@ -87,10 +110,11 @@ document.addEventListener('DOMContentLoaded', () => {
       document.getElementById('toggle-edges-btn').classList.remove('active');
 
     } catch (err) {
-      status.textContent = err.message;
-      status.className = 'error';
+      hideLoadingState(status);
+      showErrorMessage(status, err);
     } finally {
       btn.disabled = false;
+      input.disabled = false;
     }
   });
 
@@ -103,3 +127,53 @@ document.addEventListener('DOMContentLoaded', () => {
     );
   });
 });
+
+/* ── 로딩 상태 표시 ── */
+
+function showLoadingState(statusEl, message) {
+  statusEl.className = 'loading-status';
+  statusEl.textContent = '';
+  const spinner = document.createElement('span');
+  spinner.className = 'loading-spinner';
+  const text = document.createElement('span');
+  text.textContent = message;
+  text.className = 'loading-text';
+  statusEl.appendChild(spinner);
+  statusEl.appendChild(text);
+}
+
+function updateLoadingStep(statusEl, message) {
+  const text = statusEl.querySelector('.loading-text');
+  if (text) {
+    text.textContent = message;
+  } else {
+    showLoadingState(statusEl, message);
+  }
+}
+
+function hideLoadingState(statusEl) {
+  statusEl.textContent = '';
+  statusEl.className = '';
+}
+
+/* ── 에러 피드백 ── */
+
+function showErrorMessage(statusEl, err) {
+  const message = err.message || '알 수 없는 오류';
+  let hint = '';
+
+  if (message.includes('fetch') || message.includes('network') || message.includes('Failed to fetch')) {
+    hint = ' (서버 연결을 확인하세요)';
+  } else if (message.includes('404') || message.includes('찾을 수 없')) {
+    hint = ' (경로나 URL을 확인하세요)';
+  } else if (message.includes('clone') || message.includes('git')) {
+    hint = ' (Git URL 형식을 확인하세요)';
+  } else if (message.includes('timeout') || message.includes('시간 초과')) {
+    hint = ' (잠시 후 다시 시도하세요)';
+  } else if (message.includes('파일') || message.includes('file')) {
+    hint = ' (파일 경로를 확인하세요)';
+  }
+
+  statusEl.textContent = `${message}${hint}`;
+  statusEl.className = 'error';
+}

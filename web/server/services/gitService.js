@@ -99,7 +99,8 @@ function findPythonFiles(dirPath) {
   return { files, warnings };
 }
 
-//디렉토리에서 지원하는 모든 파일(.py, .html, .css, .js)을 재귀적으로 찾는 함수다.
+//디렉토리에서 지원하는 모든 파일을 재귀적으로 찾는 함수다.
+//지원 확장자: .py, .html, .css, .js, .cpp, .h, .cs, .ts, .tsx
 //반환값에 language 필드를 포함한다.
 const SUPPORTED_EXTENSIONS = {
   '.py': 'python',
@@ -113,6 +114,8 @@ const SUPPORTED_EXTENSIONS = {
   '.h': 'cpp',
   '.hpp': 'cpp',
   '.cs': 'csharp',
+  '.ts': 'typescript',
+  '.tsx': 'typescript',
 };
 
 function findFiles(dirPath) {

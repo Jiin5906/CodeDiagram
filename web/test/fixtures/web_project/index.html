@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>Web Project</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .inline-highlight {
+      background-color: var(--primary-color);
+      color: white;
+    }
+  </style>
+</head>
+<body>
+  <header id="main-header" class="header sticky">
+    <nav class="nav-bar" data-role="navigation">
+      <a href="/" class="logo">Home</a>
+      <ul id="nav-list" class="nav-list">
+        <li class="nav-item">About</li>
+        <li class="nav-item">Contact</li>
+      </ul>
+    </nav>
+  </header>
+
+  <main id="content" class="main-content">
+    <section id="search-section" class="section">
+      <input id="search-input" type="text" class="input-field" data-validate="required">
+      <button id="search-btn" class="btn primary-btn" onclick="handleSearch()">Search</button>
+    </section>
+
+    <div id="results" class="results-container"></div>
+
+    <form id="contact-form" class="form" onsubmit="handleFormSubmit(event)">
+      <input type="text" name="name" class="input-field">
+      <input type="email" name="email" class="input-field">
+      <button type="submit" class="btn submit-btn">Submit</button>
+    </form>
+  </main>
+
+  <footer id="footer" class="footer">
+    <p class="copyright">2024</p>
+  </footer>
+
+  <script src="app.js"></script>
+  <script>
+    function handleSearch() {
+      var input = document.getElementById('search-input');
+      var results = document.getElementById('results');
+      results.textContent = 'Searching: ' + input.value;
+    }
+
+    function handleFormSubmit(event) {
+      event.preventDefault();
+    }
+  </script>
+</body>
+</html>

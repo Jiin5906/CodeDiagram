@@ -1,4 +1,5 @@
-//paser가 추출한 "함수 A가 funcB를 호출한다"라는 원시 데이터를 실제 어떤 파일의 어떤 함수인지 매칭한다.
+//파서가 추출한 "함수 A가 funcB를 호출한다"라는 원시 데이터를 실제 어떤 파일의 어떤 함수인지 매칭한다.
+//대상 언어: Python, C++, C#, TypeScript (티어 기반 언어)
 /*
 3단계 우선순위로 해석한다.
     1. 같은 파일 내 일치하는 함수가 있으면 그것으로 연결
@@ -78,7 +79,7 @@ function resolveCallee(call, funcByQName, funcByFile, importMap) {
     const candidates = funcByQName.get(simpleCallee) || funcByQName.get(calleeName) || [];
     const fromModule = candidates.find(f => {
       //모듈이 "utils"이고 파일이 "utils.py"일 수 있으니까 확장자 떼고 비교함
-      const fileBase = f.filePath.replace(/\.(py|cpp|cc|cxx|h|hpp|cs)$/, '').replace(/\//g, '.');
+      const fileBase = f.filePath.replace(/\.(py|cpp|cc|cxx|h|hpp|cs|ts|tsx|js|jsx)$/, '').replace(/\//g, '.');
       return fileBase === importModule || fileBase.endsWith('.' + importModule) || fileBase.endsWith('/' + importModule);
     });
     if (fromModule) return fromModule;
@@ -191,7 +192,7 @@ function resolveVariableRefs(allVariables, allVariableRefs, allImports) {
       if (importModule) {
         const candidates = varByName.get(varName) || [];
         target = candidates.find(v => {
-          const fileBase = v.filePath.replace(/\.(py|cpp|cc|cxx|h|hpp|cs)$/, '').replace(/\//g, '.');
+          const fileBase = v.filePath.replace(/\.(py|cpp|cc|cxx|h|hpp|cs|ts|tsx|js|jsx)$/, '').replace(/\//g, '.');
           return fileBase === importModule || fileBase.endsWith('.' + importModule);
         });
       }

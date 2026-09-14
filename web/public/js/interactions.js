@@ -26,26 +26,33 @@ function setupInteractions() {
     evt.stopPropagation();
   });
 
-  //함수 노드 클릭 → AI 설명 표시
+  //함수 노드 클릭 → AI 설명 + 코드 뷰어 표시
   cy.on('tap', 'node[type="function"]', function (evt) {
     const node = evt.target;
     const nodeId = node.id();
 
     highlightNode(nodeId);
     showExplanation(node.data());
+    if (node.data('code') && typeof showCodeViewer === 'function') {
+      showCodeViewer(node.data());
+    }
     evt.stopPropagation();
   });
 
-  //웹 노드 클릭 → 하이라이트 + 줌 + 엣지 애니메이션
-  cy.on('tap', 'node[type="js-function"], node[type="html-element"], node[type="css-selector"], node[type="css-variable"]', function (evt) {
+  //웹/TS/C++/C# 노드 클릭 → 하이라이트 + 줌 + 엣지 애니메이션
+  cy.on('tap', 'node[type="js-function"], node[type="ts-function"], node[type="cpp-function"], node[type="csharp-function"], node[type="html-element"], node[type="css-selector"], node[type="css-variable"]', function (evt) {
     const node = evt.target;
     const nodeId = node.id();
 
     highlightNode(nodeId);
 
-    //JS 함수이면서 코드가 있으면 AI 설명 표시
-    if (node.data('type') === 'js-function' && node.data('code')) {
+    //코드가 있으면 AI 설명 + 코드 뷰어 표시
+    const funcTypes = ['js-function', 'ts-function', 'cpp-function', 'csharp-function'];
+    if (funcTypes.includes(node.data('type')) && node.data('code')) {
       showExplanation(node.data());
+      if (typeof showCodeViewer === 'function') showCodeViewer(node.data());
+    } else if (node.data('code') && typeof showCodeViewer === 'function') {
+      showCodeViewer(node.data());
     }
 
     evt.stopPropagation();
@@ -150,6 +157,9 @@ function setupInteractions() {
 
     setupSearch();
     setupEdgeToggle();
+    setupKeyboardShortcuts();
+    setupLayoutSelect();
+    setupLongPress();
   }
 }
 
@@ -583,6 +593,125 @@ function clearSearch() {
   if (!cy) return;
   cy.nodes().removeClass('highlighted dimmed');
   cy.edges().removeClass('highlighted dimmed');
+}
+
+/* ── 키보드 단축키 ── */
+
+function setupKeyboardShortcuts() {
+  document.addEventListener('keydown', (e) => {
+    //입력 필드에 포커스 중이면 무시 (Escape 제외)
+    const activeTag = document.activeElement?.tagName;
+    const isInput = activeTag === 'INPUT' || activeTag === 'TEXTAREA';
+
+    //Escape: 팝업/오버레이 닫기
+    if (e.key === 'Escape') {
+      hideRefPopup();
+      hideExplanation();
+      clearHighlights();
+      //코드 뷰어 닫기
+      if (typeof hideCodeViewer === 'function') hideCodeViewer();
+      //진단 패널 닫기
+      document.getElementById('diagnostics-panel').classList.add('hidden');
+      //Diff 오버레이 닫기
+      const diffOverlay = document.getElementById('diff-overlay');
+      if (diffOverlay) diffOverlay.classList.add('hidden');
+      if (isInput) document.activeElement.blur();
+      return;
+    }
+
+    if (isInput) return;
+
+    //Ctrl+F: 검색 입력 포커스
+    if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+      e.preventDefault();
+      const searchInput = document.getElementById('search-input');
+      if (searchInput && !searchInput.classList.contains('hidden')) {
+        searchInput.focus();
+        searchInput.select();
+      }
+      return;
+    }
+
+    //F: 화면 전체에 맞추기
+    if (e.key === 'f' || e.key === 'F') {
+      if (cy) {
+        cy.animate({ fit: { padding: 30 } }, { duration: 300 });
+      }
+      return;
+    }
+  });
+}
+
+/* ── 롱 프레스 (모바일 우클릭 대체) ── */
+
+function setupLongPress() {
+  if (!cy) return;
+  let longPressTimer = null;
+  let longPressTarget = null;
+
+  cy.on('tapstart', 'node', function (evt) {
+    longPressTarget = evt.target;
+    longPressTimer = setTimeout(() => {
+      if (!longPressTarget) return;
+      const node = longPressTarget;
+      const nodeType = node.data('type');
+      const funcTypes = ['function', 'js-function', 'ts-function', 'cpp-function', 'csharp-function'];
+
+      if (funcTypes.includes(nodeType)) {
+        highlightNode(node.id());
+        if (node.data('code')) {
+          showExplanation(node.data());
+          if (typeof showCodeViewer === 'function') showCodeViewer(node.data());
+        }
+      } else if (nodeType === 'file') {
+        //파일 노드 롱프레스 → 파일 상세 뷰
+        const filePath = node.data('fullPath');
+        if (filePath && graphData && typeof renderFileDetailView === 'function') {
+          renderFileDetailView(graphData, filePath);
+          setupInteractions();
+        }
+      }
+      longPressTarget = null;
+    }, 600);
+  });
+
+  cy.on('tapend tapdrag', function () {
+    if (longPressTimer) {
+      clearTimeout(longPressTimer);
+      longPressTimer = null;
+    }
+    longPressTarget = null;
+  });
+}
+
+/* ── 레이아웃 선택 ── */
+
+function setupLayoutSelect() {
+  const select = document.getElementById('layout-select');
+  if (!select) return;
+
+  select.addEventListener('change', () => {
+    if (!cy || !graphData) return;
+    const layout = select.value;
+
+    if (layout === 'dagre') {
+      cy.layout({
+        name: 'dagre',
+        animate: false,
+        fit: true,
+        padding: 40,
+        nodeDimensionsIncludeLabels: true,
+        rankDir: 'TB',
+        rankSep: 80,
+        nodeSep: 40,
+        edgeSep: 20,
+      }).run();
+    } else {
+      //fcose: 원래 renderGraph 재실행
+      renderGraph(graphData);
+      setupInteractions();
+    }
+  });
 }
 
 /* ── 엣지 보기 토글 ── */

@@ -1,5 +1,5 @@
 //HTML/CSS/JS 간 크로스 언어 관계를 해석하는 웹 전용 resolver다.
-//Python resolver와 분리하여 웹 파일 간 연결 관계를 해석한다.
+//티어 기반 resolver(resolver.js)와 분리하여 웹 파일 간 연결 관계를 해석한다.
 
 const path = require('path');
 

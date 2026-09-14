@@ -140,6 +140,26 @@ body {
   display: none;
 }
 
+.toolbar-select {
+  padding: 4px 8px;
+  background: #1e293b;
+  border: 1px solid #334155;
+  color: #94a3b8;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  outline: none;
+}
+
+.toolbar-select:hover {
+  border-color: #60a5fa;
+  color: #e2e8f0;
+}
+
+.toolbar-select.hidden {
+  display: none;
+}
+
 /* ── 검색 입력 필드 ── */
 .toolbar-search {
   padding: 5px 12px;
@@ -267,6 +287,21 @@ body {
   border-color: #94a3b8;
 }
 
+.legend-swatch.ts-function {
+  background: #1e3a5f;
+  border-color: #3b82f6;
+}
+
+.legend-swatch.cpp-function {
+  background: #164e63;
+  border-color: #06b6d4;
+}
+
+.legend-swatch.csharp-function {
+  background: #14532d;
+  border-color: #22c55e;
+}
+
 .legend-swatch.method {
   background: #1e293b;
   border-color: #a78bfa;
@@ -327,6 +362,23 @@ body {
   border: 3px solid #f59e0b;
   border-radius: 3px;
   background: transparent;
+}
+
+.legend-divider {
+  width: 100%;
+  height: 1px;
+  background: #374151;
+  margin: 4px 0;
+}
+
+.legend-symbol {
+  display: inline-block;
+  width: 18px;
+  font-size: 11px;
+  font-weight: bold;
+  color: #fbbf24;
+  text-align: center;
+  margin-right: 4px;
 }
 
 /* ── 메인 콘텐츠 래퍼 (좌우 분할) ── */
@@ -396,11 +448,54 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   transition: background 0.15s, color 0.15s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .tree-item:hover {
   background: #1e293b;
   color: #60a5fa;
+}
+
+.tree-item.active {
+  background: #1e3a5f;
+  color: #93c5fd;
+  border-left: 2px solid #3b82f6;
+}
+
+.tree-item.dragging {
+  opacity: 0.4;
+}
+
+.tree-item.drop-target {
+  border-top: 2px solid #60a5fa;
+  background: rgba(96, 165, 250, 0.08);
+}
+
+.tree-file-icon {
+  font-size: 12px;
+  width: 18px;
+  text-align: center;
+  flex-shrink: 0;
+  font-weight: 700;
+  font-family: 'Cascadia Code', 'Fira Code', Consolas, monospace;
+}
+
+.tree-file-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+}
+
+.tree-func-badge {
+  font-size: 11px;
+  background: #334155;
+  color: #94a3b8;
+  padding: 1px 5px;
+  border-radius: 8px;
+  flex-shrink: 0;
+  font-weight: 600;
 }
 
 .tree-dir-header {
@@ -425,6 +520,89 @@ body {
 
 .tree-dir.collapsed > .tree-dir-content {
   display: none;
+}
+
+/* ── 소스코드 뷰어 패널 ── */
+#code-viewer-panel {
+  width: 400px;
+  min-width: 400px;
+  background: #111827;
+  border-left: 1px solid #1e293b;
+  display: flex;
+  flex-direction: column;
+  transition: width 0.3s, min-width 0.3s, opacity 0.3s;
+  overflow: hidden;
+}
+
+#code-viewer-panel.collapsed {
+  width: 0;
+  min-width: 0;
+  opacity: 0;
+  border-left: none;
+}
+
+.code-viewer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  border-bottom: 1px solid #1e293b;
+  font-weight: 600;
+  font-size: 13px;
+  color: #93c5fd;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 0;
+}
+
+.code-viewer-header button {
+  background: none;
+  border: none;
+  color: #64748b;
+  font-size: 18px;
+  cursor: pointer;
+  padding: 0 4px;
+  transition: color 0.15s;
+  flex-shrink: 0;
+}
+
+.code-viewer-header button:hover {
+  color: #f1f5f9;
+}
+
+#code-viewer-content {
+  flex: 1;
+  overflow: auto;
+  display: flex;
+  font-size: 13px;
+  line-height: 1.6;
+  font-family: 'Cascadia Code', 'Fira Code', Consolas, monospace;
+}
+
+.code-line-numbers {
+  padding: 12px 8px 12px 12px;
+  color: #475569;
+  text-align: right;
+  user-select: none;
+  white-space: pre;
+  flex-shrink: 0;
+  border-right: 1px solid #1e293b;
+  background: #0a0e17;
+}
+
+#code-viewer-content pre {
+  margin: 0;
+  flex: 1;
+  overflow-x: auto;
+}
+
+#code-viewer-content code {
+  padding: 12px 14px;
+  display: block;
+  background: transparent !important;
+  font-size: 13px;
+  line-height: 1.6;
 }
 
 /* ── 그래프 영역 ── */
@@ -807,6 +985,71 @@ body {
   color: #86efac;
 }
 
+/* ── 빈 상태 (Empty State) ── */
+#empty-state {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  z-index: 5;
+  display: none;
+  pointer-events: none;
+}
+
+#empty-state.visible {
+  display: block;
+}
+
+.empty-state-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  opacity: 0.6;
+}
+
+.empty-state-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: #60a5fa;
+  margin-bottom: 8px;
+}
+
+.empty-state-desc {
+  font-size: 15px;
+  color: #64748b;
+  line-height: 1.5;
+}
+
+/* ── 로딩 스피너 ── */
+.loading-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #60a5fa;
+  font-size: 13px;
+  flex-basis: 100%;
+}
+
+.loading-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid #334155;
+  border-top-color: #60a5fa;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.loading-text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* ── 스크롤바 ── */
 ::-webkit-scrollbar {
   width: 5px;
@@ -824,4 +1067,146 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: #475569;
+}
+
+/* ── 반응형 레이아웃 (모바일/WebView) ── */
+@media (max-width: 768px) {
+  #top-bar {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 6px 12px;
+  }
+
+  #top-bar .logo {
+    font-size: 16px;
+  }
+
+  #analyze-form {
+    order: 2;
+    max-width: 100%;
+    flex-basis: 100%;
+  }
+
+  #source-input {
+    font-size: 14px;
+    padding: 8px 12px;
+  }
+
+  #toolbar {
+    order: 3;
+    flex-basis: 100%;
+    flex-wrap: wrap;
+    margin-left: 0;
+    gap: 4px;
+  }
+
+  .toolbar-btn {
+    padding: 6px 10px;
+    font-size: 13px;
+    min-height: 36px;
+  }
+
+  .toolbar-search {
+    width: 100%;
+    min-height: 36px;
+  }
+
+  .toolbar-divider {
+    display: none !important;
+  }
+
+  /* 파일 트리: 모바일에서 전체 너비 오버레이 */
+  #file-tree-panel {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100% !important;
+    min-width: 100% !important;
+    height: 100vh;
+    z-index: 150;
+    border-right: none;
+  }
+
+  #file-tree-panel.collapsed {
+    width: 0 !important;
+    min-width: 0 !important;
+  }
+
+  /* 코드 뷰어: 모바일에서 전체 너비 */
+  #code-viewer-panel {
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: 100% !important;
+    min-width: 100% !important;
+    height: 100vh;
+    z-index: 150;
+    border-left: none;
+  }
+
+  #code-viewer-panel.collapsed {
+    width: 0 !important;
+    min-width: 0 !important;
+  }
+
+  /* 범례 축소 */
+  #legend {
+    gap: 10px;
+    padding: 4px 12px;
+    font-size: 11px;
+  }
+
+  .legend-swatch {
+    width: 10px;
+    height: 10px;
+  }
+
+  /* 오버레이 크기 조정 */
+  .overlay {
+    width: calc(100vw - 20px);
+    right: 10px;
+    left: 10px;
+    max-width: none;
+  }
+
+  #diagnostics-panel {
+    width: calc(100vw - 20px);
+    left: 10px;
+  }
+
+  /* Diff 오버레이 */
+  .diff-overlay-inner {
+    width: calc(100vw - 20px);
+  }
+
+  #diff-content {
+    flex-direction: column;
+  }
+
+  /* 터치 타겟 최소 크기 */
+  .tree-item {
+    min-height: 44px;
+    padding: 10px 12px;
+  }
+
+  .tree-dir-header {
+    min-height: 44px;
+    padding: 10px 12px;
+  }
+
+  .ref-item {
+    min-height: 44px;
+    padding: 10px 8px;
+  }
+
+  .popup-header button,
+  .overlay-header button,
+  .file-tree-header button,
+  .code-viewer-header button {
+    min-width: 44px;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
 }
