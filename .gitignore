@@ -47,3 +47,6 @@ Thumbs.db
 
 # 환경변수
 .env
+
+# 클로드
+CLAUDE.md

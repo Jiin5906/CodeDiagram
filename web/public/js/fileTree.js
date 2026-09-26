@@ -191,33 +191,36 @@ function reorderTreeItems(draggedPath, targetPath, container) {
 function focusFileNode(filePath) {
   if (!cy) return;
 
-  //해당 파일 노드 찾기
-  const fileNodes = cy.nodes('[type="file"]').filter(n => n.data('fullPath') === filePath);
+  //뷰 모드에 따라 적절한 노드 타입으로 검색
+  const selector = currentViewMode === 'file' ? '[type="file-node"]' : '[type="file"]';
+  const fileNodes = cy.nodes(selector).filter(n => n.data('fullPath') === filePath);
   if (fileNodes.length === 0) return;
 
   const target = fileNodes[0];
 
-  //모든 하이라이트 초기화
-  cy.nodes().removeClass('highlighted dimmed');
-  cy.edges().removeClass('highlighted dimmed');
+  if (currentViewMode === 'file') {
+    //파일 뷰: 포커스 디밍 스타일 사용
+    highlightNode(target);
+  } else {
+    //함수 뷰: 기존 하이라이트 로직
+    cy.nodes().removeClass('highlighted dimmed');
+    cy.edges().removeClass('highlighted dimmed');
 
-  //파일 노드 하이라이트
-  target.addClass('highlighted');
+    target.addClass('highlighted');
 
-  //자식 함수 노드도 함께 하이라이트
-  const children = target.children();
-  children.addClass('highlighted');
+    const children = target.children();
+    children.addClass('highlighted');
 
-  //나머지 노드는 흐리게 (조상 제외)
-  const ancestors = target.ancestors();
-  const keepVisible = target.union(children).union(ancestors);
-  cy.nodes().not(keepVisible).addClass('dimmed');
+    const ancestors = target.ancestors();
+    const keepVisible = target.union(children).union(ancestors);
+    cy.nodes().not(keepVisible).addClass('dimmed');
+  }
 
   //카메라 이동
   cy.animate({
     center: { eles: target },
-    zoom: 2,
-  }, { duration: 400 });
+    zoom: currentViewMode === 'file' ? 1.5 : 2,
+  }, { duration: 400, easing: 'ease-out-cubic' });
 }
 
 let fileTreeListenersBound = false;
@@ -234,9 +237,12 @@ function setupFileTree() {
 
   toggleBtn.addEventListener('click', () => {
     panel.classList.toggle('collapsed');
-    //패널 전환 후 그래프 리사이즈
+    //패널 전환 후 그래프 리사이즈 + 화면 맞춤
     setTimeout(() => {
-      if (cy) cy.resize();
+      if (cy) {
+        cy.resize();
+        cy.fit(undefined, 30);
+      }
     }, 310);
   });
 
@@ -244,7 +250,10 @@ function setupFileTree() {
     closeBtn.addEventListener('click', () => {
       panel.classList.add('collapsed');
       setTimeout(() => {
-        if (cy) cy.resize();
+        if (cy) {
+          cy.resize();
+          cy.fit(undefined, 30);
+        }
       }, 310);
     });
   }

@@ -7,7 +7,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CodeDiagram</title>
   <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
-  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/style.css?v=2">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/python.min.js"></script>
@@ -21,6 +21,10 @@
   <script src="https://unpkg.com/cytoscape-fcose@2.2.0/cytoscape-fcose.js"></script>
   <script src="https://unpkg.com/dagre@0.8.5/dist/dagre.min.js"></script>
   <script src="https://unpkg.com/cytoscape-dagre@2.5.0/cytoscape-dagre.js"></script>
+  <script src="https://unpkg.com/d3-dispatch@3/dist/d3-dispatch.min.js"></script>
+  <script src="https://unpkg.com/d3-quadtree@3/dist/d3-quadtree.min.js"></script>
+  <script src="https://unpkg.com/d3-timer@3/dist/d3-timer.min.js"></script>
+  <script src="https://unpkg.com/d3-force@3/dist/d3-force.min.js"></script>
 </head>
 <body>
   <div id="top-bar">
@@ -33,36 +37,21 @@
         autocomplete="off"
       />
       <button type="submit" id="analyze-btn">분석</button>
-      <div id="status"></div>
     </form>
-    <div id="toolbar">
-      <div class="toolbar-group">
-        <input
-          type="text"
-          id="search-input"
-          class="toolbar-search hidden"
-          placeholder="함수/파일 검색..."
-          autocomplete="off"
-        />
-      </div>
-      <span class="toolbar-divider hidden" id="divider-1"></span>
-      <div class="toolbar-group">
-        <button id="toggle-edges-btn" class="toolbar-btn hidden" title="엣지 표시/숨김 토글">그래프 보기</button>
-        <button id="view-toggle-btn" class="toolbar-btn hidden" title="뷰 전환">함수 뷰</button>
-      </div>
-      <span class="toolbar-divider hidden" id="divider-2"></span>
-      <div class="toolbar-group">
-        <select id="layout-select" class="toolbar-select hidden" title="레이아웃 알고리즘">
-          <option value="fcose">fcose</option>
-          <option value="dagre">dagre</option>
-        </select>
-        <button id="diagnostics-btn" class="toolbar-btn hidden" title="진단 실행">진단</button>
-        <button id="collapse-all-btn" class="toolbar-btn hidden" title="전체 접기/펼치기">전체 접기</button>
-        <button id="file-tree-toggle" class="toolbar-btn hidden" title="파일 트리">파일 트리</button>
-      </div>
-      <button id="back-to-package-btn" class="toolbar-btn hidden" title="패키지 뷰로 복귀">뒤로가기</button>
-    </div>
+    <div id="repo-chip" class="hidden"></div>
+    <input
+      type="text"
+      id="search-input"
+      class="toolbar-search hidden"
+      placeholder="검색... (Ctrl+F)"
+      autocomplete="off"
+    />
+    <button id="back-to-package-btn" class="toolbar-btn hidden" title="패키지 뷰로 복귀">뒤로가기</button>
   </div>
+
+  <!--이전 호환용 숨겨진 더미 요소들 (interactions.js 참조용)-->
+  <span id="divider-1" class="hidden"></span>
+  <span id="divider-2" class="hidden"></span>
 
   <!--미리보기 배너-->
   <div id="preview-banner" class="hidden">
@@ -70,27 +59,32 @@
     <button id="preview-restore-btn">원래대로</button>
   </div>
 
-  <div id="legend">
-    <div class="legend-item"><span class="legend-swatch tier"></span> 참조 횟수 그룹</div>
-    <div class="legend-item"><span class="legend-swatch file"></span> 파일</div>
-    <div class="legend-item"><span class="legend-swatch function"></span> 함수</div>
-    <div class="legend-item"><span class="legend-swatch ts-function"></span> TS 함수</div>
-    <div class="legend-item"><span class="legend-swatch cpp-function"></span> C++ 함수</div>
-    <div class="legend-item"><span class="legend-swatch csharp-function"></span> C# 함수</div>
-    <div class="legend-item"><span class="legend-swatch method"></span> 클래스 메서드</div>
-    <div class="legend-item"><span class="legend-swatch variable-swatch"></span> 변수/필드</div>
-    <div class="legend-item"><span class="legend-swatch varref-swatch"></span> 변수 참조</div>
-    <div class="legend-item"><span class="legend-swatch edge-swatch"></span> 호출 관계</div>
-    <div class="legend-item"><span class="legend-swatch inheritance-swatch"></span> 상속 관계</div>
-    <div class="legend-item"><span class="legend-swatch cycle-swatch"></span> 순환 참조</div>
-    <div class="legend-item"><span class="legend-swatch package-swatch"></span> 패키지</div>
-    <div class="legend-item coupling-legend"><span class="legend-swatch coupling-swatch"></span> 결합도 (테두리 두께)</div>
-    <div class="legend-divider"></div>
-    <div class="legend-item"><span class="legend-symbol">N↓</span> 호출당한 횟수</div>
-    <div class="legend-item"><span class="legend-symbol">N↑</span> 호출한 횟수</div>
-  </div>
 
   <div id="main-content">
+    <!--좌측 리본 (아이콘 + 라벨 세로 바). data-tip은 마우스를 올리면 뜨는 설명-->
+    <div id="ribbon">
+      <button class="ribbon-btn" id="file-tree-toggle" data-tip="파일 탐색기 — 프로젝트의 파일 목록을 열고 닫습니다" aria-label="파일">
+        <span class="ribbon-icon" aria-hidden="true">&#x1F4C1;</span>
+        <span class="ribbon-label">파일</span>
+      </button>
+      <button class="ribbon-btn" id="view-toggle-btn" data-tip="뷰 전환 — 지금은 파일 뷰입니다. 누르면 함수 단위로 자세히 봅니다" aria-label="파일 뷰">
+        <span class="ribbon-icon" aria-hidden="true">&#x1F504;</span>
+        <span class="ribbon-label">파일 뷰</span>
+      </button>
+      <button class="ribbon-btn" id="diagnostics-btn" data-tip="코드 진단 — 순환 참조, 과한 결합도 등 개선할 점을 보여줍니다" aria-label="진단">
+        <span class="ribbon-icon" aria-hidden="true">&#x26A0;</span>
+        <span class="ribbon-label">진단</span>
+      </button>
+      <div class="ribbon-spacer"></div>
+      <button class="ribbon-btn hidden" id="toggle-edges-btn" data-tip="연결선 보기 — 함수 사이의 호출 관계 선을 표시합니다" aria-label="선 보기">
+        <span class="ribbon-icon" aria-hidden="true">&#x1F517;</span>
+        <span class="ribbon-label">선 보기</span>
+      </button>
+      <button class="ribbon-btn hidden" id="collapse-all-btn" data-tip="전체 접기 — 모든 파일 그룹을 접거나 펼칩니다" aria-label="전체 접기">
+        <span class="ribbon-icon" aria-hidden="true">&#x2261;</span>
+        <span class="ribbon-label">전체 접기</span>
+      </button>
+    </div>
     <div id="file-tree-panel" class="collapsed">
       <div class="file-tree-header">
         <span>파일 탐색기</span>
@@ -105,6 +99,52 @@
         <div class="empty-state-desc">Git URL 또는 로컬 경로를 입력하고 분석 버튼을 클릭하세요</div>
       </div>
       <div id="cy"></div>
+      <!--그래프 설정 패널 (우측 상단)-->
+      <div id="graph-settings" class="hidden">
+        <button id="graph-settings-toggle" title="그래프 설정" aria-expanded="false"><span aria-hidden="true">&#x2699;</span> 설정</button>
+        <div id="graph-settings-content" class="hidden">
+          <div class="gs-section">
+            <label class="gs-label" for="layout-select">배치 방식</label>
+            <select id="layout-select" class="gs-select">
+              <option value="fcose">자연스럽게 퍼짐</option>
+              <option value="dagre">위에서 아래로 (계층형)</option>
+            </select>
+          </div>
+          <div class="gs-section gs-section-stack">
+            <label class="gs-label" for="local-graph-depth">주변 표시 범위</label>
+            <div class="gs-row">
+              <input type="range" id="local-graph-depth" min="1" max="4" value="1" step="1" class="gs-range" />
+              <span id="local-graph-depth-label" class="gs-value">1</span>
+            </div>
+            <div class="gs-help">파일을 클릭했을 때 몇 단계 떨어진 파일까지 함께 보여줄지 정합니다</div>
+          </div>
+        </div>
+      </div>
+      <!--범례 패널 (접이식, 캔버스 좌상단)-->
+      <div id="legend-panel" class="hidden">
+        <button id="legend-toggle" aria-expanded="true">범례 ▾</button>
+        <div id="legend-content">
+          <div id="legend-file-view"></div>
+          <div id="legend-function-view" class="hidden"></div>
+        </div>
+      </div>
+      <!--하단 상태바-->
+      <div id="status-bar" class="hidden">
+        <div id="status"></div>
+        <button id="warning-badge" class="hidden" title="진단 결과 보기"></button>
+      </div>
+      <!--로컬 그래프 컨트롤 (Phase 2)-->
+      <div id="local-graph-controls" class="hidden">
+        <label>주변 범위</label>
+        <span id="local-graph-depth-display">1</span>
+        <button id="local-graph-exit" title="로컬 그래프 나가기 (Esc)">&#x2715;</button>
+      </div>
+      <!--캔버스 카드 레이어 (Phase 3)-->
+      <div id="canvas-cards-layer"></div>
+      <!--미니맵 (Phase 2)-->
+      <div id="minimap-container" class="hidden">
+        <canvas id="minimap-canvas" width="180" height="130"></canvas>
+      </div>
     </div>
     <div id="code-viewer-panel" class="collapsed">
       <div class="code-viewer-header">
@@ -163,11 +203,16 @@
     </div>
   </div>
 
-  <script src="js/graph.js?v=3"></script>
+  <script src="js/graph.js?v=13"></script>
+  <script src="js/forceSim.js?v=4"></script>
+  <script src="js/codeEffects.js?v=1"></script>
   <script src="js/codeViewer.js"></script>
-  <script src="js/interactions.js"></script>
+  <script src="js/canvasCard.js"></script>
+  <script src="js/localGraph.js"></script>
+  <script src="js/minimap.js"></script>
+  <script src="js/interactions.js?v=2"></script>
   <script src="js/diffPreview.js"></script>
   <script src="js/fileTree.js"></script>
-  <script src="js/app.js?v=3"></script>
+  <script src="js/app.js?v=5"></script>
 </body>
 </html>

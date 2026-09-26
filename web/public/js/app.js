@@ -93,21 +93,57 @@ document.addEventListener('DOMContentLoaded', () => {
       buildFileTree(data);
       setupFileTree();
 
-      //툴바 버튼 및 구분선 표시
+      //동적 범례 렌더링
+      renderDynamicLegend(data);
+
+      //하단 상태바 표시
+      const statusBar = document.getElementById('status-bar');
+      if (statusBar) statusBar.classList.remove('hidden');
+
+      //경고 배지
+      const warningBadge = document.getElementById('warning-badge');
+      if (data.warnings && data.warnings.length > 0 && warningBadge) {
+        warningBadge.textContent = '\u26A0 ' + data.warnings.length;
+        warningBadge.classList.remove('hidden');
+        warningBadge.onclick = () => {
+          if (lastAnalysisData) {
+            showDiagnosticsPanel(lastAnalysisData.diagnostics, lastAnalysisData.suggestions);
+          }
+        };
+      } else if (warningBadge) {
+        warningBadge.classList.add('hidden');
+      }
+
+      //리포 칩 표시 + 입력폼 축소
+      const repoChip = document.getElementById('repo-chip');
+      if (repoChip) {
+        const chipText = source.replace(/^https?:\/\/github\.com\//, '').replace(/\.git$/, '');
+        repoChip.textContent = chipText;
+        repoChip.classList.remove('hidden');
+      }
+
+      //그래프 설정 패널 표시
+      const gs = document.getElementById('graph-settings');
+      if (gs) gs.classList.remove('hidden');
+
+      //UI 요소 표시
       document.getElementById('search-input').classList.remove('hidden');
-      document.getElementById('toggle-edges-btn').classList.remove('hidden');
-      document.getElementById('view-toggle-btn').classList.remove('hidden');
-      document.getElementById('diagnostics-btn').classList.remove('hidden');
-      document.getElementById('collapse-all-btn').classList.remove('hidden');
-      document.getElementById('file-tree-toggle').classList.remove('hidden');
-      document.getElementById('layout-select').classList.remove('hidden');
-      document.getElementById('divider-1').classList.remove('hidden');
-      document.getElementById('divider-2').classList.remove('hidden');
+
+      //파일 뷰 기본이므로 함수 뷰 전용 UI 숨김
+      document.getElementById('toggle-edges-btn').classList.add('hidden');
+      document.getElementById('collapse-all-btn').classList.add('hidden');
 
       //엣지 토글 상태 초기화
       edgesVisible = false;
-      document.getElementById('toggle-edges-btn').textContent = '그래프 보기';
+
+      //새 분석은 파일 뷰로 시작하므로 리본 라벨도 초기 상태로
+      document.getElementById('view-toggle-btn').classList.remove('active');
       document.getElementById('toggle-edges-btn').classList.remove('active');
+      setRibbonLabel('view-toggle-btn', '파일 뷰', RIBBON_TIPS.fileView);
+      setRibbonLabel('toggle-edges-btn', '선 보기', RIBBON_TIPS.edgesHidden);
+
+      //localStorage에서 패널 상태 복원
+      restorePanelState();
 
     } catch (err) {
       hideLoadingState(status);
@@ -154,6 +190,226 @@ function updateLoadingStep(statusEl, message) {
 function hideLoadingState(statusEl) {
   statusEl.textContent = '';
   statusEl.className = '';
+}
+
+/* ── 패널 상태 저장/복원 (localStorage) ── */
+
+function savePanelState(key, collapsed) {
+  try {
+    const state = JSON.parse(localStorage.getItem('codediagram-panels') || '{}');
+    state[key] = collapsed;
+    localStorage.setItem('codediagram-panels', JSON.stringify(state));
+  } catch (e) { /* noop */ }
+}
+
+function restorePanelState() {
+  try {
+    const state = JSON.parse(localStorage.getItem('codediagram-panels') || '{}');
+    const fileTree = document.getElementById('file-tree-panel');
+    const codeViewer = document.getElementById('code-viewer-panel');
+
+    if (fileTree && state.fileTree === false) {
+      fileTree.classList.remove('collapsed');
+    }
+    if (codeViewer && state.codeViewer === false) {
+      codeViewer.classList.remove('collapsed');
+    }
+  } catch (e) { /* noop */ }
+}
+
+//그래프 설정 토글 + 범례 토글 설정
+document.addEventListener('DOMContentLoaded', () => {
+  const gsToggle = document.getElementById('graph-settings-toggle');
+  const gsContent = document.getElementById('graph-settings-content');
+  if (gsToggle && gsContent) {
+    gsToggle.addEventListener('click', () => {
+      const hidden = gsContent.classList.toggle('hidden');
+      gsToggle.setAttribute('aria-expanded', String(!hidden));
+      gsToggle.classList.toggle('active', !hidden);
+    });
+  }
+
+  //패널 상태를 localStorage에 저장하도록 기존 토글 이벤트 보강
+  const fileTreePanel = document.getElementById('file-tree-panel');
+  if (fileTreePanel) {
+    const observer = new MutationObserver(() => {
+      savePanelState('fileTree', !fileTreePanel.classList.contains('collapsed'));
+    });
+    observer.observe(fileTreePanel, { attributes: true, attributeFilter: ['class'] });
+  }
+
+  const codeViewerPanel = document.getElementById('code-viewer-panel');
+  if (codeViewerPanel) {
+    const observer = new MutationObserver(() => {
+      savePanelState('codeViewer', !codeViewerPanel.classList.contains('collapsed'));
+    });
+    observer.observe(codeViewerPanel, { attributes: true, attributeFilter: ['class'] });
+  }
+});
+
+/* ── 동적 범례 렌더링 ── */
+
+const LANG_LEGEND = {
+  python:     { color: '#F7C948', label: 'Python' },
+  javascript: { color: '#FBBF24', label: 'JavaScript' },
+  typescript: { color: '#3B82F6', label: 'TypeScript' },
+  cpp:        { color: '#06B6D4', label: 'C++' },
+  csharp:     { color: '#22C55E', label: 'C#' },
+  html:       { color: '#F97316', label: 'HTML' },
+  css:        { color: '#A855F7', label: 'CSS' },
+};
+
+//범례에 표시할 관계 유형 (같은 색은 한 줄로 묶음). 색은 graph.js의 EDGE_TYPE_COLORS와 같다.
+const EDGE_LEGEND = [
+  { types: ['call'], label: '함수 호출' },
+  { types: ['inheritance'], label: '상속' },
+  { types: ['variable-ref'], label: '변수 참조' },
+  { types: ['script-ref', 'style-ref'], label: '스크립트·스타일 연결' },
+  { types: ['dom-access'], label: 'DOM 접근' },
+  { types: ['css-target'], label: 'CSS 적용 대상' },
+  { types: ['event-binding'], label: '이벤트 연결' },
+  { types: ['js-import', 'css-import'], label: 'import' },
+  { types: ['css-var'], label: 'CSS 변수' },
+];
+
+function renderDynamicLegend(data) {
+  const fileView = document.getElementById('legend-file-view');
+  const funcView = document.getElementById('legend-function-view');
+  if (!fileView || !funcView) return;
+
+  fileView.textContent = '';
+  funcView.textContent = '';
+
+  //1) 언어 — 분석 결과에 존재하는 언어만
+  const fc = data.fileCounts || {};
+  const langItems = Object.entries(LANG_LEGEND)
+    .filter(([key]) => fc[key] > 0)
+    .map(([key, info]) => _legendRow(_legendDot(info.color), info.label, fc[key]));
+  if (langItems.length) fileView.appendChild(_legendSection('언어 (원 색)', langItems, 'legend-grid'));
+
+  //2) 선 색 — 실제로 존재하는 관계 유형만. 기본은 회색이고 마우스를 올리면 이 색으로 바뀐다.
+  const present = new Set();
+  if (data.edges && data.edges.length) present.add('call');
+  if (data.inheritanceEdges && data.inheritanceEdges.length) present.add('inheritance');
+  if (data.variableEdges && data.variableEdges.length) present.add('variable-ref');
+  for (const e of (data.webEdges || [])) present.add(e.type);
+  const edgeItems = EDGE_LEGEND
+    .filter(item => item.types.some(t => present.has(t)))
+    .map(item => _legendRow(_legendLine(EDGE_TYPE_COLORS[item.types[0]]), item.label));
+  if (edgeItems.length) fileView.appendChild(_legendSection('선 색 (마우스를 올리면 표시)', edgeItems));
+
+  //3) 진단 표시 — codeEffects.js의 글로우와 같은 기준
+  const diag = data.diagnostics || {};
+  const hasCycle = ((diag.cycles && diag.cycles.files) || []).length > 0;
+  const hasWarning = [...(diag.couplingIssues || []), ...(diag.antiPatterns || [])]
+    .some(i => i.severity === 'warning' || i.severity === 'error');
+  const diagItems = [];
+  if (hasCycle) diagItems.push(_legendRow(_legendDot('#EF4444', true), '순환 참조 (서로를 참조하는 파일)'));
+  if (hasWarning) diagItems.push(_legendRow(_legendDot('#F59E0B', true), '주의 필요 (과한 결합도 등)'));
+  if (diagItems.length) fileView.appendChild(_legendSection('진단 (깜빡이는 빛)', diagItems));
+
+  //4) 읽는 법
+  fileView.appendChild(_legendSection('읽는 법', [
+    _legendRow(_legendSymbol('●'), '원이 클수록 함수가 많은 파일'),
+    _legendRow(_legendSymbol('─'), '선이 굵을수록 참조가 많음'),
+    _legendRow(_legendSymbol('↗'), '클릭: 주변 파일만 보기 · 더블클릭: 코드 열기'),
+  ]));
+
+  //함수 뷰 범례
+  const funcItems = [
+    { cls: 'tier', label: '참조 횟수 그룹' },
+    { cls: 'file', label: '파일' },
+    { cls: 'function', label: '함수' },
+    { cls: 'method', label: '클래스 메서드' },
+    { cls: 'edge-swatch', label: '호출 관계' },
+    { cls: 'cycle-swatch', label: '순환 참조' },
+  ];
+  //언어별 함수가 실제로 존재할 때만 추가
+  if (fc.typescript > 0) funcItems.splice(3, 0, { cls: 'ts-function', label: 'TS 함수' });
+  if (fc.cpp > 0) funcItems.splice(3, 0, { cls: 'cpp-function', label: 'C++ 함수' });
+  if (fc.csharp > 0) funcItems.splice(3, 0, { cls: 'csharp-function', label: 'C# 함수' });
+  funcView.appendChild(_legendSection('함수 뷰', funcItems.map(fi => {
+    const swatch = document.createElement('span');
+    swatch.className = 'legend-swatch ' + fi.cls;
+    return _legendRow(swatch, fi.label);
+  })));
+
+  //범례 접기/펼치기 — 처음 쓰는 사람을 위해 기본은 펼침, 접은 상태는 기억
+  const toggle = document.getElementById('legend-toggle');
+  const panel = document.getElementById('legend-panel');
+  if (toggle && panel) {
+    const applyCollapsed = (collapsed) => {
+      panel.classList.toggle('collapsed', collapsed);
+      toggle.textContent = collapsed ? '범례 ▸' : '범례 ▾';
+      toggle.setAttribute('aria-expanded', String(!collapsed));
+    };
+    applyCollapsed(_loadPanelState().legendCollapsed === true);
+    toggle.onclick = () => {
+      const collapsed = !panel.classList.contains('collapsed');
+      applyCollapsed(collapsed);
+      savePanelState('legendCollapsed', collapsed);
+    };
+  }
+}
+
+function _loadPanelState() {
+  try {
+    return JSON.parse(localStorage.getItem('codediagram-panels') || '{}');
+  } catch (e) {
+    return {};
+  }
+}
+
+function _legendSection(title, rows, extraClass) {
+  const section = document.createElement('div');
+  section.className = 'legend-section';
+  const heading = document.createElement('div');
+  heading.className = 'legend-section-title';
+  heading.textContent = title;
+  const body = document.createElement('div');
+  body.className = 'legend-section-body' + (extraClass ? ' ' + extraClass : '');
+  rows.forEach(row => body.appendChild(row));
+  section.appendChild(heading);
+  section.appendChild(body);
+  return section;
+}
+
+//count가 있으면 라벨 오른쪽에 흐린 숫자로 표시 (예: Python 12)
+function _legendRow(marker, label, count) {
+  const row = document.createElement('div');
+  row.className = 'legend-item';
+  row.appendChild(marker);
+  const text = document.createElement('span');
+  text.textContent = label;
+  row.appendChild(text);
+  if (count !== undefined) {
+    const countEl = document.createElement('span');
+    countEl.className = 'legend-count';
+    countEl.textContent = count;
+    row.appendChild(countEl);
+  }
+  return row;
+}
+
+function _legendDot(color, glow) {
+  const dot = document.createElement('span');
+  dot.className = 'legend-dot' + (glow ? ' glow' : '');
+  dot.style.setProperty('--dot-color', color);
+  return dot;
+}
+
+function _legendLine(color) {
+  const line = document.createElement('span');
+  line.className = 'legend-line';
+  line.style.background = color;
+  return line;
+}
+
+function _legendSymbol(symbol) {
+  const span = document.createElement('span');
+  span.className = 'legend-symbol';
+  span.textContent = symbol;
+  return span;
 }
 
 /* ── 에러 피드백 ── */

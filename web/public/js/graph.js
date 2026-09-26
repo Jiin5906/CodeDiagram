@@ -1,15 +1,227 @@
-//그래프 랜더링 및 스타일 코드
+//그래프 렌더링 및 스타일 코드
+//Phase 1 리뉴얼: 파일 노드 기반 플랫 그래프 + 옵시디언 스타일 글로우/디밍
 
 let cy = null;
-//현재 뷰 모드: 'function' 또는 'package'
-let currentViewMode = 'function';
+//현재 뷰 모드: 'file' (기본) 또는 'function' 또는 'package' 또는 'file-detail'
+let currentViewMode = 'file';
 //원본 그래프 데이터 보관
 let graphData = null;
+
+//언어별 노드 색상 매핑
+const LANG_COLORS = {
+  python:     { bg: '#F7C948', border: '#B8941E' },
+  typescript: { bg: '#3B82F6', border: '#1D4ED8' },
+  javascript: { bg: '#FBBF24', border: '#D97706' },
+  cpp:        { bg: '#06B6D4', border: '#0891B2' },
+  csharp:     { bg: '#22C55E', border: '#16A34A' },
+  html:       { bg: '#F97316', border: '#EA580C' },
+  css:        { bg: '#A855F7', border: '#7C3AED' },
+};
+
+//엣지 타입별 색상 매핑
+const EDGE_TYPE_COLORS = {
+  'call':          '#60A5FA',
+  'variable-ref':  '#14b8a6',
+  'inheritance':   '#A78BFA',
+  'script-ref':    '#22c55e',
+  'style-ref':     '#22c55e',
+  'dom-access':    '#FB923C',
+  'css-target':    '#A78BFA',
+  'event-binding': '#F472B6',
+  'js-import':     '#FBBF24',
+  'css-import':    '#FBBF24',
+  'css-var':       '#c026d3',
+};
+
+//확장자 → 언어 (같은 경로에 언어별 파일 노드가 여러 개일 때 고르는 기준)
+const EXT_TO_LANG = { html: 'html', htm: 'html', css: 'css', js: 'javascript', ts: 'typescript', tsx: 'typescript', py: 'python', cs: 'csharp', cpp: 'cpp', cc: 'cpp', h: 'cpp', hpp: 'cpp' };
+
+//리프 노드 타입
+const LEAF_TYPES = new Set([
+  'function', 'js-function', 'ts-function', 'cpp-function', 'csharp-function',
+  'variable', 'css-variable', 'html-element', 'css-selector',
+]);
 
 function initGraph(container) {
   cy = cytoscape({
     container: container,
     style: [
+      /* ══════════════════════════════════════════════
+         파일 노드 뷰 스타일 (Phase 1 리뉴얼)
+         ══════════════════════════════════════════════ */
+
+      //옵시디언 스타일: 테두리 없는 단색 원 + 은은한 원형 글로우, 라벨은 흐리게
+      //주의: overlay는 기본 모양이 둥근 사각형이라 원 위에 네모가 생기므로 파일 노드에서는 쓰지 않는다.
+      {
+        selector: 'node[type="file-node"]',
+        style: {
+          'shape': 'ellipse',
+          'background-color': 'data(color)',
+          'background-opacity': 0.92,
+          'border-width': 0,
+          'width': 'data(size)',
+          'height': 'data(size)',
+          'label': 'data(label)',
+          'text-valign': 'bottom',
+          'text-halign': 'center',
+          'text-margin-y': 6,
+          'font-family': 'Pretendard Variable, Pretendard, sans-serif',
+          'font-size': 11,
+          'font-weight': 500,
+          'color': '#9AA3B5',
+          'text-outline-color': '#0B0D11',
+          'text-outline-width': 1.5,
+          'text-outline-opacity': 0.8,
+          'text-wrap': 'ellipsis',
+          'text-max-width': '140px',
+          'min-zoomed-font-size': 7,
+          //상시 글로우 (underlay)
+          'underlay-color': 'data(color)',
+          'underlay-opacity': 0.1,
+          'underlay-padding': 5,
+          'underlay-shape': 'ellipse',
+          'overlay-opacity': 0,
+          'transition-property': 'opacity, underlay-opacity, underlay-padding, color, font-size, text-opacity',
+          'transition-duration': '0.2s',
+          'transition-timing-function': 'ease-out',
+        },
+      },
+      //결합도 높은 노드 — 테두리 대신 글로우 반경을 키워 자연스럽게 돋보이게
+      {
+        selector: 'node[type="file-node"][couplingScore > 0.3]',
+        style: {
+          'underlay-opacity': 0.18,
+          'underlay-padding': 'mapData(couplingScore, 0.3, 1, 7, 14)',
+        },
+      },
+      //클릭 시 기본 회색 사각 오버레이 제거
+      {
+        selector: 'node[type="file-node"]:active',
+        style: {
+          'overlay-opacity': 0,
+        },
+      },
+
+      //줌 기반 라벨 페이드 (옵시디언 Text fade threshold). updateLabelFade()가 클래스를 붙인다.
+      //주의: 호버/선택/디밍 규칙보다 앞에 있어야 그 상태들이 라벨 투명도를 덮어쓴다.
+      { selector: 'node[type="file-node"].label-fade-0', style: { 'text-opacity': 0 } },
+      { selector: 'node[type="file-node"].label-fade-1', style: { 'text-opacity': 0.2 } },
+      { selector: 'node[type="file-node"].label-fade-2', style: { 'text-opacity': 0.4 } },
+      { selector: 'node[type="file-node"].label-fade-3', style: { 'text-opacity': 0.6 } },
+      { selector: 'node[type="file-node"].label-fade-4', style: { 'text-opacity': 0.8 } },
+
+      //진단 글로우 (codeEffects.js). diag-pulse 토글 + transition으로 숨 쉬듯 깜빡인다.
+      {
+        selector: 'node[type="file-node"].diag-warning',
+        style: { 'underlay-color': '#F59E0B', 'underlay-opacity': 0.22, 'underlay-padding': 9 },
+      },
+      {
+        selector: 'node[type="file-node"].diag-error',
+        style: { 'underlay-color': '#EF4444', 'underlay-opacity': 0.28, 'underlay-padding': 10 },
+      },
+      {
+        selector: 'node[type="file-node"].diag-pulse',
+        style: {
+          'underlay-opacity': 0.5,
+          'underlay-padding': 16,
+          'transition-property': 'underlay-opacity, underlay-padding',
+          'transition-duration': '1.4s',
+          'transition-timing-function': 'ease-in-out-sine',
+        },
+      },
+
+      /* ── 파일 노드 인터랙션 상태 ── */
+
+      //호버 포커스 — 글로우 강화 + 라벨 밝게
+      {
+        selector: 'node[type="file-node"].hover-focus',
+        style: {
+          'background-opacity': 1,
+          'underlay-opacity': 0.35,
+          'underlay-padding': 12,
+          'color': '#F1F4F9',
+          'text-opacity': 1,
+          'font-size': 13,
+          'font-weight': 600,
+          'z-index': 999,
+        },
+      },
+      //선택 상태 — 얇은 흰 링 + 강한 글로우
+      {
+        selector: 'node[type="file-node"]:selected',
+        style: {
+          'border-width': 1.5,
+          'border-color': '#FFFFFF',
+          'border-opacity': 0.9,
+          'underlay-opacity': 0.4,
+          'underlay-padding': 14,
+          'color': '#FFFFFF',
+          'text-opacity': 1,
+          'overlay-opacity': 0,
+        },
+      },
+      //이웃 하이라이트 — 관련 노드
+      {
+        selector: 'node[type="file-node"].neighbor-highlight',
+        style: {
+          'opacity': 1.0,
+          'underlay-opacity': 0.22,
+          'underlay-padding': 8,
+          'color': '#D4D8E0',
+          'text-opacity': 1,
+        },
+      },
+
+
+      /* ── 공용 디밍/하이라이트 상태 ── */
+
+      //포커스 디밍 — 비관련 노드
+      {
+        selector: 'node.dimmed',
+        style: {
+          'opacity': 0.06,
+          'underlay-opacity': 0,
+          'text-opacity': 0,
+          'transition-property': 'opacity, underlay-opacity, text-opacity',
+          'transition-duration': '0.2s',
+        },
+      },
+      //포커스 디밍 — 비관련 엣지
+      {
+        selector: 'edge.dimmed',
+        style: {
+          'opacity': 0.03,
+          'transition-property': 'opacity',
+          'transition-duration': '0.2s',
+        },
+      },
+      //선택된 노드 하이라이트 (함수 뷰 호환)
+      {
+        selector: 'node.highlighted',
+        style: {
+          'border-color': '#f59e0b',
+          'border-width': 2.5,
+          'background-color': '#1c1917',
+          'color': '#fbbf24',
+          'z-index': 10,
+        },
+      },
+      //선택된 엣지 하이라이트 (함수 뷰 호환)
+      {
+        selector: 'edge.highlighted',
+        style: {
+          'line-color': '#f59e0b',
+          'target-arrow-color': '#f59e0b',
+          'width': 2.5,
+          'line-opacity': 1,
+          'z-index': 10,
+        },
+      },
+
+      /* ══════════════════════════════════════════════
+         함수 뷰 스타일 (기존 유지)
+         ══════════════════════════════════════════════ */
+
       //티어 노드 — 참조 횟수 그룹 컨테이너
       {
         selector: 'node[type="tier"]',
@@ -66,30 +278,9 @@ function initGraph(container) {
           'text-background-shape': 'roundrectangle',
         },
       },
-      //HTML 언어 컨테이너 — 초록 테두리
-      {
-        selector: 'node[type="lang"][language="html"]',
-        style: {
-          'border-color': '#16a34a',
-          'color': '#4ade80',
-        },
-      },
-      //CSS 언어 컨테이너 — 보라 테두리
-      {
-        selector: 'node[type="lang"][language="css"]',
-        style: {
-          'border-color': '#7c3aed',
-          'color': '#a78bfa',
-        },
-      },
-      //JS 언어 컨테이너 — 노란 테두리
-      {
-        selector: 'node[type="lang"][language="javascript"]',
-        style: {
-          'border-color': '#d97706',
-          'color': '#fbbf24',
-        },
-      },
+      { selector: 'node[type="lang"][language="html"]', style: { 'border-color': '#16a34a', 'color': '#4ade80' } },
+      { selector: 'node[type="lang"][language="css"]', style: { 'border-color': '#7c3aed', 'color': '#a78bfa' } },
+      { selector: 'node[type="lang"][language="javascript"]', style: { 'border-color': '#d97706', 'color': '#fbbf24' } },
       //패키지 노드 — 초록 테두리 컨테이너
       {
         selector: 'node[type="package"]',
@@ -113,7 +304,7 @@ function initGraph(container) {
           'z-compound-depth': 'bottom',
         },
       },
-      //파일 노드 — 파란 테두리 컨테이너
+      //파일 노드 (함수 뷰 컨테이너) — 파란 테두리
       {
         selector: 'node[type="file"]',
         style: {
@@ -140,7 +331,6 @@ function initGraph(container) {
           'text-background-shape': 'roundrectangle',
         },
       },
-      //결합도에 따른 파일 노드 테두리 두께 — 결합도 높을수록 두꺼운 테두리
       {
         selector: 'node[type="file"][couplingScore > 0.3]',
         style: {
@@ -169,7 +359,7 @@ function initGraph(container) {
           'z-compound-depth': 'top',
         },
       },
-      //inbound 참조 횟수에 따른 함수 노드 테두리 두께 + 배경색 (호출당한 횟수)
+      //inbound 참조 횟수에 따른 함수 노드 스타일
       {
         selector: 'node[type="function"][inboundRefCount > 0]',
         style: {
@@ -210,7 +400,7 @@ function initGraph(container) {
           'background-color': 'mapData(inboundRefCount, 0, 10, #14532d, #422006)',
         },
       },
-      //outbound 참조 횟수에 따른 함수 노드 스타일 (호출한 횟수 — inbound가 0인 경우만)
+      //outbound 참조 횟수에 따른 함수 노드 스타일 (inbound=0인 경우만)
       {
         selector: 'node[type="function"][outboundRefCount > 0][inboundRefCount = 0]',
         style: {
@@ -251,303 +441,107 @@ function initGraph(container) {
           'background-color': 'mapData(outboundRefCount, 0, 10, #14532d, #172554)',
         },
       },
-      //변수 노드 — 다이아몬드 모양, 청록색
+      //변수 노드
       {
         selector: 'node[type="variable"]',
         style: {
-          'shape': 'diamond',
-          'background-color': '#134e4a',
-          'border-color': '#14b8a6',
-          'border-width': 1.5,
-          'label': 'data(label)',
-          'text-valign': 'center',
-          'text-halign': 'center',
-          'font-size': '21px',
-          'color': '#5eead4',
-          'width': 'label',
-          'height': '36px',
-          'padding': '14px',
-          'font-family': '"Cascadia Code", "Fira Code", Consolas, monospace',
-          'text-wrap': 'none',
-          'z-compound-depth': 'top',
+          'shape': 'diamond', 'background-color': '#134e4a', 'border-color': '#14b8a6',
+          'border-width': 1.5, 'label': 'data(label)', 'text-valign': 'center', 'text-halign': 'center',
+          'font-size': '21px', 'color': '#5eead4', 'width': 'label', 'height': '36px', 'padding': '14px',
+          'font-family': '"Cascadia Code", "Fira Code", Consolas, monospace', 'text-wrap': 'none', 'z-compound-depth': 'top',
         },
       },
-      //클래스 필드 변수 — 보라색 강조
-      {
-        selector: 'node[type="variable"][className]',
-        style: {
-          'border-color': '#a78bfa',
-          'color': '#c4b5fd',
-        },
-      },
-      //클래스 메서드 노드 — 보라색 강조
-      {
-        selector: 'node[type="function"][className]',
-        style: {
-          'border-color': '#7c3aed',
-          'color': '#c4b5fd',
-          'border-width': 1.5,
-        },
-      },
-      //JS 함수 노드 — 노란색 계열
+      { selector: 'node[type="variable"][className]', style: { 'border-color': '#a78bfa', 'color': '#c4b5fd' } },
+      { selector: 'node[type="function"][className]', style: { 'border-color': '#7c3aed', 'color': '#c4b5fd', 'border-width': 1.5 } },
+      //JS 함수 노드
       {
         selector: 'node[type="js-function"]',
         style: {
-          'shape': 'roundrectangle',
-          'background-color': '#422006',
-          'border-color': '#d97706',
-          'border-width': 1.5,
-          'label': 'data(label)',
-          'text-valign': 'center',
-          'text-halign': 'center',
-          'font-size': '25px',
-          'color': '#fbbf24',
-          'width': 'label',
-          'height': '40px',
-          'padding': '14px',
-          'font-family': '"Cascadia Code", "Fira Code", Consolas, monospace',
-          'text-wrap': 'none',
-          'z-compound-depth': 'top',
+          'shape': 'roundrectangle', 'background-color': '#422006', 'border-color': '#d97706',
+          'border-width': 1.5, 'label': 'data(label)', 'text-valign': 'center', 'text-halign': 'center',
+          'font-size': '25px', 'color': '#fbbf24', 'width': 'label', 'height': '40px', 'padding': '14px',
+          'font-family': '"Cascadia Code", "Fira Code", Consolas, monospace', 'text-wrap': 'none', 'z-compound-depth': 'top',
         },
       },
-      //JS 클래스 메서드 — 주황 강조
-      {
-        selector: 'node[type="js-function"][className]',
-        style: {
-          'border-color': '#ea580c',
-          'color': '#fdba74',
-          'border-width': 1.5,
-        },
-      },
-      //HTML 요소 노드 — 초록색 계열
+      { selector: 'node[type="js-function"][className]', style: { 'border-color': '#ea580c', 'color': '#fdba74', 'border-width': 1.5 } },
+      //HTML 요소 노드
       {
         selector: 'node[type="html-element"]',
         style: {
-          'shape': 'roundrectangle',
-          'background-color': '#052e16',
-          'border-color': '#16a34a',
-          'border-width': 1.5,
-          'label': 'data(label)',
-          'text-valign': 'center',
-          'text-halign': 'center',
-          'font-size': '21px',
-          'color': '#4ade80',
-          'width': 'label',
-          'height': '36px',
-          'padding': '14px',
-          'font-family': '"Cascadia Code", "Fira Code", Consolas, monospace',
-          'text-wrap': 'none',
-          'z-compound-depth': 'top',
+          'shape': 'roundrectangle', 'background-color': '#052e16', 'border-color': '#16a34a',
+          'border-width': 1.5, 'label': 'data(label)', 'text-valign': 'center', 'text-halign': 'center',
+          'font-size': '21px', 'color': '#4ade80', 'width': 'label', 'height': '36px', 'padding': '14px',
+          'font-family': '"Cascadia Code", "Fira Code", Consolas, monospace', 'text-wrap': 'none', 'z-compound-depth': 'top',
         },
       },
-      //CSS 셀렉터 노드 — 보라색 계열
+      //CSS 셀렉터 노드
       {
         selector: 'node[type="css-selector"]',
         style: {
-          'shape': 'roundrectangle',
-          'background-color': '#2e1065',
-          'border-color': '#7c3aed',
-          'border-width': 1.5,
-          'label': 'data(label)',
-          'text-valign': 'center',
-          'text-halign': 'center',
-          'font-size': '21px',
-          'color': '#a78bfa',
-          'width': 'label',
-          'height': '36px',
-          'padding': '14px',
-          'font-family': '"Cascadia Code", "Fira Code", Consolas, monospace',
-          'text-wrap': 'none',
-          'z-compound-depth': 'top',
+          'shape': 'roundrectangle', 'background-color': '#2e1065', 'border-color': '#7c3aed',
+          'border-width': 1.5, 'label': 'data(label)', 'text-valign': 'center', 'text-halign': 'center',
+          'font-size': '21px', 'color': '#a78bfa', 'width': 'label', 'height': '36px', 'padding': '14px',
+          'font-family': '"Cascadia Code", "Fira Code", Consolas, monospace', 'text-wrap': 'none', 'z-compound-depth': 'top',
         },
       },
-      //TypeScript 함수 노드 — 파란색 계열
+      //TypeScript 함수 노드
       {
         selector: 'node[type="ts-function"]',
         style: {
-          'shape': 'roundrectangle',
-          'background-color': '#1e3a5f',
-          'border-color': '#3b82f6',
-          'border-width': 1.5,
-          'label': 'data(label)',
-          'text-valign': 'center',
-          'text-halign': 'center',
-          'font-size': '25px',
-          'color': '#93c5fd',
-          'width': 'label',
-          'height': '40px',
-          'padding': '14px',
-          'font-family': '"Cascadia Code", "Fira Code", Consolas, monospace',
-          'text-wrap': 'none',
-          'z-compound-depth': 'top',
+          'shape': 'roundrectangle', 'background-color': '#1e3a5f', 'border-color': '#3b82f6',
+          'border-width': 1.5, 'label': 'data(label)', 'text-valign': 'center', 'text-halign': 'center',
+          'font-size': '25px', 'color': '#93c5fd', 'width': 'label', 'height': '40px', 'padding': '14px',
+          'font-family': '"Cascadia Code", "Fira Code", Consolas, monospace', 'text-wrap': 'none', 'z-compound-depth': 'top',
         },
       },
-      //TS 클래스 메서드 — 남색 강조
-      {
-        selector: 'node[type="ts-function"][className]',
-        style: {
-          'border-color': '#2563eb',
-          'color': '#bfdbfe',
-          'border-width': 1.5,
-        },
-      },
-      //C++ 함수 노드 — 청록색 계열
+      { selector: 'node[type="ts-function"][className]', style: { 'border-color': '#2563eb', 'color': '#bfdbfe', 'border-width': 1.5 } },
+      //C++ 함수 노드
       {
         selector: 'node[type="cpp-function"]',
         style: {
-          'shape': 'roundrectangle',
-          'background-color': '#164e63',
-          'border-color': '#06b6d4',
-          'border-width': 1.5,
-          'label': 'data(label)',
-          'text-valign': 'center',
-          'text-halign': 'center',
-          'font-size': '25px',
-          'color': '#67e8f9',
-          'width': 'label',
-          'height': '40px',
-          'padding': '14px',
-          'font-family': '"Cascadia Code", "Fira Code", Consolas, monospace',
-          'text-wrap': 'none',
-          'z-compound-depth': 'top',
+          'shape': 'roundrectangle', 'background-color': '#164e63', 'border-color': '#06b6d4',
+          'border-width': 1.5, 'label': 'data(label)', 'text-valign': 'center', 'text-halign': 'center',
+          'font-size': '25px', 'color': '#67e8f9', 'width': 'label', 'height': '40px', 'padding': '14px',
+          'font-family': '"Cascadia Code", "Fira Code", Consolas, monospace', 'text-wrap': 'none', 'z-compound-depth': 'top',
         },
       },
-      //C++ 클래스 메서드 — 시안 강조
-      {
-        selector: 'node[type="cpp-function"][className]',
-        style: {
-          'border-color': '#0891b2',
-          'color': '#a5f3fc',
-          'border-width': 1.5,
-        },
-      },
-      //C# 함수 노드 — 녹색 계열
+      { selector: 'node[type="cpp-function"][className]', style: { 'border-color': '#0891b2', 'color': '#a5f3fc', 'border-width': 1.5 } },
+      //C# 함수 노드
       {
         selector: 'node[type="csharp-function"]',
         style: {
-          'shape': 'roundrectangle',
-          'background-color': '#14532d',
-          'border-color': '#22c55e',
-          'border-width': 1.5,
-          'label': 'data(label)',
-          'text-valign': 'center',
-          'text-halign': 'center',
-          'font-size': '25px',
-          'color': '#86efac',
-          'width': 'label',
-          'height': '40px',
-          'padding': '14px',
-          'font-family': '"Cascadia Code", "Fira Code", Consolas, monospace',
-          'text-wrap': 'none',
-          'z-compound-depth': 'top',
+          'shape': 'roundrectangle', 'background-color': '#14532d', 'border-color': '#22c55e',
+          'border-width': 1.5, 'label': 'data(label)', 'text-valign': 'center', 'text-halign': 'center',
+          'font-size': '25px', 'color': '#86efac', 'width': 'label', 'height': '40px', 'padding': '14px',
+          'font-family': '"Cascadia Code", "Fira Code", Consolas, monospace', 'text-wrap': 'none', 'z-compound-depth': 'top',
         },
       },
-      //C# 클래스 메서드 — 에메랄드 강조
-      {
-        selector: 'node[type="csharp-function"][className]',
-        style: {
-          'border-color': '#16a34a',
-          'color': '#bbf7d0',
-          'border-width': 1.5,
-        },
-      },
-      //TypeScript 파일 노드 — 파란 테두리
-      {
-        selector: 'node[type="file"][language="typescript"]',
-        style: {
-          'border-color': '#3b82f6',
-          'color': '#93c5fd',
-        },
-      },
-      //C++ 파일 노드 — 시안 테두리
-      {
-        selector: 'node[type="file"][language="cpp"]',
-        style: {
-          'border-color': '#06b6d4',
-          'color': '#67e8f9',
-        },
-      },
-      //C# 파일 노드 — 녹색 테두리
-      {
-        selector: 'node[type="file"][language="csharp"]',
-        style: {
-          'border-color': '#22c55e',
-          'color': '#86efac',
-        },
-      },
-      //CSS 변수 노드 — 분홍색 계열 다이아몬드
+      { selector: 'node[type="csharp-function"][className]', style: { 'border-color': '#16a34a', 'color': '#bbf7d0', 'border-width': 1.5 } },
+      //CSS 변수 노드
       {
         selector: 'node[type="css-variable"]',
         style: {
-          'shape': 'diamond',
-          'background-color': '#4a044e',
-          'border-color': '#c026d3',
-          'border-width': 1.5,
-          'label': 'data(label)',
-          'text-valign': 'center',
-          'text-halign': 'center',
-          'font-size': '21px',
-          'color': '#e879f9',
-          'width': 'label',
-          'height': '36px',
-          'padding': '14px',
-          'font-family': '"Cascadia Code", "Fira Code", Consolas, monospace',
-          'text-wrap': 'none',
-          'z-compound-depth': 'top',
+          'shape': 'diamond', 'background-color': '#4a044e', 'border-color': '#c026d3',
+          'border-width': 1.5, 'label': 'data(label)', 'text-valign': 'center', 'text-halign': 'center',
+          'font-size': '21px', 'color': '#e879f9', 'width': 'label', 'height': '36px', 'padding': '14px',
+          'font-family': '"Cascadia Code", "Fira Code", Consolas, monospace', 'text-wrap': 'none', 'z-compound-depth': 'top',
         },
       },
-      //HTML 파일 노드 — 초록 테두리
-      {
-        selector: 'node[type="file"][language="html"]',
-        style: {
-          'border-color': '#16a34a',
-          'color': '#4ade80',
-        },
-      },
-      //CSS 파일 노드 — 보라 테두리
-      {
-        selector: 'node[type="file"][language="css"]',
-        style: {
-          'border-color': '#7c3aed',
-          'color': '#a78bfa',
-        },
-      },
-      //JS 파일 노드 — 노란 테두리
-      {
-        selector: 'node[type="file"][language="javascript"]',
-        style: {
-          'border-color': '#d97706',
-          'color': '#fbbf24',
-        },
-      },
-      //접힌 노드 — 점선 테두리
-      {
-        selector: 'node.collapsed',
-        style: {
-          'border-style': 'dashed',
-          'border-opacity': 0.5,
-        },
-      },
+      //언어별 파일 노드 테두리 색상 (함수 뷰)
+      { selector: 'node[type="file"][language="typescript"]', style: { 'border-color': '#3b82f6', 'color': '#93c5fd' } },
+      { selector: 'node[type="file"][language="cpp"]', style: { 'border-color': '#06b6d4', 'color': '#67e8f9' } },
+      { selector: 'node[type="file"][language="csharp"]', style: { 'border-color': '#22c55e', 'color': '#86efac' } },
+      { selector: 'node[type="file"][language="html"]', style: { 'border-color': '#16a34a', 'color': '#4ade80' } },
+      { selector: 'node[type="file"][language="css"]', style: { 'border-color': '#7c3aed', 'color': '#a78bfa' } },
+      { selector: 'node[type="file"][language="javascript"]', style: { 'border-color': '#d97706', 'color': '#fbbf24' } },
+      //접힌 노드
+      { selector: 'node.collapsed', style: { 'border-style': 'dashed', 'border-opacity': 0.5 } },
       //마우스 올렸을 때 효과
-      {
-        selector: 'node[type="function"]:active',
-        style: {
-          'overlay-color': '#60a5fa',
-          'overlay-opacity': 0.08,
-        },
-      },
-      //선택된 함수 노드 하이라이트
-      {
-        selector: 'node.highlighted',
-        style: {
-          'border-color': '#f59e0b',
-          'border-width': 2.5,
-          'background-color': '#1c1917',
-          'color': '#fbbf24',
-          'z-index': 10,
-        },
-      },
-      //엣지 — 기본 숨김 (노드 클릭 시 관련 엣지만 표시)
+      { selector: 'node[type="function"]:active', style: { 'overlay-color': '#60a5fa', 'overlay-opacity': 0.08 } },
+
+      /* ── 함수 뷰 엣지 스타일 ── */
+
+      //엣지 기본 (함수 뷰에서는 기본 숨김)
       {
         selector: 'edge',
         style: {
@@ -561,182 +555,484 @@ function initGraph(container) {
           'display': 'none',
         },
       },
-      //엣지 라벨 (참조 횟수 표시)
+      //엣지 라벨 (참조 횟수)
       {
         selector: 'edge[refCount > 1]',
         style: {
-          'label': 'data(refCount)',
-          'font-size': '36px',
-          'color': '#94a3b8',
-          'text-background-color': '#0a0e17',
-          'text-background-opacity': 1,
-          'text-background-padding': '3px',
-          'text-background-shape': 'roundrectangle',
-          'font-weight': 'bold',
+          'label': 'data(refCount)', 'font-size': '36px', 'color': '#94a3b8',
+          'text-background-color': '#0a0e17', 'text-background-opacity': 1,
+          'text-background-padding': '3px', 'text-background-shape': 'roundrectangle', 'font-weight': 'bold',
         },
       },
-      //변수 참조 엣지 — 청록색 점선
+      //변수 참조 엣지
+      { selector: 'edge[edgeType="variable-ref"]', style: { 'line-color': '#14b8a6', 'line-style': 'dashed', 'target-arrow-color': '#14b8a6', 'width': 1.5, 'line-opacity': 0.6 } },
+      //상속 엣지
+      { selector: 'edge[edgeType="inheritance"]', style: { 'line-color': '#a78bfa', 'line-style': 'dashed', 'target-arrow-color': '#a78bfa', 'target-arrow-shape': 'triangle-backcurve', 'width': 2, 'line-opacity': 0.7 } },
+      //웹 관계 엣지
+      { selector: 'edge[edgeType="script-ref"], edge[edgeType="style-ref"]', style: { 'line-color': '#22c55e', 'line-style': 'dashed', 'target-arrow-color': '#22c55e', 'width': 1.5, 'line-opacity': 0.6 } },
+      { selector: 'edge[edgeType="dom-access"]', style: { 'line-color': '#f97316', 'line-style': 'dashed', 'target-arrow-color': '#f97316', 'width': 1.5, 'line-opacity': 0.6 } },
+      { selector: 'edge[edgeType="css-target"]', style: { 'line-color': '#a78bfa', 'line-style': 'dashed', 'target-arrow-color': '#a78bfa', 'width': 1.5, 'line-opacity': 0.5 } },
+      { selector: 'edge[edgeType="event-binding"]', style: { 'line-color': '#ec4899', 'line-style': 'dashed', 'target-arrow-color': '#ec4899', 'width': 1.5, 'line-opacity': 0.6 } },
+      { selector: 'edge[edgeType="js-import"], edge[edgeType="css-import"]', style: { 'line-color': '#eab308', 'line-style': 'dashed', 'target-arrow-color': '#eab308', 'width': 1.5, 'line-opacity': 0.5 } },
+      { selector: 'edge[edgeType="css-var"]', style: { 'line-color': '#c026d3', 'line-style': 'dashed', 'target-arrow-color': '#c026d3', 'width': 1.5, 'line-opacity': 0.5 } },
+      //순환 참조 엣지
+      { selector: 'edge.cycle-edge', style: { 'line-color': '#ef4444', 'target-arrow-color': '#ef4444', 'width': 2.5, 'line-opacity': 0.9 } },
+      //미리보기 모드에서 제거될 엣지
+      { selector: 'edge.preview-removed', style: { 'line-color': '#ef4444', 'line-style': 'dashed', 'line-opacity': 0.3, 'target-arrow-color': '#ef4444', 'width': 1 } },
+
+      /* ── 파일 뷰 엣지 스타일 ── */
+      //주의: 함수 뷰의 공통 edge 규칙(display: none) 뒤에 선언해야 집약 엣지가 보인다.
+
+      //옵시디언 스타일: 기본은 가늘고 은은한 중립색 곡선, 호버 시에만 관계 색상으로 살아난다.
+      //집약 엣지 — 기본 표시
       {
-        selector: 'edge[edgeType="variable-ref"]',
+        selector: 'edge[type="aggregated"]',
         style: {
-          'line-color': '#14b8a6',
-          'line-style': 'dashed',
-          'target-arrow-color': '#14b8a6',
-          'target-arrow-shape': 'triangle',
-          'width': 1.5,
-          'line-opacity': 0.6,
-        },
-      },
-      //상속 엣지 — 보라색 점선
-      {
-        selector: 'edge[edgeType="inheritance"]',
-        style: {
-          'line-color': '#a78bfa',
-          'line-style': 'dashed',
-          'target-arrow-color': '#a78bfa',
-          'target-arrow-shape': 'triangle-backcurve',
-          'width': 2,
-          'line-opacity': 0.7,
-        },
-      },
-      //웹 관계 엣지 — script-ref, style-ref (초록 점선)
-      {
-        selector: 'edge[edgeType="script-ref"], edge[edgeType="style-ref"]',
-        style: {
-          'line-color': '#22c55e',
-          'line-style': 'dashed',
-          'target-arrow-color': '#22c55e',
-          'target-arrow-shape': 'triangle',
-          'width': 1.5,
-          'line-opacity': 0.6,
-        },
-      },
-      //DOM 접근 엣지 — 주황 점선
-      {
-        selector: 'edge[edgeType="dom-access"]',
-        style: {
-          'line-color': '#f97316',
-          'line-style': 'dashed',
-          'target-arrow-color': '#f97316',
-          'target-arrow-shape': 'triangle',
-          'width': 1.5,
-          'line-opacity': 0.6,
-        },
-      },
-      //CSS 타겟 엣지 — 보라 점선
-      {
-        selector: 'edge[edgeType="css-target"]',
-        style: {
-          'line-color': '#a78bfa',
-          'line-style': 'dashed',
-          'target-arrow-color': '#a78bfa',
-          'target-arrow-shape': 'triangle',
-          'width': 1.5,
-          'line-opacity': 0.5,
-        },
-      },
-      //이벤트 바인딩 엣지 — 분홍색 점선
-      {
-        selector: 'edge[edgeType="event-binding"]',
-        style: {
-          'line-color': '#ec4899',
-          'line-style': 'dashed',
-          'target-arrow-color': '#ec4899',
-          'target-arrow-shape': 'triangle',
-          'width': 1.5,
-          'line-opacity': 0.6,
-        },
-      },
-      //JS import 엣지 — 노란 점선
-      {
-        selector: 'edge[edgeType="js-import"], edge[edgeType="css-import"]',
-        style: {
-          'line-color': '#eab308',
-          'line-style': 'dashed',
-          'target-arrow-color': '#eab308',
-          'target-arrow-shape': 'triangle',
-          'width': 1.5,
-          'line-opacity': 0.5,
-        },
-      },
-      //CSS 변수 참조 엣지 — 분홍 점선
-      {
-        selector: 'edge[edgeType="css-var"]',
-        style: {
-          'line-color': '#c026d3',
-          'line-style': 'dashed',
-          'target-arrow-color': '#c026d3',
-          'target-arrow-shape': 'triangle',
-          'width': 1.5,
-          'line-opacity': 0.5,
-        },
-      },
-      //순환 참조 엣지 — 빨간 하이라이트
-      {
-        selector: 'edge.cycle-edge',
-        style: {
-          'line-color': '#ef4444',
-          'target-arrow-color': '#ef4444',
-          'width': 2.5,
-          'line-opacity': 0.9,
-        },
-      },
-      //선택된 엣지 하이라이트
-      {
-        selector: 'edge.highlighted',
-        style: {
-          'line-color': '#f59e0b',
-          'target-arrow-color': '#f59e0b',
-          'width': 2.5,
+          'display': 'element',
+          'curve-style': 'unbundled-bezier',
+          //방향 기준 거리라 A→B, B→A 엣지가 서로 반대쪽으로 휘어 겹치지 않는다.
+          'control-point-distances': [18],
+          'control-point-weights': [0.5],
+          'width': 'mapData(refCount, 1, 20, 0.8, 2.2)',
+          'line-color': '#5B6478',
+          'line-style': 'solid',
+          'line-cap': 'round',
           'line-opacity': 1,
-          'z-index': 10,
+          'opacity': 0.5,
+          'target-arrow-shape': 'triangle',
+          'target-arrow-color': '#5B6478',
+          'arrow-scale': 0.45,
+          'label': '',
+          'overlay-opacity': 0,
+          'transition-property': 'line-color, target-arrow-color, width, opacity, arrow-scale',
+          'transition-duration': '0.2s',
+          'transition-timing-function': 'ease-out',
         },
       },
-      //선택 안 된 요소들 흐리게 처리
+      //엣지 하이라이트 — 연결선만 관계 색상으로 밝게
       {
-        selector: 'node.dimmed',
+        selector: 'edge[type="aggregated"].highlighted',
         style: {
-          'opacity': 0.3,
+          'line-color': 'data(edgeColor)',
+          'target-arrow-color': 'data(edgeColor)',
+          'width': 'mapData(refCount, 1, 20, 1.6, 3.2)',
+          'opacity': 0.95,
+          'arrow-scale': 0.7,
+          'z-index': 999,
         },
       },
+      //순환 참조를 이루는 엣지 — 붉게 (codeEffects.js)
       {
-        selector: 'edge.dimmed',
+        selector: 'edge[type="aggregated"].diag-cycle-edge',
         style: {
-          'opacity': 0.1,
+          'line-color': '#EF4444',
+          'target-arrow-color': '#EF4444',
+          'opacity': 0.8,
         },
       },
-      //미리보기 모드에서 제거될 엣지 표시
+      //호출 방향 입자 — 강조된 엣지 위를 캡슐 모양 점이 흐른다 (codeEffects.js가 line-dash-offset을 움직임)
       {
-        selector: 'edge.preview-removed',
+        selector: 'edge[type="aggregated"].edge-flow',
         style: {
-          'line-color': '#ef4444',
           'line-style': 'dashed',
-          'line-opacity': 0.3,
-          'target-arrow-color': '#ef4444',
-          'width': 1,
+          'line-dash-pattern': [4, 8],
+          'line-cap': 'round',
+        },
+      },
+      //엣지 디밍 — 거의 안 보이게
+      {
+        selector: 'edge[type="aggregated"].dimmed',
+        style: {
+          'opacity': 0.04,
+        },
+      },
+
+
+      /* ══════════════════════════════════════════════
+         시맨틱 줌 LOD 스타일 (Phase 2)
+         ══════════════════════════════════════════════ */
+
+      //LOD-point (zoom < 0.3): 작은 도트, 라벨 없음
+      {
+        selector: 'node[type="file-node"].lod-point',
+        style: {
+          //모델 좌표 크기를 유지해야 축소 시에도 점이 보인다 (줌 0.25 → 화면상 3~10px)
+          'label': '',
+          'underlay-opacity': 0.18,
+          'underlay-padding': 6,
+        },
+      },
+      {
+        selector: 'edge[type="aggregated"].lod-point',
+        style: {
+          'display': 'none',
+        },
+      },
+
+      //LOD-circle (0.3~0.7): 중간 원, 짧은 파일명, 주요 엣지만
+      {
+        selector: 'node[type="file-node"].lod-circle',
+        style: {
+          'label': 'data(shortLabel)',
+          'font-size': 10,
+        },
+      },
+      {
+        selector: 'edge[type="aggregated"].lod-circle',
+        style: {
+          'display': 'none',
+        },
+      },
+      {
+        selector: 'edge[type="aggregated"].lod-circle[refCount >= 3]',
+        style: {
+          'display': 'element',
+          'label': '',
+        },
+      },
+
+      //LOD-card (zoom > 1.5): 카드형, 상세 라벨, 엣지 refCount 표시
+      {
+        selector: 'node[type="file-node"].lod-card',
+        style: {
+          'shape': 'roundrectangle',
+          'width': 'mapData(funcCount, 0, 30, 100, 160)',
+          'height': 'mapData(funcCount, 0, 30, 50, 80)',
+          'label': 'data(detailLabel)',
+          'text-valign': 'center',
+          'text-halign': 'center',
+          'text-wrap': 'wrap',
+          'text-max-width': '140px',
+          'font-size': 11,
+          'text-margin-y': 0,
+          'color': '#D4D8E0',
+          'background-color': '#151922',
+          'background-opacity': 0.95,
+          'border-width': 1.5,
+          'border-color': 'data(color)',
+          'border-opacity': 0.7,
+          'underlay-opacity': 0.12,
+          'underlay-padding': 6,
+          'underlay-shape': 'round-rectangle',
+        },
+      },
+      {
+        selector: 'edge[type="aggregated"].lod-card',
+        style: {
+          'label': 'data(refCount)',
+          'font-size': 8,
+          'color': '#8A93A6',
+          'text-background-color': '#0B0D11',
+          'text-background-opacity': 0.6,
+          'text-background-padding': 2,
+          'text-background-shape': 'roundrectangle',
+        },
+      },
+
+      /* ── 로컬 그래프 스타일 (Phase 2) ── */
+      {
+        selector: '.local-graph-hidden',
+        style: {
+          'display': 'none',
+        },
+      },
+      {
+        selector: '.local-graph-center',
+        style: {
+          'border-width': 2,
+          'border-color': '#FFFFFF',
+          'border-opacity': 0.9,
+          'color': '#FFFFFF',
+          'underlay-opacity': 0.4,
+          'underlay-padding': 16,
+          'underlay-color': 'data(color)',
+          'z-index': 999,
         },
       },
     ],
     layout: { name: 'preset' },
     wheelSensitivity: 0.3,
-    minZoom: 0.1,
+    minZoom: 0.05,
     maxZoom: 5,
   });
 
   return cy;
 }
 
+/* ══════════════════════════════════════════════════════════════════
+   Phase 1: 파일 노드 기반 플랫 그래프 (기본 뷰)
+   ══════════════════════════════════════════════════════════════════ */
+
 function renderGraph(data) {
   if (!cy) return;
 
-  //원본 데이터 보관
+  graphData = data;
+  currentViewMode = 'file';
+
+  if (typeof stopForceSim === 'function') stopForceSim();
+  if (typeof stopCodeEffects === 'function') stopCodeEffects();
+  cy.elements().remove();
+
+  //Step 1: 파일 정보 수집 및 함수 매핑
+  const fileNodeMap = new Map();
+  const funcToFileNode = new Map();
+
+  for (const node of data.nodes) {
+    if (node.data.type === 'file') {
+      fileNodeMap.set(node.data.id, {
+        ...node.data,
+        functions: [],
+        funcCount: 0,
+      });
+    }
+  }
+
+  for (const node of data.nodes) {
+    if (LEAF_TYPES.has(node.data.type) && node.data.parent) {
+      funcToFileNode.set(node.data.id, node.data.parent);
+      const fileInfo = fileNodeMap.get(node.data.parent);
+      if (fileInfo) {
+        fileInfo.functions.push({
+          name: node.data.label || node.data.qualifiedName,
+          type: node.data.type,
+          id: node.data.id,
+          code: node.data.code,
+          filePath: node.data.filePath,
+          qualifiedName: node.data.qualifiedName,
+          inboundRefCount: node.data.inboundRefCount || 0,
+          outboundRefCount: node.data.outboundRefCount || 0,
+        });
+        fileInfo.funcCount++;
+      }
+    }
+  }
+
+  //Step 2: 모든 엣지를 수집하고 파일 쌍으로 집약
+  const allEdges = [];
+  for (const edge of data.edges) {
+    allEdges.push({ source: edge.source, target: edge.target, edgeType: 'call', references: edge.references });
+  }
+  if (data.inheritanceEdges) {
+    for (const edge of data.inheritanceEdges) {
+      allEdges.push({ source: edge.source, target: edge.target, edgeType: 'inheritance', references: edge.references });
+    }
+  }
+  if (data.variableEdges) {
+    for (const edge of data.variableEdges) {
+      allEdges.push({ source: edge.source, target: edge.target, edgeType: 'variable-ref', references: edge.references });
+    }
+  }
+  if (data.webEdges) {
+    for (const edge of data.webEdges) {
+      allEdges.push({ source: edge.source, target: edge.target, edgeType: edge.type, references: edge.references });
+    }
+  }
+
+  //경로 → 파일 노드 ID 매핑 (같은 경로에 언어별 파일 노드가 여러 개일 수 있음. 예: index.html__html, index.html__javascript)
+  const pathToFileNodes = new Map();
+  for (const [fileId, fileInfo] of fileNodeMap) {
+    const p = fileInfo.fullPath || fileInfo.label;
+    if (!pathToFileNodes.has(p)) pathToFileNodes.set(p, []);
+    pathToFileNodes.get(p).push(fileId);
+  }
+
+  //엣지 끝점(함수/클래스/변수/파일 경로)을 파일 노드 ID로 변환
+  //상속(models.ts::User), import/script-ref(index.html) 엣지는 함수 노드가 아니므로 경로로 찾는다.
+  function resolveFileNode(id) {
+    if (funcToFileNode.has(id)) return funcToFileNode.get(id);
+    if (fileNodeMap.has(id)) return id;
+    const p = String(id).split('::')[0];
+    const candidates = pathToFileNodes.get(p);
+    if (!candidates) return null;
+    if (candidates.length === 1) return candidates[0];
+    const lang = EXT_TO_LANG[p.split('.').pop().toLowerCase()];
+    return candidates.find(c => fileNodeMap.get(c).language === lang) || candidates[0];
+  }
+
+  const fileEdgeMap = new Map();
+
+  for (const edge of allEdges) {
+    const srcFile = resolveFileNode(edge.source);
+    const tgtFile = resolveFileNode(edge.target);
+    if (!srcFile || !tgtFile || srcFile === tgtFile) continue;
+    if (!fileNodeMap.has(srcFile) || !fileNodeMap.has(tgtFile)) continue;
+
+    const key = `${srcFile}->${tgtFile}`;
+    if (!fileEdgeMap.has(key)) {
+      fileEdgeMap.set(key, {
+        source: srcFile,
+        target: tgtFile,
+        refCount: 0,
+        functionEdges: [],
+        types: {},
+      });
+    }
+    const info = fileEdgeMap.get(key);
+    const refs = edge.references ? edge.references.length : 1;
+    info.refCount += refs;
+    info.functionEdges.push(edge);
+    info.types[edge.edgeType] = (info.types[edge.edgeType] || 0) + refs;
+  }
+
+  //Step 3: 연결된 파일 결정 (엣지가 있는 파일만 표시)
+  const connectedFiles = new Set();
+  for (const [, edgeInfo] of fileEdgeMap) {
+    connectedFiles.add(edgeInfo.source);
+    connectedFiles.add(edgeInfo.target);
+  }
+
+  //연결이 없어도 파일이 1개인 경우는 표시
+  if (connectedFiles.size === 0) {
+    for (const [fileId] of fileNodeMap) {
+      connectedFiles.add(fileId);
+    }
+  }
+
+  //Step 4: 파일 노드 엘리먼트 생성
+  const elements = [];
+  const funcCounts = Array.from(fileNodeMap.values())
+    .filter(f => connectedFiles.has(f.id))
+    .map(f => f.funcCount);
+  const maxFuncCount = Math.max(1, ...funcCounts);
+
+  for (const [fileId, fileInfo] of fileNodeMap) {
+    if (!connectedFiles.has(fileId)) continue;
+
+    const lang = fileInfo.language || 'python';
+    const colors = LANG_COLORS[lang] || LANG_COLORS.python;
+    const funcCount = fileInfo.funcCount;
+
+    //크기: 함수 수에 비례 (min 14, max 42). 옵시디언처럼 작은 원으로, 제곱근으로 완만하게 키운다.
+    const size = 14 + Math.sqrt(funcCount / maxFuncCount) * 28;
+
+    //함수를 inbound 참조 순으로 정렬
+    fileInfo.functions.sort((a, b) => (b.inboundRefCount || 0) - (a.inboundRefCount || 0));
+
+    const fileName = fileInfo.label || fileId.replace('file__', '');
+    const shortName = fileName.replace(/\.[^.]+$/, '');
+
+    elements.push({
+      data: {
+        id: fileId,
+        label: fileName,
+        shortLabel: shortName,
+        fullLabel: fileName,
+        detailLabel: `${fileName}\n${funcCount} functions`,
+        type: 'file-node',
+        language: lang,
+        fullPath: fileInfo.fullPath,
+        color: colors.bg,
+        borderColor: colors.border,
+        funcCount: funcCount,
+        functions: fileInfo.functions,
+        couplingScore: fileInfo.couplingScore || 0,
+        size: size,
+      },
+    });
+  }
+
+  //Step 5: 집약 엣지 생성
+  const maxRefCount = Math.max(1, ...Array.from(fileEdgeMap.values()).map(e => e.refCount));
+
+  for (const [key, edgeInfo] of fileEdgeMap) {
+    //지배적 엣지 타입 결정
+    let dominantType = 'call';
+    let maxCount = 0;
+    for (const [type, count] of Object.entries(edgeInfo.types)) {
+      if (count > maxCount) {
+        maxCount = count;
+        dominantType = type;
+      }
+    }
+
+    const edgeColor = EDGE_TYPE_COLORS[dominantType] || '#60A5FA';
+    const width = Math.max(1, Math.min(5, 1 + (edgeInfo.refCount / maxRefCount) * 4));
+
+    elements.push({
+      data: {
+        id: `agg__${key}`,
+        source: edgeInfo.source,
+        target: edgeInfo.target,
+        type: 'aggregated',
+        refCount: edgeInfo.refCount,
+        edgeType: dominantType,
+        edgeColor: edgeColor,
+        width: width,
+        functionEdges: edgeInfo.functionEdges,
+        typeBreakdown: edgeInfo.types,
+      },
+    });
+  }
+
+  cy.add(elements);
+
+  //Step 6: 레이아웃 실행
+  //옵시디언 스타일 실시간 물리(d3-force, forceSim.js)를 우선 사용하고, 불러오지 못했으면 fcose 정적 레이아웃
+  const fileCount = elements.filter(e => e.data.type === 'file-node').length;
+  if (typeof isForceSimAvailable === 'function' && isForceSimAvailable()) {
+    runForceLayout();
+  } else {
+    //옵시디언 스타일: 짧은 링크 + 약한 척력 + 강한 중심 인력 → 둥글고 촘촘한 군집
+    const nodeRepulsion = Math.max(2500, Math.min(8000, fileCount * 60));
+
+    cy.layout({
+      name: 'fcose',
+      animate: false,
+      fit: true,
+      padding: 40,
+      //라벨 폭(최대 140px)까지 간격에 넣으면 노드가 멀어진다. 옵시디언처럼 원 크기만 고려한다.
+      nodeDimensionsIncludeLabels: false,
+      idealEdgeLength: function (edge) {
+        const refCount = edge.data('refCount') || 1;
+        return Math.max(60, 90 - refCount * 3);
+      },
+      nodeRepulsion: nodeRepulsion,
+      edgeElasticity: 0.45,
+      gravity: 0.5,
+      gravityRange: 3.8,
+      quality: 'default',
+      randomize: true,
+      numIter: 1500,
+      nodeSeparation: 60,
+      avoidOverlap: true,
+    }).run();
+
+    //노드가 적으면 fit이 과하게 확대해 카드(LOD) 단계로 넘어가므로 기본 배율로 제한
+    if (cy.zoom() > 1.2) {
+      cy.zoom(1.2);
+      cy.center();
+    }
+  }
+
+  //범례 표시
+  const legendPanel = document.getElementById('legend-panel');
+  if (legendPanel) legendPanel.classList.remove('hidden');
+
+  console.log(`[renderGraph] 파일 노드 뷰: ${fileCount}개 파일, ${fileEdgeMap.size}개 엣지`);
+
+  setupSemanticZoom();
+  if (typeof initMinimap === 'function') initMinimap();
+  if (typeof applyCodeEffects === 'function') applyCodeEffects(data);
+
+  return cy;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   함수 뷰 (기존 renderGraph 보존)
+   ══════════════════════════════════════════════════════════════════ */
+
+function renderFunctionView(data) {
+  if (!cy) return;
+  if (typeof stopForceSim === 'function') stopForceSim();
+  if (typeof stopCodeEffects === 'function') stopCodeEffects();
+
+  teardownSemanticZoom();
+  if (typeof destroyMinimap === 'function') destroyMinimap();
+
   graphData = data;
   currentViewMode = 'function';
 
   cy.elements().remove();
-
-  //리프 노드 타입 목록
-  const leafTypes = new Set(['function', 'js-function', 'ts-function', 'cpp-function', 'csharp-function', 'variable', 'css-variable', 'html-element', 'css-selector']);
 
   //엣지에 연결된 함수 노드 ID 수집 (고립 함수 필터링용)
   const connectedIds = new Set();
@@ -763,14 +1059,13 @@ function renderGraph(data) {
     }
   }
 
-  //유지할 노드 ID 결정 (4단계 계층 대응: leaf → file → tier → lang)
+  //유지할 노드 ID 결정
   const keptIds = new Set();
   for (const node of data.nodes) {
-    if (leafTypes.has(node.data.type) && connectedIds.has(node.data.id)) {
+    if (LEAF_TYPES.has(node.data.type) && connectedIds.has(node.data.id)) {
       keptIds.add(node.data.id);
     }
   }
-  //부모 방향으로 전파 (3회 반복으로 file → tier → lang 까지 도달)
   for (let pass = 0; pass < 3; pass++) {
     for (const node of data.nodes) {
       if (keptIds.has(node.data.id) && node.data.parent) {
@@ -779,87 +1074,53 @@ function renderGraph(data) {
     }
   }
 
-  //노드 추가 (엣지 없는 고립 리프와 빈 컨테이너 제외)
+  //노드 추가
   const containerTypes = new Set(['file', 'tier', 'lang']);
   const elements = [];
   for (const node of data.nodes) {
-    if (leafTypes.has(node.data.type) && !connectedIds.has(node.data.id)) continue;
+    if (LEAF_TYPES.has(node.data.type) && !connectedIds.has(node.data.id)) continue;
     if (containerTypes.has(node.data.type) && !keptIds.has(node.data.id)) continue;
     elements.push(node);
   }
 
-  //호출 엣지 추가
+  //엣지 추가
   const addedNodeIds = new Set(elements.filter(e => e.data && !e.data.source).map(e => e.data.id));
   for (const edge of data.edges) {
     if (!addedNodeIds.has(edge.source) || !addedNodeIds.has(edge.target)) continue;
     elements.push({
       data: {
         id: `${edge.source}->${edge.target}`,
-        source: edge.source,
-        target: edge.target,
+        source: edge.source, target: edge.target,
         refCount: edge.references.length,
-        references: edge.references,
-        edgeType: 'call',
+        references: edge.references, edgeType: 'call',
       },
     });
   }
-
-  //상속 엣지 추가 (source와 target 노드가 모두 존재할 때만)
   if (data.inheritanceEdges) {
     for (const edge of data.inheritanceEdges) {
       if (addedNodeIds.has(edge.source) && addedNodeIds.has(edge.target)) {
-        elements.push({
-          data: {
-            id: `inherit__${edge.source}->${edge.target}`,
-            source: edge.source,
-            target: edge.target,
-            edgeType: 'inheritance',
-          },
-        });
+        elements.push({ data: { id: `inherit__${edge.source}->${edge.target}`, source: edge.source, target: edge.target, edgeType: 'inheritance' } });
       }
     }
   }
-
-  //변수 참조 엣지 추가
   if (data.variableEdges) {
     for (const edge of data.variableEdges) {
       if (addedNodeIds.has(edge.source) && addedNodeIds.has(edge.target)) {
-        elements.push({
-          data: {
-            id: `varref__${edge.source}->${edge.target}`,
-            source: edge.source,
-            target: edge.target,
-            edgeType: 'variable-ref',
-            refCount: edge.references.length,
-            references: edge.references,
-          },
-        });
+        elements.push({ data: { id: `varref__${edge.source}->${edge.target}`, source: edge.source, target: edge.target, edgeType: 'variable-ref', refCount: edge.references.length, references: edge.references } });
       }
     }
   }
-
-  //웹 관계 엣지 추가
   if (data.webEdges) {
     for (const edge of data.webEdges) {
       if (addedNodeIds.has(edge.source) && addedNodeIds.has(edge.target)) {
-        const edgeId = `web__${edge.source}->${edge.target}__${edge.type}`;
-        elements.push({
-          data: {
-            id: edgeId,
-            source: edge.source,
-            target: edge.target,
-            edgeType: edge.type,
-            refCount: edge.references ? edge.references.length : 1,
-            references: edge.references,
-          },
-        });
+        elements.push({ data: { id: `web__${edge.source}->${edge.target}__${edge.type}`, source: edge.source, target: edge.target, edgeType: edge.type, refCount: edge.references ? edge.references.length : 1, references: edge.references } });
       }
     }
   }
 
   cy.add(elements);
 
-  //순환 참조 엣지에 클래스 추가
+  //순환 참조 엣지 마킹
   if (data.cycleEdgeIds) {
     for (const edgeId of data.cycleEdgeIds) {
       const edge = cy.getElementById(edgeId);
@@ -867,87 +1128,69 @@ function renderGraph(data) {
     }
   }
 
-  //최상위 컨테이너 ID 목록 생성 (tier + lang)
+  //최상위 컨테이너 ID 목록 생성
   const sortedTiers = data.tiers ? [...data.tiers].sort((a, b) => a - b) : [];
   const containerIds = sortedTiers.map(t => `tier__${t}`);
-  //언어 컨테이너를 고정 순서로 추가 (HTML → CSS → JS)
   if (data.langs) {
     const langOrder = ['html', 'css', 'javascript'];
     for (const lang of langOrder) {
-      if (data.langs.includes(lang)) {
-        containerIds.push(`lang__${lang}`);
-      }
+      if (data.langs.includes(lang)) containerIds.push(`lang__${lang}`);
     }
   }
 
-  //1단계: fcose로 내부 노드 자동 배치 (완료 후 컨테이너 재배치)
+  //fcose 레이아웃 + 컨테이너 재배치
   cy.layout({
     name: 'fcose',
-    animate: false,
-    fit: false,
-    padding: 30,
+    animate: false, fit: false, padding: 30,
     nodeDimensionsIncludeLabels: true,
-    idealEdgeLength: 80,
-    nodeRepulsion: 6000,
-    edgeElasticity: 0.3,
-    nestingFactor: 0.4,
-    gravity: 0.3,
-    gravityRange: 2.0,
-    quality: 'default',
-    randomize: true,
-    numIter: 800,
-    nodeSeparation: 120,
-    avoidOverlap: true,
+    idealEdgeLength: 80, nodeRepulsion: 6000, edgeElasticity: 0.3,
+    nestingFactor: 0.4, gravity: 0.3, gravityRange: 2.0,
+    quality: 'default', randomize: true, numIter: 800,
+    nodeSeparation: 120, avoidOverlap: true,
     stop: function () {
-      //2단계: 레이아웃 완료 후 컨테이너 박스를 좌→우로 겹치지 않게 재배치
       arrangeContainers(containerIds);
     },
   }).run();
 
-  //범례 표시
-  document.getElementById('legend').classList.add('visible');
-
+  const legendPanel = document.getElementById('legend-panel');
+  if (legendPanel) legendPanel.classList.remove('hidden');
   return cy;
 }
 
-//패키지 뷰로 전환한다.
+/* ══════════════════════════════════════════════════════════════════
+   패키지 뷰 (기존 유지)
+   ══════════════════════════════════════════════════════════════════ */
+
 function renderPackageView(data) {
   if (!cy || !data) return;
+  if (typeof stopForceSim === 'function') stopForceSim();
+  if (typeof stopCodeEffects === 'function') stopCodeEffects();
   currentViewMode = 'package';
 
   cy.elements().remove();
   const elements = [];
 
-  //패키지 노드 추가
   if (data.packageNodes) {
-    for (const node of data.packageNodes) {
-      elements.push(node);
-    }
+    for (const node of data.packageNodes) elements.push(node);
   }
 
-  //파일 노드를 패키지 안에 추가
   const fileSet = new Set();
   for (const node of data.nodes) {
     if (node.data.type === 'file') {
       const filePath = node.data.fullPath;
       if (fileSet.has(filePath)) continue;
       fileSet.add(filePath);
-
       const dir = filePath.split('/').slice(0, -1).join('/') || '.';
       elements.push({
         data: {
-          id: `pkgfile__${filePath}`,
-          label: filePath.split('/').pop(),
-          type: 'file',
-          fullPath: filePath,
-          parent: `pkg__${dir}`,
+          id: `pkgfile__${filePath}`, label: filePath.split('/').pop(),
+          type: 'file', fullPath: filePath, parent: `pkg__${dir}`,
           couplingScore: node.data.couplingScore || 0,
         },
       });
     }
   }
 
-  //파일 간 엣지 추가 (중복 제거)
   const fileEdgeSet = new Set();
   for (const edge of data.edges) {
     const sf = edge.source.split('::')[0];
@@ -956,47 +1199,30 @@ function renderPackageView(data) {
     const key = `${sf}->${tf}`;
     if (fileEdgeSet.has(key)) continue;
     fileEdgeSet.add(key);
-    elements.push({
-      data: {
-        id: `pkgedge__${key}`,
-        source: `pkgfile__${sf}`,
-        target: `pkgfile__${tf}`,
-        edgeType: 'call',
-      },
-    });
+    elements.push({ data: { id: `pkgedge__${key}`, source: `pkgfile__${sf}`, target: `pkgfile__${tf}`, edgeType: 'call' } });
   }
 
   cy.add(elements);
 
   cy.layout({
-    name: 'fcose',
-    animate: false,
-    fit: true,
-    padding: 60,
-    nodeDimensionsIncludeLabels: true,
-    idealEdgeLength: 100,
-    nodeRepulsion: 6000,
-    quality: 'default',
-    randomize: true,
-    numIter: 2000,
+    name: 'fcose', animate: false, fit: true, padding: 60,
+    nodeDimensionsIncludeLabels: true, idealEdgeLength: 100,
+    nodeRepulsion: 6000, quality: 'default', randomize: true, numIter: 2000,
   }).run();
 }
 
-//최상위 컨테이너 박스들을 좌→우 순서로 재배치하는 함수다.
-//tier 컨테이너와 lang 컨테이너 모두 처리한다.
-//재귀적으로 내부 계층을 정리한 뒤 최상위 컨테이너를 좌→우 배치한다.
-//  - Python tier: tier → file → leaf (3단계)
-//  - Web lang: lang → tier → file → leaf (4단계)
+/* ══════════════════════════════════════════════════════════════════
+   컨테이너 배치 (함수 뷰 전용)
+   ══════════════════════════════════════════════════════════════════ */
+
 function arrangeContainers(containerIds) {
   if (!containerIds || containerIds.length === 0) return;
 
-  //compound 노드 패딩 보정값
   const containerGap = 166;
   const subTierGap = 120;
   const fileGap = 80;
   const fnGap = 8;
 
-  //파일 노드 내부의 리프 노드를 행 기반으로 컴팩트하게 배치한다.
   function arrangeLeafNodes(fileNode) {
     const leafNodes = fileNode.children();
     if (leafNodes.length === 0) return null;
@@ -1017,9 +1243,7 @@ function arrangeContainers(containerIds) {
     let rowX = 0, rowY = 0, rowMaxH = 0;
     for (const item of items) {
       if (rowX > 0 && rowX + item.w > maxRowW) {
-        rowX = 0;
-        rowY += rowMaxH + fnGap;
-        rowMaxH = 0;
+        rowX = 0; rowY += rowMaxH + fnGap; rowMaxH = 0;
       }
       item.node.position({ x: rowX + item.w / 2, y: rowY + item.h / 2 });
       rowX += item.w + fnGap;
@@ -1030,10 +1254,8 @@ function arrangeContainers(containerIds) {
     return { leafNodes, bb, w: bb.w, h: bb.h };
   }
 
-  //블록 목록을 그리드 배치한다. 각 블록의 leafNodes를 이동시킨다.
   function gridLayout(blocks, gap) {
     if (blocks.length === 0) return null;
-
     let allLeafNodes = cy.collection();
     const cols = Math.max(1, Math.ceil(Math.cbrt(blocks.length)));
     blocks.sort((a, b) => b.h - a.h);
@@ -1051,37 +1273,26 @@ function arrangeContainers(containerIds) {
       rowMaxH = Math.max(rowMaxH, block.h);
       gridX += block.w + gap;
       col++;
-      if (col >= cols) {
-        gridX = 0;
-        gridY += rowMaxH + gap;
-        rowMaxH = 0;
-        col = 0;
-      }
+      if (col >= cols) { gridX = 0; gridY += rowMaxH + gap; rowMaxH = 0; col = 0; }
     }
 
     const bb = allLeafNodes.boundingBox();
     return { leafNodes: allLeafNodes, bb, w: bb.w, h: bb.h };
   }
 
-  //컨테이너 내부를 재귀적으로 정리한다.
-  //반환: { leafNodes, bb, w, h } 또는 null
   function arrangeInternals(containerNode) {
     const children = containerNode.children();
     if (children.length === 0) return null;
-
     const firstChildType = children[0].data('type');
 
     if (firstChildType === 'tier') {
-      //자식이 서브 티어 (lang → tier 구조) — 재귀 처리
       const subBlocks = [];
       children.forEach(subTier => {
         const result = arrangeInternals(subTier);
         if (result) subBlocks.push(result);
       });
       return gridLayout(subBlocks, subTierGap);
-
     } else {
-      //자식이 파일 노드 — 리프 배치 후 파일 그리드 배치
       const fileBlocks = [];
       children.forEach(fileNode => {
         const result = arrangeLeafNodes(fileNode);
@@ -1091,33 +1302,25 @@ function arrangeContainers(containerIds) {
     }
   }
 
-  //모든 최상위 컨테이너 내부 정리
   const containerInfo = [];
   for (const containerId of containerIds) {
     const containerNode = cy.getElementById(containerId);
     if (!containerNode.length) continue;
     if (containerNode.descendants().length === 0) continue;
-
     const result = arrangeInternals(containerNode);
     if (!result) continue;
-
-    console.log(`[layout] ${containerId}: ${result.leafNodes.length} leaves, bbox ${Math.round(result.w)}×${Math.round(result.h)}`);
     containerInfo.push({ containerId, leafNodes: result.leafNodes, bb: result.bb });
   }
 
   if (containerInfo.length === 0) return;
 
-  //최상위 컨테이너들을 자동 줄바꿈으로 배치
   const maxW = Math.max(...containerInfo.map(t => t.bb.w));
   const targetWidth = Math.max(maxW + containerGap, 2500);
 
   const rows = [[]];
   let rowW = 0;
   for (const info of containerInfo) {
-    if (rowW > 0 && rowW + info.bb.w > targetWidth) {
-      rows.push([]);
-      rowW = 0;
-    }
+    if (rowW > 0 && rowW + info.bb.w > targetWidth) { rows.push([]); rowW = 0; }
     rows[rows.length - 1].push(info);
     rowW += info.bb.w + containerGap;
   }
@@ -1126,7 +1329,6 @@ function arrangeContainers(containerIds) {
   for (const row of rows) {
     const rowH = Math.max(...row.map(r => r.bb.h));
     let x = 0;
-
     for (const info of row) {
       const { leafNodes, bb } = info;
       const offsetX = x - bb.x1;
@@ -1137,20 +1339,14 @@ function arrangeContainers(containerIds) {
       });
       x += bb.w + containerGap;
     }
-
     rowY += rowH + containerGap;
   }
 
-  console.log(`[layout] rows: ${rows.length}, rowSizes: [${rows.map(r => r.length).join(',')}], targetWidth: ${targetWidth}`);
   cy.fit(undefined, 20);
 
-  //초기 줌: 노드 수에 따라 동적 조정 후 첫 리프 노드 중심으로 패닝
   const allLeaves = cy.nodes('[type="function"], [type="variable"], [type="js-function"], [type="ts-function"], [type="cpp-function"], [type="csharp-function"], [type="css-variable"], [type="html-element"], [type="css-selector"]');
   const nodeCount = allLeaves.length;
-  const zoomLevel = nodeCount <= 10 ? 1.2
-    : nodeCount <= 30 ? 0.9
-    : nodeCount <= 80 ? 0.7
-    : 0.5;
+  const zoomLevel = nodeCount <= 10 ? 1.2 : nodeCount <= 30 ? 0.9 : nodeCount <= 80 ? 0.7 : 0.5;
   const firstLeaf = cy.nodes('[type="function"], [type="js-function"], [type="ts-function"], [type="cpp-function"], [type="csharp-function"]')[0];
   if (firstLeaf) {
     cy.zoom({ level: zoomLevel, position: firstLeaf.position() });
@@ -1158,29 +1354,27 @@ function arrangeContainers(containerIds) {
   }
 }
 
-//파일 상세 뷰: 해당 파일의 함수 노드만 + 외부 연결 스텁 노드 표시
+/* ══════════════════════════════════════════════════════════════════
+   파일 상세 뷰 (기존 유지)
+   ══════════════════════════════════════════════════════════════════ */
+
 function renderFileDetailView(data, filePath) {
   if (!cy || !data) return;
+  if (typeof stopForceSim === 'function') stopForceSim();
+  if (typeof stopCodeEffects === 'function') stopCodeEffects();
   currentViewMode = 'file-detail';
 
   cy.elements().remove();
   const elements = [];
 
-  //해당 파일의 함수/변수 노드 수집
   const fileNodeIds = new Set();
   for (const node of data.nodes) {
-    if ((node.data.type === 'function' || node.data.type === 'variable') && node.data.filePath === filePath) {
+    if (LEAF_TYPES.has(node.data.type) && node.data.filePath === filePath) {
       fileNodeIds.add(node.data.id);
-      elements.push({
-        data: {
-          ...node.data,
-          parent: undefined, //부모 없이 자유 배치
-        },
-      });
+      elements.push({ data: { ...node.data, parent: undefined } });
     }
   }
 
-  //외부 연결 스텁 노드 수집
   const stubIds = new Set();
   const allEdges = [...(data.edges || []), ...(data.variableEdges || [])];
 
@@ -1192,147 +1386,207 @@ function renderFileDetailView(data, filePath) {
       stubIds.add(edge.target);
       const name = edge.target.split('::').pop();
       const file = edge.target.split('::')[0];
-      elements.push({
-        data: {
-          id: edge.target,
-          label: name,
-          type: 'function',
-          filePath: file,
-          qualifiedName: name,
-          isStub: true,
-        },
-      });
+      elements.push({ data: { id: edge.target, label: name, type: 'function', filePath: file, qualifiedName: name, isStub: true } });
     }
-
     if (tgtIn && !srcIn && !stubIds.has(edge.source)) {
       stubIds.add(edge.source);
       const name = edge.source.split('::').pop();
       const file = edge.source.split('::')[0];
-      elements.push({
-        data: {
-          id: edge.source,
-          label: name,
-          type: 'function',
-          filePath: file,
-          qualifiedName: name,
-          isStub: true,
-        },
-      });
+      elements.push({ data: { id: edge.source, label: name, type: 'function', filePath: file, qualifiedName: name, isStub: true } });
     }
   }
 
-  //관련 엣지 추가
   const allNodeIds = new Set([...fileNodeIds, ...stubIds]);
   for (const edge of data.edges) {
     if (allNodeIds.has(edge.source) && allNodeIds.has(edge.target)) {
-      elements.push({
-        data: {
-          id: `${edge.source}->${edge.target}`,
-          source: edge.source,
-          target: edge.target,
-          refCount: edge.references.length,
-          references: edge.references,
-          edgeType: 'call',
-        },
-      });
+      elements.push({ data: { id: `${edge.source}->${edge.target}`, source: edge.source, target: edge.target, refCount: edge.references.length, references: edge.references, edgeType: 'call' } });
     }
   }
-
   if (data.variableEdges) {
     for (const edge of data.variableEdges) {
       if (allNodeIds.has(edge.source) && allNodeIds.has(edge.target)) {
-        elements.push({
-          data: {
-            id: `varref__${edge.source}->${edge.target}`,
-            source: edge.source,
-            target: edge.target,
-            edgeType: 'variable-ref',
-            refCount: edge.references.length,
-            references: edge.references,
-          },
-        });
+        elements.push({ data: { id: `varref__${edge.source}->${edge.target}`, source: edge.source, target: edge.target, edgeType: 'variable-ref', refCount: edge.references.length, references: edge.references } });
       }
     }
   }
 
   cy.add(elements);
 
-  //스텁 노드에 특수 스타일 적용
-  cy.nodes('[?isStub]').style({
-    'opacity': 0.5,
-    'border-style': 'dashed',
-  });
-
-  //모든 엣지 표시
+  cy.nodes('[?isStub]').style({ 'opacity': 0.5, 'border-style': 'dashed' });
   cy.edges().style({ 'display': 'element', 'line-opacity': 0.6 });
 
   cy.layout({
-    name: 'fcose',
-    animate: false,
-    fit: true,
-    padding: 60,
-    nodeDimensionsIncludeLabels: true,
-    idealEdgeLength: 80,
-    nodeRepulsion: 5000,
-    quality: 'default',
-    randomize: true,
-    numIter: 1000,
+    name: 'fcose', animate: false, fit: true, padding: 60,
+    nodeDimensionsIncludeLabels: true, idealEdgeLength: 80,
+    nodeRepulsion: 5000, quality: 'default', randomize: true, numIter: 1000,
   }).run();
 
-  //뒤로가기 버튼 표시
   document.getElementById('back-to-package-btn').classList.remove('hidden');
 }
 
-function highlightNode(nodeId) {
-  if (!cy) return;
-  cy.nodes().removeClass('highlighted dimmed');
-  cy.edges().removeClass('highlighted dimmed');
+/* ══════════════════════════════════════════════════════════════════
+   시맨틱 줌 (Phase 2)
+   ══════════════════════════════════════════════════════════════════ */
 
-  //엣지 토글 상태에 따라 초기화
-  if (typeof edgesVisible !== 'undefined' && edgesVisible) {
-    //토글 ON 상태: 모든 엣지 유지, opacity 낮춤
-    cy.edges().style({ 'display': 'element', 'line-opacity': 0.3 });
-  } else {
-    //토글 OFF 상태: 모든 엣지 숨김
-    cy.edges().style('display', 'none');
+//물리 레이아웃의 원 간격(약 60px)에 맞춘 기준. 배치가 넓어 화면 맞춤 배율이 낮으므로 기준도 낮게 둔다.
+const LOD_STAGES = [
+  { name: 'point',  maxZoom: 0.18, cls: 'lod-point'  },
+  { name: 'circle', maxZoom: 0.42, cls: 'lod-circle' },
+  { name: 'normal', maxZoom: 1.5,  cls: null          },
+  { name: 'card',   maxZoom: Infinity, cls: 'lod-card' },
+];
+
+let _lodStageIndex = 2;
+let _lodZoomHandler = null;
+let _lodDebounceTimer = null;
+
+function setupSemanticZoom() {
+  if (!cy) return;
+
+  if (!_lodZoomHandler) {
+    _lodZoomHandler = function () {
+      //라벨 페이드는 줌하는 동안 연속적으로, LOD 단계 전환은 debounce
+      updateLabelFade();
+      clearTimeout(_lodDebounceTimer);
+      _lodDebounceTimer = setTimeout(onZoomChange, 100);
+    };
+    cy.on('zoom', _lodZoomHandler);
   }
 
-  const node = cy.getElementById(nodeId);
-  if (node.length) {
-    node.addClass('highlighted');
+  //다시 렌더링된 경우에도 새 요소에 현재 단계가 적용되도록 강제로 재계산
+  _lodStageIndex = -1;
+  _labelFadeBucket = -1;
+  onZoomChange();
+  updateLabelFade();
+}
 
-    //연결된 엣지와 이웃 노드 하이라이트
+//옵시디언의 Text fade threshold: 줌 0.18~0.45 구간에서 라벨이 서서히 나타난다
+//스타일 transition(0.2s)이 단계 사이를 보간하므로 연속적으로 보인다.
+const LABEL_FADE_MIN_ZOOM = 0.18;
+const LABEL_FADE_MAX_ZOOM = 0.45;
+const LABEL_FADE_STEPS = 5;
+const LABEL_FADE_CLASSES = 'label-fade-0 label-fade-1 label-fade-2 label-fade-3 label-fade-4';
+let _labelFadeBucket = -1;
+
+function updateLabelFade() {
+  if (!cy) return;
+  const t = (cy.zoom() - LABEL_FADE_MIN_ZOOM) / (LABEL_FADE_MAX_ZOOM - LABEL_FADE_MIN_ZOOM);
+  const bucket = Math.round(Math.min(1, Math.max(0, t)) * LABEL_FADE_STEPS);
+  if (bucket === _labelFadeBucket) return;
+  _labelFadeBucket = bucket;
+
+  cy.batch(() => {
+    const nodes = cy.nodes('[type="file-node"]');
+    nodes.removeClass(LABEL_FADE_CLASSES);
+    if (bucket < LABEL_FADE_STEPS) nodes.addClass('label-fade-' + bucket);
+  });
+}
+
+function teardownSemanticZoom() {
+  if (!cy || !_lodZoomHandler) return;
+  cy.off('zoom', _lodZoomHandler);
+  _lodZoomHandler = null;
+  clearTimeout(_lodDebounceTimer);
+
+  //모든 LOD 클래스 제거
+  const allCls = LOD_STAGES.filter(s => s.cls).map(s => s.cls);
+  cy.batch(() => {
+    cy.elements().removeClass(allCls.join(' ') + ' ' + LABEL_FADE_CLASSES);
+  });
+  _lodStageIndex = 2;
+  _labelFadeBucket = -1;
+}
+
+function onZoomChange() {
+  if (!cy) return;
+  const zoom = cy.zoom();
+
+  let newIndex = LOD_STAGES.length - 1;
+  for (let i = 0; i < LOD_STAGES.length; i++) {
+    if (zoom < LOD_STAGES[i].maxZoom) {
+      newIndex = i;
+      break;
+    }
+  }
+
+  if (newIndex !== _lodStageIndex) {
+    applyLodStage(newIndex);
+    _lodStageIndex = newIndex;
+  }
+}
+
+function applyLodStage(index) {
+  if (!cy) return;
+  const allCls = LOD_STAGES.filter(s => s.cls).map(s => s.cls);
+  const newCls = LOD_STAGES[index].cls;
+
+  cy.batch(() => {
+    cy.elements().removeClass(allCls.join(' '));
+    if (newCls) {
+      cy.nodes('[type="file-node"]').addClass(newCls);
+      cy.edges('[type="aggregated"]').addClass(newCls);
+    }
+  });
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   노드 하이라이트 / 해제
+   ══════════════════════════════════════════════════════════════════ */
+
+function highlightNode(nodeId) {
+  if (!cy) return;
+  cy.nodes().removeClass('highlighted dimmed hover-focus neighbor-highlight');
+  cy.edges().removeClass('highlighted dimmed');
+
+  if (currentViewMode === 'file') {
+    //파일 뷰: 포커스 디밍 방식
+    const node = cy.getElementById(nodeId);
+    if (!node.length) return;
+
+    const neighborhood = node.closedNeighborhood();
     const connectedEdges = node.connectedEdges();
-    const neighborNodes = node.neighborhood('node');
 
-    //연결된 엣지만 강조 표시
-    connectedEdges.style('display', 'element');
+    cy.elements().not(neighborhood).addClass('dimmed');
+    neighborhood.removeClass('dimmed');
+    neighborhood.addClass('neighbor-highlight');
     connectedEdges.addClass('highlighted');
+    connectedEdges.removeClass('dimmed');
+    node.addClass('hover-focus');
+  } else {
+    //함수 뷰: 기존 방식
+    if (typeof edgesVisible !== 'undefined' && edgesVisible) {
+      cy.edges().style({ 'display': 'element', 'line-opacity': 0.3 });
+    } else {
+      cy.edges().style('display', 'none');
+    }
 
-    //모든 조상 노드(file, tier, lang)도 흐려지지 않도록 처리
-    const ancestors = node.ancestors();
-    const keepVisible = node.union(neighborNodes).union(ancestors);
+    const node = cy.getElementById(nodeId);
+    if (node.length) {
+      node.addClass('highlighted');
+      const connectedEdges = node.connectedEdges();
+      const neighborNodes = node.neighborhood('node');
+      connectedEdges.style('display', 'element');
+      connectedEdges.addClass('highlighted');
 
-    //이웃 노드의 모든 조상도 흐려지지 않도록 처리
-    let neighborAncestors = cy.collection();
-    neighborNodes.forEach(n => {
-      neighborAncestors = neighborAncestors.union(n.ancestors());
-    });
-
-    //나머지는 전부 흐리게
-    cy.nodes().not(keepVisible).not(neighborAncestors).addClass('dimmed');
+      const ancestors = node.ancestors();
+      const keepVisible = node.union(neighborNodes).union(ancestors);
+      let neighborAncestors = cy.collection();
+      neighborNodes.forEach(n => { neighborAncestors = neighborAncestors.union(n.ancestors()); });
+      cy.nodes().not(keepVisible).not(neighborAncestors).addClass('dimmed');
+    }
   }
 }
 
 function clearHighlights() {
   if (!cy) return;
-  cy.nodes().removeClass('highlighted dimmed');
+  cy.nodes().removeClass('highlighted dimmed hover-focus neighbor-highlight');
   cy.edges().removeClass('highlighted dimmed');
 
-  //엣지 토글 상태에 따라 복원
-  if (typeof edgesVisible !== 'undefined' && edgesVisible) {
-    cy.edges().style({ 'display': 'element', 'line-opacity': 0.3 });
-  } else {
-    cy.edges().style('display', 'none');
+  if (currentViewMode !== 'file') {
+    if (typeof edgesVisible !== 'undefined' && edgesVisible) {
+      cy.edges().style({ 'display': 'element', 'line-opacity': 0.3 });
+    } else {
+      cy.edges().style('display', 'none');
+    }
   }
 }

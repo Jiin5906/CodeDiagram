@@ -633,6 +633,21 @@ class Child(Base1, Base2):
   assert(tsGraph.nodes.filter(n => n.data.type === 'function').length > 0, '[TS] graph has function nodes');
   assert(tsGraph.fileCounts.typescript > 0, '[TS] fileCounts has typescript');
 
+  // --- Inline Script Event Binding Test (익명 핸들러 null 회귀) ---
+  console.log('\n=== Inline Script Event Binding Tests ===');
+
+  let inlineGraph = null;
+  try {
+    inlineGraph = await buildGraph(path.join(__dirname, 'fixtures', 'inline_script_project'));
+  } catch (err) {
+    console.error('  ERROR:', err.message);
+  }
+  assert(inlineGraph !== null, '[Inline] anonymous addEventListener handler does not crash buildGraph');
+  if (inlineGraph) {
+    const onclickEdge = inlineGraph.webEdges.find(e => e.type === 'event-binding' && e.target.endsWith('::handleSave'));
+    assert(onclickEdge !== undefined, '[Inline] onclick attribute still links to handleSave');
+  }
+
   // --- Summary ---
   console.log(`\n=== Results: ${passed} passed, ${failed} failed ===`);
   process.exit(failed > 0 ? 1 : 0);

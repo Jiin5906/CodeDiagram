@@ -221,6 +221,9 @@ function resolveWebRelations(parsedFiles, projectPath) {
   //HTML 인라인 이벤트
   for (const hf of htmlFiles) {
     for (const evt of (hf.parsed.eventBindings || [])) {
+      //인라인 <script>의 addEventListener 결과도 graphBuilder에서 여기로 병합된다.
+      //익명 함수 핸들러(addEventListener('click', () => {...}))는 handler가 null이므로 건너뛴다.
+      if (typeof evt.handler !== 'string') continue;
       //인라인 핸들러에서 함수명 추출 (onclick="handleClick()" → handleClick)
       const funcMatch = evt.handler.match(/(\w+)\s*\(/);
       if (funcMatch) {
