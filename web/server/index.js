@@ -7,6 +7,7 @@ const path = require('path');
 
 const analyzeRouter = require('./routes/analyze');
 const explainRouter = require('./routes/explain');
+const fileRouter = require('./routes/file');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -17,6 +18,7 @@ app.use(express.static(path.join(__dirname, '..', 'public')));
 
 app.use('/api/analyze', analyzeRouter);
 app.use('/api/explain', explainRouter);
+app.use('/api/file', fileRouter);
 
 const server = app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);

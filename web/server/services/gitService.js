@@ -179,4 +179,4 @@ function findFiles(dirPath) {
   return { files, warnings };
 }
 
-module.exports = { getProjectPath, findPythonFiles, findFiles };
+module.exports = { getProjectPath, findPythonFiles, findFiles, SUPPORTED_EXTENSIONS };

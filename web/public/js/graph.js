@@ -9,28 +9,28 @@ let graphData = null;
 
 //언어별 노드 색상 매핑
 const LANG_COLORS = {
-  python:     { bg: '#F7C948', border: '#B8941E' },
-  typescript: { bg: '#3B82F6', border: '#1D4ED8' },
-  javascript: { bg: '#FBBF24', border: '#D97706' },
-  cpp:        { bg: '#06B6D4', border: '#0891B2' },
-  csharp:     { bg: '#22C55E', border: '#16A34A' },
-  html:       { bg: '#F97316', border: '#EA580C' },
-  css:        { bg: '#A855F7', border: '#7C3AED' },
+  python:     { bg: '#4B8BBE', border: '#346A94' },
+  typescript: { bg: '#3178C6', border: '#245A96' },
+  javascript: { bg: '#E3CF5A', border: '#AD9C3C' },
+  cpp:        { bg: '#D0607F', border: '#A0465F' },
+  csharp:     { bg: '#5A9E4B', border: '#437836' },
+  html:       { bg: '#D9663F', border: '#A84C2C' },
+  css:        { bg: '#8A6CC2', border: '#674F95' },
 };
 
 //엣지 타입별 색상 매핑
 const EDGE_TYPE_COLORS = {
-  'call':          '#60A5FA',
-  'variable-ref':  '#14b8a6',
-  'inheritance':   '#A78BFA',
-  'script-ref':    '#22c55e',
-  'style-ref':     '#22c55e',
-  'dom-access':    '#FB923C',
-  'css-target':    '#A78BFA',
-  'event-binding': '#F472B6',
-  'js-import':     '#FBBF24',
-  'css-import':    '#FBBF24',
-  'css-var':       '#c026d3',
+  'call':          '#548AF7',
+  'variable-ref':  '#4FA8A0',
+  'inheritance':   '#A58BD6',
+  'script-ref':    '#5FB865',
+  'style-ref':     '#5FB865',
+  'dom-access':    '#D98A4E',
+  'css-target':    '#A58BD6',
+  'event-binding': '#C77DAD',
+  'js-import':     '#E3C06B',
+  'css-import':    '#E3C06B',
+  'css-var':       '#B06CC0',
 };
 
 //확장자 → 언어 (같은 경로에 언어별 파일 노드가 여러 개일 때 고르는 기준)
@@ -50,15 +50,16 @@ function initGraph(container) {
          파일 노드 뷰 스타일 (Phase 1 리뉴얼)
          ══════════════════════════════════════════════ */
 
-      //옵시디언 스타일: 테두리 없는 단색 원 + 은은한 원형 글로우, 라벨은 흐리게
+      //단색 원 + 같은 계열의 진한 1px 테두리. 글로우는 쓰지 않고 상태는 테두리로만 표시한다.
       //주의: overlay는 기본 모양이 둥근 사각형이라 원 위에 네모가 생기므로 파일 노드에서는 쓰지 않는다.
       {
         selector: 'node[type="file-node"]',
         style: {
           'shape': 'ellipse',
           'background-color': 'data(color)',
-          'background-opacity': 0.92,
-          'border-width': 0,
+          'background-opacity': 1,
+          'border-width': 1,
+          'border-color': 'data(borderColor)',
           'width': 'data(size)',
           'height': 'data(size)',
           'label': 'data(label)',
@@ -68,30 +69,24 @@ function initGraph(container) {
           'font-family': 'Pretendard Variable, Pretendard, sans-serif',
           'font-size': 11,
           'font-weight': 500,
-          'color': '#9AA3B5',
-          'text-outline-color': '#0B0D11',
-          'text-outline-width': 1.5,
-          'text-outline-opacity': 0.8,
+          'color': '#A8ABB2',
+          'text-outline-color': '#1E1F22',
+          'text-outline-width': 2,
+          'text-outline-opacity': 1,
           'text-wrap': 'ellipsis',
           'text-max-width': '140px',
           'min-zoomed-font-size': 7,
-          //상시 글로우 (underlay)
-          'underlay-color': 'data(color)',
-          'underlay-opacity': 0.1,
-          'underlay-padding': 5,
-          'underlay-shape': 'ellipse',
           'overlay-opacity': 0,
-          'transition-property': 'opacity, underlay-opacity, underlay-padding, color, font-size, text-opacity',
+          'transition-property': 'opacity, border-width, border-color, color, text-opacity',
           'transition-duration': '0.2s',
           'transition-timing-function': 'ease-out',
         },
       },
-      //결합도 높은 노드 — 테두리 대신 글로우 반경을 키워 자연스럽게 돋보이게
+      //결합도 높은 노드 — 테두리를 조금 두껍게
       {
         selector: 'node[type="file-node"][couplingScore > 0.3]',
         style: {
-          'underlay-opacity': 0.18,
-          'underlay-padding': 'mapData(couplingScore, 0.3, 1, 7, 14)',
+          'border-width': 'mapData(couplingScore, 0.3, 1, 1.5, 3)',
         },
       },
       //클릭 시 기본 회색 사각 오버레이 제거
@@ -110,52 +105,37 @@ function initGraph(container) {
       { selector: 'node[type="file-node"].label-fade-3', style: { 'text-opacity': 0.6 } },
       { selector: 'node[type="file-node"].label-fade-4', style: { 'text-opacity': 0.8 } },
 
-      //진단 글로우 (codeEffects.js). diag-pulse 토글 + transition으로 숨 쉬듯 깜빡인다.
+      //진단 표시 (codeEffects.js가 클래스를 붙인다) — 깜빡임 없이 바깥 테두리 색으로 고정 표시
       {
         selector: 'node[type="file-node"].diag-warning',
-        style: { 'underlay-color': '#F59E0B', 'underlay-opacity': 0.22, 'underlay-padding': 9 },
+        style: { 'border-color': '#D6A547', 'border-width': 2.5 },
       },
       {
         selector: 'node[type="file-node"].diag-error',
-        style: { 'underlay-color': '#EF4444', 'underlay-opacity': 0.28, 'underlay-padding': 10 },
-      },
-      {
-        selector: 'node[type="file-node"].diag-pulse',
-        style: {
-          'underlay-opacity': 0.5,
-          'underlay-padding': 16,
-          'transition-property': 'underlay-opacity, underlay-padding',
-          'transition-duration': '1.4s',
-          'transition-timing-function': 'ease-in-out-sine',
-        },
+        style: { 'border-color': '#E06666', 'border-width': 2.5 },
       },
 
       /* ── 파일 노드 인터랙션 상태 ── */
 
-      //호버 포커스 — 글로우 강화 + 라벨 밝게
+      //호버 포커스 — 라벨만 밝고 크게
       {
         selector: 'node[type="file-node"].hover-focus',
         style: {
-          'background-opacity': 1,
-          'underlay-opacity': 0.35,
-          'underlay-padding': 12,
-          'color': '#F1F4F9',
+          'color': '#DFE1E5',
           'text-opacity': 1,
           'font-size': 13,
           'font-weight': 600,
           'z-index': 999,
         },
       },
-      //선택 상태 — 얇은 흰 링 + 강한 글로우
+      //선택 상태 — 강조색 테두리
       {
         selector: 'node[type="file-node"]:selected',
         style: {
-          'border-width': 1.5,
-          'border-color': '#FFFFFF',
-          'border-opacity': 0.9,
-          'underlay-opacity': 0.4,
-          'underlay-padding': 14,
-          'color': '#FFFFFF',
+          'border-width': 2.5,
+          'border-color': '#548AF7',
+          'border-opacity': 1,
+          'color': '#DFE1E5',
           'text-opacity': 1,
           'overlay-opacity': 0,
         },
@@ -165,9 +145,7 @@ function initGraph(container) {
         selector: 'node[type="file-node"].neighbor-highlight',
         style: {
           'opacity': 1.0,
-          'underlay-opacity': 0.22,
-          'underlay-padding': 8,
-          'color': '#D4D8E0',
+          'color': '#C9CCD1',
           'text-opacity': 1,
         },
       },
@@ -180,9 +158,8 @@ function initGraph(container) {
         selector: 'node.dimmed',
         style: {
           'opacity': 0.06,
-          'underlay-opacity': 0,
           'text-opacity': 0,
-          'transition-property': 'opacity, underlay-opacity, text-opacity',
+          'transition-property': 'opacity, text-opacity',
           'transition-duration': '0.2s',
         },
       },
@@ -199,10 +176,10 @@ function initGraph(container) {
       {
         selector: 'node.highlighted',
         style: {
-          'border-color': '#f59e0b',
+          'border-color': '#D6A547',
           'border-width': 2.5,
-          'background-color': '#1c1917',
-          'color': '#fbbf24',
+          'background-color': '#2B2D30',
+          'color': '#E3C06B',
           'z-index': 10,
         },
       },
@@ -210,8 +187,8 @@ function initGraph(container) {
       {
         selector: 'edge.highlighted',
         style: {
-          'line-color': '#f59e0b',
-          'target-arrow-color': '#f59e0b',
+          'line-color': '#D6A547',
+          'target-arrow-color': '#D6A547',
           'width': 2.5,
           'line-opacity': 1,
           'z-index': 10,
@@ -227,24 +204,24 @@ function initGraph(container) {
         selector: 'node[type="tier"]',
         style: {
           'shape': 'roundrectangle',
-          'background-color': '#0f1419',
+          'background-color': '#1E1F22',
           'background-opacity': 0.6,
-          'border-color': '#f59e0b',
-          'border-width': 2,
+          'border-color': '#4E5157',
+          'border-width': 1,
           'border-opacity': 0.7,
           'border-style': 'dashed',
           'label': 'data(label)',
           'text-valign': 'top',
           'text-halign': 'center',
-          'font-size': '39px',
-          'color': '#fbbf24',
+          'font-size': '30px',
+          'color': '#A8ABB2',
           'padding': '30px',
           'text-margin-y': '-6px',
-          'font-weight': 'bold',
+          'font-weight': 600,
           'min-width': '240px',
           'min-height': '140px',
           'z-compound-depth': 'bottom',
-          'text-background-color': '#0f1419',
+          'text-background-color': '#1E1F22',
           'text-background-opacity': 1,
           'text-background-padding': '6px',
           'text-background-shape': 'roundrectangle',
@@ -255,47 +232,47 @@ function initGraph(container) {
         selector: 'node[type="lang"]',
         style: {
           'shape': 'roundrectangle',
-          'background-color': '#0f1419',
+          'background-color': '#1E1F22',
           'background-opacity': 0.6,
-          'border-color': '#6b7280',
-          'border-width': 2,
+          'border-color': '#6F737A',
+          'border-width': 1,
           'border-opacity': 0.7,
           'border-style': 'dashed',
           'label': 'data(label)',
           'text-valign': 'top',
           'text-halign': 'center',
-          'font-size': '39px',
-          'color': '#9ca3af',
+          'font-size': '30px',
+          'color': '#A8ABB2',
           'padding': '30px',
           'text-margin-y': '-6px',
-          'font-weight': 'bold',
+          'font-weight': 600,
           'min-width': '240px',
           'min-height': '140px',
           'z-compound-depth': 'bottom',
-          'text-background-color': '#0f1419',
+          'text-background-color': '#1E1F22',
           'text-background-opacity': 1,
           'text-background-padding': '6px',
           'text-background-shape': 'roundrectangle',
         },
       },
-      { selector: 'node[type="lang"][language="html"]', style: { 'border-color': '#16a34a', 'color': '#4ade80' } },
-      { selector: 'node[type="lang"][language="css"]', style: { 'border-color': '#7c3aed', 'color': '#a78bfa' } },
-      { selector: 'node[type="lang"][language="javascript"]', style: { 'border-color': '#d97706', 'color': '#fbbf24' } },
+      { selector: 'node[type="lang"][language="html"]', style: { 'border-color': '#4A9A50', 'color': '#7FC784' } },
+      { selector: 'node[type="lang"][language="css"]', style: { 'border-color': '#8466C0', 'color': '#A58BD6' } },
+      { selector: 'node[type="lang"][language="javascript"]', style: { 'border-color': '#B8862F', 'color': '#E3C06B' } },
       //패키지 노드 — 초록 테두리 컨테이너
       {
         selector: 'node[type="package"]',
         style: {
           'shape': 'roundrectangle',
-          'background-color': '#0f1419',
+          'background-color': '#1E1F22',
           'background-opacity': 0.6,
-          'border-color': '#22c55e',
+          'border-color': '#5FB865',
           'border-width': 2,
           'border-opacity': 0.8,
           'label': 'data(label)',
           'text-valign': 'top',
           'text-halign': 'center',
           'font-size': '23px',
-          'color': '#4ade80',
+          'color': '#7FC784',
           'padding': '40px',
           'text-margin-y': '-4px',
           'font-weight': 'bold',
@@ -309,23 +286,23 @@ function initGraph(container) {
         selector: 'node[type="file"]',
         style: {
           'shape': 'roundrectangle',
-          'background-color': '#111827',
+          'background-color': '#2B2D30',
           'background-opacity': 0.85,
-          'border-color': '#3b82f6',
+          'border-color': '#3574F0',
           'border-width': 2,
           'border-opacity': 0.8,
           'label': 'data(label)',
           'text-valign': 'top',
           'text-halign': 'center',
           'font-size': '25px',
-          'color': '#93c5fd',
+          'color': '#8FB2F5',
           'padding': '18px',
           'text-margin-y': '-2px',
           'font-weight': 'bold',
           'min-width': '180px',
           'min-height': '90px',
           'z-compound-depth': 'bottom',
-          'text-background-color': '#111827',
+          'text-background-color': '#2B2D30',
           'text-background-opacity': 1,
           'text-background-padding': '4px',
           'text-background-shape': 'roundrectangle',
@@ -335,7 +312,7 @@ function initGraph(container) {
         selector: 'node[type="file"][couplingScore > 0.3]',
         style: {
           'border-width': 'mapData(couplingScore, 0, 1, 2, 7)',
-          'border-color': 'mapData(couplingScore, 0, 1, #3b82f6, #f59e0b)',
+          'border-color': 'mapData(couplingScore, 0, 1, #3574F0, #D6A547)',
         },
       },
       //함수 노드 — 둥근 알약 모양
@@ -343,18 +320,18 @@ function initGraph(container) {
         selector: 'node[type="function"]',
         style: {
           'shape': 'roundrectangle',
-          'background-color': '#1e293b',
-          'border-color': '#475569',
+          'background-color': '#2B2D30',
+          'border-color': '#4E5157',
           'border-width': 1.5,
           'label': 'data(label)',
           'text-valign': 'center',
           'text-halign': 'center',
           'font-size': '25px',
-          'color': '#e2e8f0',
+          'color': '#DFE1E5',
           'width': 'label',
           'height': '40px',
           'padding': '14px',
-          'font-family': '"Cascadia Code", "Fira Code", Consolas, monospace',
+          'font-family': 'D2Coding, "JetBrains Mono", Consolas, monospace',
           'text-wrap': 'none',
           'z-compound-depth': 'top',
         },
@@ -364,40 +341,40 @@ function initGraph(container) {
         selector: 'node[type="function"][inboundRefCount > 0]',
         style: {
           'border-width': 'mapData(inboundRefCount, 0, 10, 1.5, 5)',
-          'border-color': 'mapData(inboundRefCount, 0, 10, #475569, #f59e0b)',
-          'background-color': 'mapData(inboundRefCount, 0, 10, #1e293b, #422006)',
+          'border-color': 'mapData(inboundRefCount, 0, 10, #4E5157, #D6A547)',
+          'background-color': 'mapData(inboundRefCount, 0, 10, #2B2D30, #3A2F1C)',
         },
       },
       {
         selector: 'node[type="js-function"][inboundRefCount > 0]',
         style: {
           'border-width': 'mapData(inboundRefCount, 0, 10, 1.5, 5)',
-          'border-color': 'mapData(inboundRefCount, 0, 10, #d97706, #f59e0b)',
-          'background-color': 'mapData(inboundRefCount, 0, 10, #422006, #78350f)',
+          'border-color': 'mapData(inboundRefCount, 0, 10, #B8862F, #D6A547)',
+          'background-color': 'mapData(inboundRefCount, 0, 10, #3A2F1C, #4A3A1E)',
         },
       },
       {
         selector: 'node[type="ts-function"][inboundRefCount > 0]',
         style: {
           'border-width': 'mapData(inboundRefCount, 0, 10, 1.5, 5)',
-          'border-color': 'mapData(inboundRefCount, 0, 10, #3b82f6, #f59e0b)',
-          'background-color': 'mapData(inboundRefCount, 0, 10, #1e3a5f, #422006)',
+          'border-color': 'mapData(inboundRefCount, 0, 10, #3574F0, #D6A547)',
+          'background-color': 'mapData(inboundRefCount, 0, 10, #25324D, #3A2F1C)',
         },
       },
       {
         selector: 'node[type="cpp-function"][inboundRefCount > 0]',
         style: {
           'border-width': 'mapData(inboundRefCount, 0, 10, 1.5, 5)',
-          'border-color': 'mapData(inboundRefCount, 0, 10, #06b6d4, #f59e0b)',
-          'background-color': 'mapData(inboundRefCount, 0, 10, #164e63, #422006)',
+          'border-color': 'mapData(inboundRefCount, 0, 10, #3FA8B5, #D6A547)',
+          'background-color': 'mapData(inboundRefCount, 0, 10, #1D3A40, #3A2F1C)',
         },
       },
       {
         selector: 'node[type="csharp-function"][inboundRefCount > 0]',
         style: {
           'border-width': 'mapData(inboundRefCount, 0, 10, 1.5, 5)',
-          'border-color': 'mapData(inboundRefCount, 0, 10, #22c55e, #f59e0b)',
-          'background-color': 'mapData(inboundRefCount, 0, 10, #14532d, #422006)',
+          'border-color': 'mapData(inboundRefCount, 0, 10, #5FB865, #D6A547)',
+          'background-color': 'mapData(inboundRefCount, 0, 10, #1F3A24, #3A2F1C)',
         },
       },
       //outbound 참조 횟수에 따른 함수 노드 스타일 (inbound=0인 경우만)
@@ -405,139 +382,139 @@ function initGraph(container) {
         selector: 'node[type="function"][outboundRefCount > 0][inboundRefCount = 0]',
         style: {
           'border-width': 'mapData(outboundRefCount, 0, 10, 1.5, 5)',
-          'border-color': 'mapData(outboundRefCount, 0, 10, #475569, #60a5fa)',
-          'background-color': 'mapData(outboundRefCount, 0, 10, #1e293b, #172554)',
+          'border-color': 'mapData(outboundRefCount, 0, 10, #4E5157, #548AF7)',
+          'background-color': 'mapData(outboundRefCount, 0, 10, #2B2D30, #1F2A44)',
         },
       },
       {
         selector: 'node[type="js-function"][outboundRefCount > 0][inboundRefCount = 0]',
         style: {
           'border-width': 'mapData(outboundRefCount, 0, 10, 1.5, 5)',
-          'border-color': 'mapData(outboundRefCount, 0, 10, #d97706, #60a5fa)',
-          'background-color': 'mapData(outboundRefCount, 0, 10, #422006, #172554)',
+          'border-color': 'mapData(outboundRefCount, 0, 10, #B8862F, #548AF7)',
+          'background-color': 'mapData(outboundRefCount, 0, 10, #3A2F1C, #1F2A44)',
         },
       },
       {
         selector: 'node[type="ts-function"][outboundRefCount > 0][inboundRefCount = 0]',
         style: {
           'border-width': 'mapData(outboundRefCount, 0, 10, 1.5, 5)',
-          'border-color': 'mapData(outboundRefCount, 0, 10, #3b82f6, #60a5fa)',
-          'background-color': 'mapData(outboundRefCount, 0, 10, #1e3a5f, #172554)',
+          'border-color': 'mapData(outboundRefCount, 0, 10, #3574F0, #548AF7)',
+          'background-color': 'mapData(outboundRefCount, 0, 10, #25324D, #1F2A44)',
         },
       },
       {
         selector: 'node[type="cpp-function"][outboundRefCount > 0][inboundRefCount = 0]',
         style: {
           'border-width': 'mapData(outboundRefCount, 0, 10, 1.5, 5)',
-          'border-color': 'mapData(outboundRefCount, 0, 10, #06b6d4, #60a5fa)',
-          'background-color': 'mapData(outboundRefCount, 0, 10, #164e63, #172554)',
+          'border-color': 'mapData(outboundRefCount, 0, 10, #3FA8B5, #548AF7)',
+          'background-color': 'mapData(outboundRefCount, 0, 10, #1D3A40, #1F2A44)',
         },
       },
       {
         selector: 'node[type="csharp-function"][outboundRefCount > 0][inboundRefCount = 0]',
         style: {
           'border-width': 'mapData(outboundRefCount, 0, 10, 1.5, 5)',
-          'border-color': 'mapData(outboundRefCount, 0, 10, #22c55e, #60a5fa)',
-          'background-color': 'mapData(outboundRefCount, 0, 10, #14532d, #172554)',
+          'border-color': 'mapData(outboundRefCount, 0, 10, #5FB865, #548AF7)',
+          'background-color': 'mapData(outboundRefCount, 0, 10, #1F3A24, #1F2A44)',
         },
       },
       //변수 노드
       {
         selector: 'node[type="variable"]',
         style: {
-          'shape': 'diamond', 'background-color': '#134e4a', 'border-color': '#14b8a6',
+          'shape': 'diamond', 'background-color': '#1D3634', 'border-color': '#4FA8A0',
           'border-width': 1.5, 'label': 'data(label)', 'text-valign': 'center', 'text-halign': 'center',
-          'font-size': '21px', 'color': '#5eead4', 'width': 'label', 'height': '36px', 'padding': '14px',
-          'font-family': '"Cascadia Code", "Fira Code", Consolas, monospace', 'text-wrap': 'none', 'z-compound-depth': 'top',
+          'font-size': '21px', 'color': '#86CFC6', 'width': 'label', 'height': '36px', 'padding': '14px',
+          'font-family': 'D2Coding, "JetBrains Mono", Consolas, monospace', 'text-wrap': 'none', 'z-compound-depth': 'top',
         },
       },
-      { selector: 'node[type="variable"][className]', style: { 'border-color': '#a78bfa', 'color': '#c4b5fd' } },
-      { selector: 'node[type="function"][className]', style: { 'border-color': '#7c3aed', 'color': '#c4b5fd', 'border-width': 1.5 } },
+      { selector: 'node[type="variable"][className]', style: { 'border-color': '#A58BD6', 'color': '#C3B3E3' } },
+      { selector: 'node[type="function"][className]', style: { 'border-color': '#8466C0', 'color': '#C3B3E3', 'border-width': 1.5 } },
       //JS 함수 노드
       {
         selector: 'node[type="js-function"]',
         style: {
-          'shape': 'roundrectangle', 'background-color': '#422006', 'border-color': '#d97706',
+          'shape': 'roundrectangle', 'background-color': '#3A2F1C', 'border-color': '#B8862F',
           'border-width': 1.5, 'label': 'data(label)', 'text-valign': 'center', 'text-halign': 'center',
-          'font-size': '25px', 'color': '#fbbf24', 'width': 'label', 'height': '40px', 'padding': '14px',
-          'font-family': '"Cascadia Code", "Fira Code", Consolas, monospace', 'text-wrap': 'none', 'z-compound-depth': 'top',
+          'font-size': '25px', 'color': '#E3C06B', 'width': 'label', 'height': '40px', 'padding': '14px',
+          'font-family': 'D2Coding, "JetBrains Mono", Consolas, monospace', 'text-wrap': 'none', 'z-compound-depth': 'top',
         },
       },
-      { selector: 'node[type="js-function"][className]', style: { 'border-color': '#ea580c', 'color': '#fdba74', 'border-width': 1.5 } },
+      { selector: 'node[type="js-function"][className]', style: { 'border-color': '#C0703A', 'color': '#E5B084', 'border-width': 1.5 } },
       //HTML 요소 노드
       {
         selector: 'node[type="html-element"]',
         style: {
-          'shape': 'roundrectangle', 'background-color': '#052e16', 'border-color': '#16a34a',
+          'shape': 'roundrectangle', 'background-color': '#1C2E20', 'border-color': '#4A9A50',
           'border-width': 1.5, 'label': 'data(label)', 'text-valign': 'center', 'text-halign': 'center',
-          'font-size': '21px', 'color': '#4ade80', 'width': 'label', 'height': '36px', 'padding': '14px',
-          'font-family': '"Cascadia Code", "Fira Code", Consolas, monospace', 'text-wrap': 'none', 'z-compound-depth': 'top',
+          'font-size': '21px', 'color': '#7FC784', 'width': 'label', 'height': '36px', 'padding': '14px',
+          'font-family': 'D2Coding, "JetBrains Mono", Consolas, monospace', 'text-wrap': 'none', 'z-compound-depth': 'top',
         },
       },
       //CSS 셀렉터 노드
       {
         selector: 'node[type="css-selector"]',
         style: {
-          'shape': 'roundrectangle', 'background-color': '#2e1065', 'border-color': '#7c3aed',
+          'shape': 'roundrectangle', 'background-color': '#2E2640', 'border-color': '#8466C0',
           'border-width': 1.5, 'label': 'data(label)', 'text-valign': 'center', 'text-halign': 'center',
-          'font-size': '21px', 'color': '#a78bfa', 'width': 'label', 'height': '36px', 'padding': '14px',
-          'font-family': '"Cascadia Code", "Fira Code", Consolas, monospace', 'text-wrap': 'none', 'z-compound-depth': 'top',
+          'font-size': '21px', 'color': '#A58BD6', 'width': 'label', 'height': '36px', 'padding': '14px',
+          'font-family': 'D2Coding, "JetBrains Mono", Consolas, monospace', 'text-wrap': 'none', 'z-compound-depth': 'top',
         },
       },
       //TypeScript 함수 노드
       {
         selector: 'node[type="ts-function"]',
         style: {
-          'shape': 'roundrectangle', 'background-color': '#1e3a5f', 'border-color': '#3b82f6',
+          'shape': 'roundrectangle', 'background-color': '#25324D', 'border-color': '#3574F0',
           'border-width': 1.5, 'label': 'data(label)', 'text-valign': 'center', 'text-halign': 'center',
-          'font-size': '25px', 'color': '#93c5fd', 'width': 'label', 'height': '40px', 'padding': '14px',
-          'font-family': '"Cascadia Code", "Fira Code", Consolas, monospace', 'text-wrap': 'none', 'z-compound-depth': 'top',
+          'font-size': '25px', 'color': '#8FB2F5', 'width': 'label', 'height': '40px', 'padding': '14px',
+          'font-family': 'D2Coding, "JetBrains Mono", Consolas, monospace', 'text-wrap': 'none', 'z-compound-depth': 'top',
         },
       },
-      { selector: 'node[type="ts-function"][className]', style: { 'border-color': '#2563eb', 'color': '#bfdbfe', 'border-width': 1.5 } },
+      { selector: 'node[type="ts-function"][className]', style: { 'border-color': '#3574F0', 'color': '#B5CBF7', 'border-width': 1.5 } },
       //C++ 함수 노드
       {
         selector: 'node[type="cpp-function"]',
         style: {
-          'shape': 'roundrectangle', 'background-color': '#164e63', 'border-color': '#06b6d4',
+          'shape': 'roundrectangle', 'background-color': '#1D3A40', 'border-color': '#3FA8B5',
           'border-width': 1.5, 'label': 'data(label)', 'text-valign': 'center', 'text-halign': 'center',
-          'font-size': '25px', 'color': '#67e8f9', 'width': 'label', 'height': '40px', 'padding': '14px',
-          'font-family': '"Cascadia Code", "Fira Code", Consolas, monospace', 'text-wrap': 'none', 'z-compound-depth': 'top',
+          'font-size': '25px', 'color': '#86C9D2', 'width': 'label', 'height': '40px', 'padding': '14px',
+          'font-family': 'D2Coding, "JetBrains Mono", Consolas, monospace', 'text-wrap': 'none', 'z-compound-depth': 'top',
         },
       },
-      { selector: 'node[type="cpp-function"][className]', style: { 'border-color': '#0891b2', 'color': '#a5f3fc', 'border-width': 1.5 } },
+      { selector: 'node[type="cpp-function"][className]', style: { 'border-color': '#2F8793', 'color': '#A9D8DE', 'border-width': 1.5 } },
       //C# 함수 노드
       {
         selector: 'node[type="csharp-function"]',
         style: {
-          'shape': 'roundrectangle', 'background-color': '#14532d', 'border-color': '#22c55e',
+          'shape': 'roundrectangle', 'background-color': '#1F3A24', 'border-color': '#5FB865',
           'border-width': 1.5, 'label': 'data(label)', 'text-valign': 'center', 'text-halign': 'center',
-          'font-size': '25px', 'color': '#86efac', 'width': 'label', 'height': '40px', 'padding': '14px',
-          'font-family': '"Cascadia Code", "Fira Code", Consolas, monospace', 'text-wrap': 'none', 'z-compound-depth': 'top',
+          'font-size': '25px', 'color': '#A3D6A6', 'width': 'label', 'height': '40px', 'padding': '14px',
+          'font-family': 'D2Coding, "JetBrains Mono", Consolas, monospace', 'text-wrap': 'none', 'z-compound-depth': 'top',
         },
       },
-      { selector: 'node[type="csharp-function"][className]', style: { 'border-color': '#16a34a', 'color': '#bbf7d0', 'border-width': 1.5 } },
+      { selector: 'node[type="csharp-function"][className]', style: { 'border-color': '#4A9A50', 'color': '#BFE3C1', 'border-width': 1.5 } },
       //CSS 변수 노드
       {
         selector: 'node[type="css-variable"]',
         style: {
-          'shape': 'diamond', 'background-color': '#4a044e', 'border-color': '#c026d3',
+          'shape': 'diamond', 'background-color': '#3A2440', 'border-color': '#B06CC0',
           'border-width': 1.5, 'label': 'data(label)', 'text-valign': 'center', 'text-halign': 'center',
-          'font-size': '21px', 'color': '#e879f9', 'width': 'label', 'height': '36px', 'padding': '14px',
-          'font-family': '"Cascadia Code", "Fira Code", Consolas, monospace', 'text-wrap': 'none', 'z-compound-depth': 'top',
+          'font-size': '21px', 'color': '#D39BDD', 'width': 'label', 'height': '36px', 'padding': '14px',
+          'font-family': 'D2Coding, "JetBrains Mono", Consolas, monospace', 'text-wrap': 'none', 'z-compound-depth': 'top',
         },
       },
       //언어별 파일 노드 테두리 색상 (함수 뷰)
-      { selector: 'node[type="file"][language="typescript"]', style: { 'border-color': '#3b82f6', 'color': '#93c5fd' } },
-      { selector: 'node[type="file"][language="cpp"]', style: { 'border-color': '#06b6d4', 'color': '#67e8f9' } },
-      { selector: 'node[type="file"][language="csharp"]', style: { 'border-color': '#22c55e', 'color': '#86efac' } },
-      { selector: 'node[type="file"][language="html"]', style: { 'border-color': '#16a34a', 'color': '#4ade80' } },
-      { selector: 'node[type="file"][language="css"]', style: { 'border-color': '#7c3aed', 'color': '#a78bfa' } },
-      { selector: 'node[type="file"][language="javascript"]', style: { 'border-color': '#d97706', 'color': '#fbbf24' } },
+      { selector: 'node[type="file"][language="typescript"]', style: { 'border-color': '#3574F0', 'color': '#8FB2F5' } },
+      { selector: 'node[type="file"][language="cpp"]', style: { 'border-color': '#3FA8B5', 'color': '#86C9D2' } },
+      { selector: 'node[type="file"][language="csharp"]', style: { 'border-color': '#5FB865', 'color': '#A3D6A6' } },
+      { selector: 'node[type="file"][language="html"]', style: { 'border-color': '#4A9A50', 'color': '#7FC784' } },
+      { selector: 'node[type="file"][language="css"]', style: { 'border-color': '#8466C0', 'color': '#A58BD6' } },
+      { selector: 'node[type="file"][language="javascript"]', style: { 'border-color': '#B8862F', 'color': '#E3C06B' } },
       //접힌 노드
       { selector: 'node.collapsed', style: { 'border-style': 'dashed', 'border-opacity': 0.5 } },
       //마우스 올렸을 때 효과
-      { selector: 'node[type="function"]:active', style: { 'overlay-color': '#60a5fa', 'overlay-opacity': 0.08 } },
+      { selector: 'node[type="function"]:active', style: { 'overlay-color': '#548AF7', 'overlay-opacity': 0.08 } },
 
       /* ── 함수 뷰 엣지 스타일 ── */
 
@@ -546,9 +523,9 @@ function initGraph(container) {
         selector: 'edge',
         style: {
           'width': 1.5,
-          'line-color': '#60a5fa',
+          'line-color': '#548AF7',
           'line-opacity': 0,
-          'target-arrow-color': '#60a5fa',
+          'target-arrow-color': '#548AF7',
           'target-arrow-shape': 'triangle',
           'arrow-scale': 0.9,
           'curve-style': 'bezier',
@@ -559,26 +536,26 @@ function initGraph(container) {
       {
         selector: 'edge[refCount > 1]',
         style: {
-          'label': 'data(refCount)', 'font-size': '36px', 'color': '#94a3b8',
-          'text-background-color': '#0a0e17', 'text-background-opacity': 1,
+          'label': 'data(refCount)', 'font-size': '36px', 'color': '#A8ABB2',
+          'text-background-color': '#1E1F22', 'text-background-opacity': 1,
           'text-background-padding': '3px', 'text-background-shape': 'roundrectangle', 'font-weight': 'bold',
         },
       },
       //변수 참조 엣지
-      { selector: 'edge[edgeType="variable-ref"]', style: { 'line-color': '#14b8a6', 'line-style': 'dashed', 'target-arrow-color': '#14b8a6', 'width': 1.5, 'line-opacity': 0.6 } },
+      { selector: 'edge[edgeType="variable-ref"]', style: { 'line-color': '#4FA8A0', 'line-style': 'dashed', 'target-arrow-color': '#4FA8A0', 'width': 1.5, 'line-opacity': 0.6 } },
       //상속 엣지
-      { selector: 'edge[edgeType="inheritance"]', style: { 'line-color': '#a78bfa', 'line-style': 'dashed', 'target-arrow-color': '#a78bfa', 'target-arrow-shape': 'triangle-backcurve', 'width': 2, 'line-opacity': 0.7 } },
+      { selector: 'edge[edgeType="inheritance"]', style: { 'line-color': '#A58BD6', 'line-style': 'dashed', 'target-arrow-color': '#A58BD6', 'target-arrow-shape': 'triangle-backcurve', 'width': 2, 'line-opacity': 0.7 } },
       //웹 관계 엣지
-      { selector: 'edge[edgeType="script-ref"], edge[edgeType="style-ref"]', style: { 'line-color': '#22c55e', 'line-style': 'dashed', 'target-arrow-color': '#22c55e', 'width': 1.5, 'line-opacity': 0.6 } },
-      { selector: 'edge[edgeType="dom-access"]', style: { 'line-color': '#f97316', 'line-style': 'dashed', 'target-arrow-color': '#f97316', 'width': 1.5, 'line-opacity': 0.6 } },
-      { selector: 'edge[edgeType="css-target"]', style: { 'line-color': '#a78bfa', 'line-style': 'dashed', 'target-arrow-color': '#a78bfa', 'width': 1.5, 'line-opacity': 0.5 } },
-      { selector: 'edge[edgeType="event-binding"]', style: { 'line-color': '#ec4899', 'line-style': 'dashed', 'target-arrow-color': '#ec4899', 'width': 1.5, 'line-opacity': 0.6 } },
-      { selector: 'edge[edgeType="js-import"], edge[edgeType="css-import"]', style: { 'line-color': '#eab308', 'line-style': 'dashed', 'target-arrow-color': '#eab308', 'width': 1.5, 'line-opacity': 0.5 } },
-      { selector: 'edge[edgeType="css-var"]', style: { 'line-color': '#c026d3', 'line-style': 'dashed', 'target-arrow-color': '#c026d3', 'width': 1.5, 'line-opacity': 0.5 } },
+      { selector: 'edge[edgeType="script-ref"], edge[edgeType="style-ref"]', style: { 'line-color': '#5FB865', 'line-style': 'dashed', 'target-arrow-color': '#5FB865', 'width': 1.5, 'line-opacity': 0.6 } },
+      { selector: 'edge[edgeType="dom-access"]', style: { 'line-color': '#D98A4E', 'line-style': 'dashed', 'target-arrow-color': '#D98A4E', 'width': 1.5, 'line-opacity': 0.6 } },
+      { selector: 'edge[edgeType="css-target"]', style: { 'line-color': '#A58BD6', 'line-style': 'dashed', 'target-arrow-color': '#A58BD6', 'width': 1.5, 'line-opacity': 0.5 } },
+      { selector: 'edge[edgeType="event-binding"]', style: { 'line-color': '#C77DAD', 'line-style': 'dashed', 'target-arrow-color': '#C77DAD', 'width': 1.5, 'line-opacity': 0.6 } },
+      { selector: 'edge[edgeType="js-import"], edge[edgeType="css-import"]', style: { 'line-color': '#C9A94B', 'line-style': 'dashed', 'target-arrow-color': '#C9A94B', 'width': 1.5, 'line-opacity': 0.5 } },
+      { selector: 'edge[edgeType="css-var"]', style: { 'line-color': '#B06CC0', 'line-style': 'dashed', 'target-arrow-color': '#B06CC0', 'width': 1.5, 'line-opacity': 0.5 } },
       //순환 참조 엣지
-      { selector: 'edge.cycle-edge', style: { 'line-color': '#ef4444', 'target-arrow-color': '#ef4444', 'width': 2.5, 'line-opacity': 0.9 } },
+      { selector: 'edge.cycle-edge', style: { 'line-color': '#E06666', 'target-arrow-color': '#E06666', 'width': 2.5, 'line-opacity': 0.9 } },
       //미리보기 모드에서 제거될 엣지
-      { selector: 'edge.preview-removed', style: { 'line-color': '#ef4444', 'line-style': 'dashed', 'line-opacity': 0.3, 'target-arrow-color': '#ef4444', 'width': 1 } },
+      { selector: 'edge.preview-removed', style: { 'line-color': '#E06666', 'line-style': 'dashed', 'line-opacity': 0.3, 'target-arrow-color': '#E06666', 'width': 1 } },
 
       /* ── 파일 뷰 엣지 스타일 ── */
       //주의: 함수 뷰의 공통 edge 규칙(display: none) 뒤에 선언해야 집약 엣지가 보인다.
@@ -594,13 +571,13 @@ function initGraph(container) {
           'control-point-distances': [18],
           'control-point-weights': [0.5],
           'width': 'mapData(refCount, 1, 20, 0.8, 2.2)',
-          'line-color': '#5B6478',
+          'line-color': '#5A5D63',
           'line-style': 'solid',
           'line-cap': 'round',
           'line-opacity': 1,
           'opacity': 0.5,
           'target-arrow-shape': 'triangle',
-          'target-arrow-color': '#5B6478',
+          'target-arrow-color': '#5A5D63',
           'arrow-scale': 0.45,
           'label': '',
           'overlay-opacity': 0,
@@ -625,8 +602,8 @@ function initGraph(container) {
       {
         selector: 'edge[type="aggregated"].diag-cycle-edge',
         style: {
-          'line-color': '#EF4444',
-          'target-arrow-color': '#EF4444',
+          'line-color': '#E06666',
+          'target-arrow-color': '#E06666',
           'opacity': 0.8,
         },
       },
@@ -658,8 +635,6 @@ function initGraph(container) {
         style: {
           //모델 좌표 크기를 유지해야 축소 시에도 점이 보인다 (줌 0.25 → 화면상 3~10px)
           'label': '',
-          'underlay-opacity': 0.18,
-          'underlay-padding': 6,
         },
       },
       {
@@ -705,15 +680,12 @@ function initGraph(container) {
           'text-max-width': '140px',
           'font-size': 11,
           'text-margin-y': 0,
-          'color': '#D4D8E0',
+          'color': '#C9CCD1',
           'background-color': '#151922',
           'background-opacity': 0.95,
           'border-width': 1.5,
           'border-color': 'data(color)',
           'border-opacity': 0.7,
-          'underlay-opacity': 0.12,
-          'underlay-padding': 6,
-          'underlay-shape': 'round-rectangle',
         },
       },
       {
@@ -722,7 +694,7 @@ function initGraph(container) {
           'label': 'data(refCount)',
           'font-size': 8,
           'color': '#8A93A6',
-          'text-background-color': '#0B0D11',
+          'text-background-color': '#1E1F22',
           'text-background-opacity': 0.6,
           'text-background-padding': 2,
           'text-background-shape': 'roundrectangle',
@@ -739,13 +711,10 @@ function initGraph(container) {
       {
         selector: '.local-graph-center',
         style: {
-          'border-width': 2,
-          'border-color': '#FFFFFF',
-          'border-opacity': 0.9,
-          'color': '#FFFFFF',
-          'underlay-opacity': 0.4,
-          'underlay-padding': 16,
-          'underlay-color': 'data(color)',
+          'border-width': 2.5,
+          'border-color': '#548AF7',
+          'border-opacity': 1,
+          'color': '#DFE1E5',
           'z-index': 999,
         },
       },
@@ -945,7 +914,7 @@ function renderGraph(data) {
       }
     }
 
-    const edgeColor = EDGE_TYPE_COLORS[dominantType] || '#60A5FA';
+    const edgeColor = EDGE_TYPE_COLORS[dominantType] || '#548AF7';
     const width = Math.max(1, Math.min(5, 1 + (edgeInfo.refCount / maxRefCount) * 4));
 
     elements.push({

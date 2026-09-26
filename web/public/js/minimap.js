@@ -80,7 +80,7 @@ function renderMinimap() {
   ctx.clearRect(0, 0, w, h);
 
   //배경
-  ctx.fillStyle = '#0B0D11';
+  ctx.fillStyle = '#1E1F22';
   ctx.fillRect(0, 0, w, h);
 
   //그래프 바운딩 박스
@@ -107,7 +107,7 @@ function renderMinimap() {
   nodes.forEach(node => {
     const pos = node.position();
     const mp = toMinimap(pos.x, pos.y);
-    const color = node.data('color') || '#60a5fa';
+    const color = node.data('color') || '#548AF7';
     const r = Math.max(1.5, (node.data('size') || 30) * scale * 0.3);
 
     ctx.beginPath();
@@ -121,7 +121,7 @@ function renderMinimap() {
   const topLeft = toMinimap(extent.x1, extent.y1);
   const bottomRight = toMinimap(extent.x2, extent.y2);
 
-  ctx.strokeStyle = '#60a5fa';
+  ctx.strokeStyle = '#548AF7';
   ctx.lineWidth = 1.5;
   ctx.strokeRect(
     topLeft.x,

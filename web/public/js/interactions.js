@@ -244,12 +244,12 @@ function setupFunctionViewInteractions() {
 
 //리본 버튼 라벨/설명 갱신. textContent를 통째로 바꾸면 아이콘이 사라지므로 라벨 span만 바꾼다.
 const RIBBON_TIPS = {
-  fileView: '뷰 전환 — 지금은 파일 뷰입니다. 누르면 함수 단위로 자세히 봅니다',
-  functionView: '뷰 전환 — 지금은 함수 뷰입니다. 누르면 파일 단위 그래프로 돌아갑니다',
-  edgesHidden: '연결선 보기 — 함수 사이의 호출 관계 선을 표시합니다',
-  edgesShown: '연결선 숨기기 — 함수 사이의 호출 관계 선을 감춥니다',
-  collapse: '전체 접기 — 모든 파일 그룹을 접습니다',
-  expand: '전체 펼치기 — 접힌 파일 그룹을 모두 펼칩니다',
+  fileView: '지금은 파일 단위로 보고 있습니다. 누르면 함수 단위로 바뀝니다',
+  functionView: '지금은 함수 단위로 보고 있습니다. 누르면 파일 단위로 돌아갑니다',
+  edgesHidden: '함수끼리 호출하는 선을 보여줍니다',
+  edgesShown: '함수끼리 호출하는 선을 감춥니다',
+  collapse: '모든 파일 그룹을 접습니다',
+  expand: '접힌 파일 그룹을 모두 펼칩니다',
 };
 
 function setRibbonLabel(id, label, tip) {
@@ -415,6 +415,214 @@ function expandNode(node) {
 
 /* ── 진단 패널 표시 ── */
 
+//nodeId('경로::함수명' 또는 '경로')에서 파일 경로만 뽑는다
+function _diagFilePath(nodeId) {
+  return String(nodeId || '').replace(/^file__/, '').split('::')[0];
+}
+
+//진단 항목 클릭 → 그래프에서 해당 노드(파일 뷰면 파일 노드)로 이동
+function _focusDiagTarget(nodeId) {
+  if (!cy || !nodeId) return;
+  let target = cy.getElementById(nodeId);
+  if (!target.length) {
+    //노드가 없으면(파일 뷰 등) 같은 경로의 파일 노드로 이동
+    const filePath = _diagFilePath(nodeId);
+    target = cy.nodes().filter(n => n.data('fullPath') === filePath).first();
+  }
+  if (!target.length) return;
+  highlightNode(target.id());
+  cy.animate({ center: { eles: target } }, { duration: 350, easing: 'ease-out-cubic' });
+}
+
+//진단 대상의 코드 위치를 찾는다 → { filePath, startLine, endLine, name }
+//  1) 함수 노드(id가 '경로::함수명')의 시작~끝 줄
+//  2) '경로::클래스명'이면 그 클래스 메서드들의 첫 줄~마지막 줄
+//  3) 메시지 끝의 '(파일:줄)' (예: 미사용 CSS 셀렉터)
+//  4) 못 찾으면 파일 첫 줄
+function _diagLocation(nodeId, message) {
+  const filePath = _diagFilePath(nodeId);
+  const data = (typeof lastAnalysisData !== 'undefined' && lastAnalysisData) || graphData;
+  const nodes = (data && data.nodes) || [];
+
+  const node = nodes.find(n => n.data.id === nodeId);
+  if (node && node.data.startLine) {
+    return {
+      filePath,
+      startLine: node.data.startLine,
+      endLine: node.data.endLine || node.data.startLine,
+      name: node.data.qualifiedName || node.data.name,
+      fnData: node.data,
+    };
+  }
+
+  const memberName = String(nodeId || '').split('::')[1];
+  if (memberName) {
+    const methods = nodes.filter(n => n.data.filePath === filePath && n.data.className === memberName && n.data.startLine);
+    if (methods.length) {
+      return {
+        filePath,
+        startLine: Math.min(...methods.map(n => n.data.startLine)),
+        endLine: Math.max(...methods.map(n => n.data.endLine || n.data.startLine)),
+        name: memberName,
+      };
+    }
+  }
+
+  const m = /\(([^()]+):(\d+)\)\s*$/.exec(message || '');
+  if (m && (m[1] === filePath || m[1].endsWith('/' + filePath) || filePath.endsWith(m[1]))) {
+    const line = parseInt(m[2], 10);
+    return { filePath, startLine: line, endLine: line, name: memberName || '' };
+  }
+
+  return { filePath, startLine: 0, endLine: 0, name: memberName || '' };
+}
+
+//진단 항목 클릭 → 그래프에서 위치를 보여주고, 코드 뷰어에서 해당 줄로 이동
+function _openDiagLocation(nodeId, message, itemEl) {
+  const panel = document.getElementById('code-viewer-panel');
+  const wasClosed = panel && panel.classList.contains('collapsed');
+  const loc = _diagLocation(nodeId, message);
+  if (loc.filePath && typeof showCodeAtLocation === 'function') {
+    showCodeAtLocation(loc.filePath, loc.startLine, loc.endLine, loc.name, loc.fnData);
+  }
+  //코드 뷰어가 새로 열리면 그래프가 다시 맞춰지므로(0.31초 뒤) 그 다음에 대상 노드로 이동한다
+  if (wasClosed) {
+    setTimeout(() => _focusDiagTarget(nodeId), 360);
+  } else {
+    _focusDiagTarget(nodeId);
+  }
+  //어떤 항목을 보고 있는지 표시
+  document.querySelectorAll('#diagnostics-panel .diag-item.active').forEach(el => el.classList.remove('active'));
+  if (itemEl) itemEl.classList.add('active');
+}
+
+//진단 항목 한 줄: 메시지 + 위치 칩(파일:줄). data-search에 검색용 텍스트를 담는다.
+function _makeDiagItem(severity, message, nodeIds) {
+  const item = document.createElement('div');
+  item.className = 'diag-item severity-' + severity;
+  item.tabIndex = 0;
+  item.setAttribute('role', 'button');
+
+  const msg = document.createElement('div');
+  msg.className = 'diag-item-msg';
+  msg.textContent = message;
+  item.appendChild(msg);
+
+  //파일마다 칩 하나 — 순환처럼 여러 파일이 얽힌 경우 칩을 눌러 각 파일로 갈 수 있다
+  const firstIdByFile = new Map();
+  for (const id of (nodeIds || [])) {
+    const f = _diagFilePath(id);
+    if (f && !firstIdByFile.has(f)) firstIdByFile.set(f, id);
+  }
+  if (firstIdByFile.size) {
+    const fileRow = document.createElement('div');
+    fileRow.className = 'diag-item-files';
+    for (const [f, id] of firstIdByFile) {
+      const loc = _diagLocation(id, message);
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'diag-file-chip';
+      chip.textContent = f.split('/').pop() + (loc.startLine ? ':' + loc.startLine : '');
+      chip.title = f + (loc.startLine ? ` ${loc.startLine}번째 줄로 이동` : ' 열기');
+      chip.addEventListener('click', (e) => {
+        e.stopPropagation();
+        _openDiagLocation(id, message, item);
+      });
+      fileRow.appendChild(chip);
+    }
+    item.appendChild(fileRow);
+  }
+
+  item.dataset.search = (message + ' ' + (nodeIds || []).join(' ')).toLowerCase();
+  if (nodeIds && nodeIds.length) {
+    item.title = '클릭하면 해당 코드로 이동합니다';
+    item.addEventListener('click', () => _openDiagLocation(nodeIds[0], message, item));
+    item.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        _openDiagLocation(nodeIds[0], message, item);
+      }
+    });
+  }
+  return item;
+}
+
+function _makeDiagSection(title, items, emptyText) {
+  const section = document.createElement('div');
+  section.className = 'diag-section';
+  const heading = document.createElement('div');
+  heading.className = 'diag-section-title';
+  const label = document.createElement('span');
+  label.textContent = title;
+  const count = document.createElement('span');
+  count.className = 'diag-section-count';
+  count.dataset.total = String(items.length);
+  count.textContent = items.length;
+  heading.appendChild(label);
+  heading.appendChild(count);
+  section.appendChild(heading);
+
+  if (items.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'diag-empty';
+    empty.textContent = emptyText;
+    section.appendChild(empty);
+  } else {
+    items.forEach(item => section.appendChild(item));
+    //검색 결과가 없을 때 보여줄 안내
+    const noMatch = document.createElement('div');
+    noMatch.className = 'diag-empty diag-no-match hidden';
+    noMatch.textContent = '일치하는 항목이 없습니다';
+    section.appendChild(noMatch);
+  }
+  return section;
+}
+
+//검색어로 진단 항목·리팩토링 제안을 거른다 (공백으로 나눈 단어가 모두 들어있어야 일치)
+function filterDiagnostics(query) {
+  const panel = document.getElementById('diagnostics-panel');
+  if (!panel) return;
+  const terms = String(query || '').toLowerCase().split(/\s+/).filter(Boolean);
+  let shown = 0;
+  let total = 0;
+
+  panel.querySelectorAll('.diag-item, .suggestion-item').forEach(item => {
+    const text = item.dataset.search || item.textContent.toLowerCase();
+    const match = terms.every(t => text.includes(t));
+    item.classList.toggle('hidden', !match);
+    total++;
+    if (match) shown++;
+  });
+
+  panel.querySelectorAll('.diag-section').forEach(section => {
+    const items = section.querySelectorAll('.diag-item');
+    const visible = section.querySelectorAll('.diag-item:not(.hidden)').length;
+    const count = section.querySelector('.diag-section-count');
+    const total = count ? Number(count.dataset.total) : 0;
+    if (count) count.textContent = terms.length && total > 0 ? `${visible}/${total}` : String(total);
+    const noMatch = section.querySelector('.diag-no-match');
+    if (noMatch) noMatch.classList.toggle('hidden', !(items.length && visible === 0));
+  });
+
+  //리팩토링 제안이 모두 걸러졌을 때 안내
+  const sugContent = document.getElementById('suggestions-content');
+  if (sugContent) {
+    let sugNoMatch = sugContent.querySelector('.diag-no-match');
+    const sugItems = sugContent.querySelectorAll('.suggestion-item');
+    const sugVisible = sugContent.querySelectorAll('.suggestion-item:not(.hidden)').length;
+    if (!sugNoMatch && sugItems.length) {
+      sugNoMatch = document.createElement('div');
+      sugNoMatch.className = 'diag-empty diag-no-match';
+      sugNoMatch.textContent = '일치하는 제안이 없습니다';
+      sugContent.appendChild(sugNoMatch);
+    }
+    if (sugNoMatch) sugNoMatch.classList.toggle('hidden', !(sugItems.length && sugVisible === 0));
+  }
+
+  const countEl = document.getElementById('diag-search-count');
+  if (countEl) countEl.textContent = terms.length ? `${shown}/${total}` : '';
+}
+
 function showDiagnosticsPanel(diagnostics, suggestions) {
   const panel = document.getElementById('diagnostics-panel');
   const content = document.getElementById('diagnostics-content');
@@ -424,92 +632,33 @@ function showDiagnosticsPanel(diagnostics, suggestions) {
   suggestionsContent.textContent = '';
 
   //순환 참조 섹션
-  const cycleSection = document.createElement('div');
-  cycleSection.className = 'diag-section';
-  const cycleTitle = document.createElement('div');
-  cycleTitle.className = 'diag-section-title';
-  cycleTitle.textContent = '순환 참조';
-  cycleSection.appendChild(cycleTitle);
-
   const fileCycles = diagnostics.cycles.files || [];
   const funcCycles = diagnostics.cycles.functions || [];
-
-  if (fileCycles.length === 0 && funcCycles.length === 0) {
-    const empty = document.createElement('div');
-    empty.className = 'diag-empty';
-    empty.textContent = '순환 참조가 없습니다';
-    cycleSection.appendChild(empty);
-  } else {
-    for (const cycle of fileCycles) {
-      const item = document.createElement('div');
-      item.className = 'diag-item severity-error';
-      item.textContent = `파일 순환: ${cycle.join(' → ')}`;
-      cycleSection.appendChild(item);
-    }
-    for (const cycle of funcCycles) {
-      const item = document.createElement('div');
-      item.className = 'diag-item severity-warning';
-      item.textContent = `함수 순환: ${cycle.map(n => n.split('::').pop()).join(' → ')}`;
-      cycleSection.appendChild(item);
-    }
-  }
-  content.appendChild(cycleSection);
+  const cycleItems = [
+    ...fileCycles.map(cycle => _makeDiagItem('error',
+      `파일 순환: ${cycle.map(f => f.split('/').pop()).join(' → ')}`, cycle)),
+    ...funcCycles.map(cycle => _makeDiagItem('warning',
+      `함수 순환: ${cycle.map(n => n.split('::').pop()).join(' → ')}`, cycle)),
+  ];
+  content.appendChild(_makeDiagSection('순환 참조', cycleItems, '순환 참조가 없습니다'));
 
   //결합도 과다 섹션
-  const couplingSection = document.createElement('div');
-  couplingSection.className = 'diag-section';
-  const couplingTitle = document.createElement('div');
-  couplingTitle.className = 'diag-section-title';
-  couplingTitle.textContent = '결합도 과다';
-  couplingSection.appendChild(couplingTitle);
-
-  const couplingIssues = diagnostics.couplingIssues || [];
-  if (couplingIssues.length === 0) {
-    const empty = document.createElement('div');
-    empty.className = 'diag-empty';
-    empty.textContent = '결합도 문제가 없습니다';
-    couplingSection.appendChild(empty);
-  } else {
-    for (const issue of couplingIssues) {
-      const item = document.createElement('div');
-      item.className = 'diag-item severity-warning';
-      item.textContent = `${issue.nodeId.split('::').pop()}: ${issue.message}`;
-      item.addEventListener('click', () => { highlightNode(issue.nodeId); });
-      couplingSection.appendChild(item);
-    }
-  }
-  content.appendChild(couplingSection);
+  const couplingItems = (diagnostics.couplingIssues || []).map(issue =>
+    _makeDiagItem('warning', `${issue.nodeId.split('::').pop()}: ${issue.message}`, [issue.nodeId]));
+  content.appendChild(_makeDiagSection('결합도 과다', couplingItems, '결합도 문제가 없습니다'));
 
   //안티패턴 섹션
-  const antiSection = document.createElement('div');
-  antiSection.className = 'diag-section';
-  const antiTitle = document.createElement('div');
-  antiTitle.className = 'diag-section-title';
-  antiTitle.textContent = '안티패턴';
-  antiSection.appendChild(antiTitle);
-
-  const antiPatterns = diagnostics.antiPatterns || [];
-  if (antiPatterns.length === 0) {
-    const empty = document.createElement('div');
-    empty.className = 'diag-empty';
-    empty.textContent = '안티패턴이 없습니다';
-    antiSection.appendChild(empty);
-  } else {
-    for (const issue of antiPatterns) {
-      const item = document.createElement('div');
-      item.className = 'diag-item severity-info';
-      item.textContent = issue.message;
-      item.addEventListener('click', () => { highlightNode(issue.nodeId); });
-      antiSection.appendChild(item);
-    }
-  }
-  content.appendChild(antiSection);
+  const antiItems = (diagnostics.antiPatterns || []).map(issue =>
+    _makeDiagItem('info', issue.message, [issue.nodeId]));
+  content.appendChild(_makeDiagSection('안티패턴', antiItems, '안티패턴이 없습니다'));
 
   //리팩토링 제안 표시
   if (suggestions && suggestions.length > 0) {
     for (const sug of suggestions) {
       const item = document.createElement('div');
       item.className = 'suggestion-item';
+      item.dataset.search = [sug.title, sug.description, sug.suggestion, ...(sug.relatedNodes || [])]
+        .join(' ').toLowerCase();
 
       const title = document.createElement('div');
       title.className = 'suggestion-title';
@@ -555,6 +704,24 @@ function showDiagnosticsPanel(diagnostics, suggestions) {
     empty.className = 'diag-empty';
     empty.textContent = '리팩토링 제안이 없습니다';
     suggestionsContent.appendChild(empty);
+  }
+
+  //다시 열어도 이전 검색어를 유지한다
+  const searchInput = document.getElementById('diag-search-input');
+  if (searchInput) {
+    if (!searchInput.dataset.bound) {
+      searchInput.dataset.bound = '1';
+      searchInput.addEventListener('input', () => filterDiagnostics(searchInput.value));
+      searchInput.addEventListener('keydown', (e) => {
+        //Esc: 검색어가 있으면 지우기만 하고 패널은 닫지 않는다
+        if (e.key === 'Escape' && searchInput.value) {
+          e.stopPropagation();
+          searchInput.value = '';
+          filterDiagnostics('');
+        }
+      });
+    }
+    filterDiagnostics(searchInput.value);
   }
 
   panel.classList.remove('hidden');
@@ -819,6 +986,14 @@ function setupKeyboardShortcuts() {
 
     if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
       e.preventDefault();
+      //진단 패널이 열려 있으면 진단 검색창으로
+      const diagPanel = document.getElementById('diagnostics-panel');
+      const diagSearch = document.getElementById('diag-search-input');
+      if (diagPanel && diagSearch && !diagPanel.classList.contains('hidden')) {
+        diagSearch.focus();
+        diagSearch.select();
+        return;
+      }
       const searchInput = document.getElementById('search-input');
       if (searchInput && !searchInput.classList.contains('hidden')) {
         searchInput.focus();
@@ -935,7 +1110,6 @@ function showFunctionPreview(node, top3, position) {
   const listDiv = document.createElement('div');
   listDiv.className = 'fn-preview-list';
   for (const fn of top3) {
-    const refs = (fn.inboundRefCount || 0);
     const icon = fn.type === 'variable' ? '\u25C6' : '\u0192';
     const item = document.createElement('div');
     item.className = 'fn-preview-item';
@@ -943,13 +1117,8 @@ function showFunctionPreview(node, top3, position) {
     iconSpan.className = 'fn-preview-icon';
     iconSpan.textContent = icon;
     item.appendChild(iconSpan);
-    item.appendChild(document.createTextNode(fn.name));
-    if (refs > 0) {
-      const refSpan = document.createElement('span');
-      refSpan.className = 'fn-preview-refs';
-      refSpan.textContent = refs + '\u2191';
-      item.appendChild(refSpan);
-    }
+    item.appendChild(document.createTextNode(fnDisplayName(fn)));
+    appendRefBadges(item, fn, 'fn-preview-refs');
     listDiv.appendChild(item);
   }
   if (funcCount > 3) {
@@ -978,34 +1147,59 @@ function hideFunctionPreview() {
 function showFunctionList(node) {
   const panel = document.getElementById('code-viewer-panel');
   const header = document.getElementById('code-viewer-filename');
-  const content = document.getElementById('code-viewer-content');
-  if (!panel || !header || !content) return;
+  const fnListEl = document.getElementById('code-viewer-fnlist');
+  if (!panel || !header || !fnListEl) return;
 
   const fileName = node.data('label') || '';
+  const filePath = node.data('fullPath') || '';
   const functions = node.data('functions') || [];
 
   header.textContent = fileName;
-  content.textContent = '';
+  header.title = filePath || fileName;
+  fnListEl.textContent = '';
+  fnListEl.classList.remove('hidden');
+  if (typeof setCodeViewerFile === 'function') setCodeViewerFile(filePath);
+
+  //목록 머리: 개수 + 숫자↑ 설명 (범례와 같은 내용)
+  const head = document.createElement('div');
+  head.className = 'fn-list-head';
+  const count = document.createElement('span');
+  count.textContent = '함수 ' + functions.length + '개';
+  const hint = document.createElement('span');
+  hint.className = 'fn-list-hint';
+  hint.textContent = '↓ 불린 횟수   ↑ 부른 횟수';
+  head.appendChild(count);
+  head.appendChild(hint);
+  fnListEl.appendChild(head);
 
   if (functions.length === 0) {
     const empty = document.createElement('div');
-    empty.style.cssText = 'padding: 20px; color: #64748b; font-style: italic;';
-    empty.textContent = '\uD568\uC218\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4';
-    content.appendChild(empty);
-    panel.classList.remove('collapsed');
+    empty.className = 'fn-list-empty';
+    empty.textContent = '함수가 없는 파일입니다. 아래에 전체 코드를 보여줍니다.';
+    fnListEl.appendChild(empty);
+    //함수가 없으면 전체 코드를 바로 보여준다
+    if (typeof showFullFileCode === 'function') showFullFileCode(filePath);
     return;
   }
 
   const list = document.createElement('div');
   list.className = 'fn-list';
 
-  for (const fn of functions) {
+  const openFn = (fn, index) => {
+    if (fn.code && typeof showCodeViewer === 'function') {
+      showCodeViewer({
+        ...fn,
+        filePath: filePath,
+        label: fn.name,
+      }, { keepFnList: true, fnIndex: index });
+    }
+  };
+
+  functions.forEach((fn, index) => {
     const item = document.createElement('div');
     item.className = 'fn-list-item';
 
-    const icon = fn.type === 'variable' ? '\u25C6' : (fn.type.includes('function') ? '\u0192' : '\u25CB');
-    const refs = (fn.inboundRefCount || 0);
-
+    const icon = fn.type === 'variable' ? '◆' : ((fn.type || '').includes('function') ? 'ƒ' : '○');
     const iconSpan = document.createElement('span');
     iconSpan.className = 'fn-list-icon';
     iconSpan.textContent = icon;
@@ -1013,33 +1207,25 @@ function showFunctionList(node) {
 
     const nameSpan = document.createElement('span');
     nameSpan.className = 'fn-list-name';
-    nameSpan.textContent = fn.name;
+    nameSpan.textContent = fnDisplayName(fn);
+    nameSpan.title = fnDisplayName(fn);
     item.appendChild(nameSpan);
 
-    if (refs > 0) {
-      const refSpan = document.createElement('span');
-      refSpan.className = 'fn-list-refs';
-      refSpan.textContent = refs + '\u2191';
-      item.appendChild(refSpan);
-    }
+    appendRefBadges(item, fn, 'fn-list-refs');
 
-    item.addEventListener('click', () => {
-      if (fn.code && typeof showCodeViewer === 'function') {
-        showCodeViewer({
-          ...fn,
-          filePath: node.data('fullPath'),
-          label: fn.name,
-        });
-      }
-      list.querySelectorAll('.fn-list-item').forEach(el => el.classList.remove('active'));
-      item.classList.add('active');
-    });
-
+    item.addEventListener('click', () => openFn(fn, index));
     list.appendChild(item);
-  }
+  });
 
-  content.appendChild(list);
-  panel.classList.remove('collapsed');
+  fnListEl.appendChild(list);
+
+  //첫 번째 함수(참조가 가장 많은 함수) 코드를 먼저 보여준다
+  const firstIndex = functions.findIndex(fn => fn.code);
+  if (firstIndex >= 0) {
+    openFn(functions[firstIndex], firstIndex);
+  } else {
+    panel.classList.remove('collapsed');
+  }
 }
 
 /* ── 엣지 프리뷰 (Phase 2) ── */
@@ -1079,7 +1265,7 @@ function showEdgePreview(edge, position) {
     const typesDiv = document.createElement('div');
     typesDiv.className = 'edge-preview-types';
     for (const [type, count] of types) {
-      const color = EDGE_TYPE_COLORS[type] || '#60A5FA';
+      const color = EDGE_TYPE_COLORS[type] || '#548AF7';
       const typeSpan = document.createElement('span');
       typeSpan.className = 'edge-preview-type';
       typeSpan.style.borderLeft = '3px solid ' + color;

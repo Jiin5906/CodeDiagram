@@ -23,7 +23,7 @@ function applyCodeEffects(data) {
   _applyDiagnosticGlow(data.diagnostics);
 
   if (_prefersReducedMotion()) return;
-  _startDiagPulse();
+  //진단 깜빡임은 쓰지 않는다 — 계속 움직이는 요소가 그래프 읽기를 방해한다. 선택한 선 위 입자 흐름만 유지.
   _startEdgeFlow();
 }
 

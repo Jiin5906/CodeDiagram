@@ -7,7 +7,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CodeDiagram</title>
   <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
-  <link rel="stylesheet" href="css/style.css?v=2">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/d2coding@1.3.2/d2coding-subset.css">
+  <link rel="stylesheet" href="css/style.css?v=8">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/python.min.js"></script>
@@ -63,25 +64,25 @@
   <div id="main-content">
     <!--좌측 리본 (아이콘 + 라벨 세로 바). data-tip은 마우스를 올리면 뜨는 설명-->
     <div id="ribbon">
-      <button class="ribbon-btn" id="file-tree-toggle" data-tip="파일 탐색기 — 프로젝트의 파일 목록을 열고 닫습니다" aria-label="파일">
-        <span class="ribbon-icon" aria-hidden="true">&#x1F4C1;</span>
+      <button class="ribbon-btn" id="file-tree-toggle" data-tip="프로젝트 파일 목록을 열고 닫습니다" aria-label="파일">
+        <span class="ribbon-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg></span>
         <span class="ribbon-label">파일</span>
       </button>
-      <button class="ribbon-btn" id="view-toggle-btn" data-tip="뷰 전환 — 지금은 파일 뷰입니다. 누르면 함수 단위로 자세히 봅니다" aria-label="파일 뷰">
-        <span class="ribbon-icon" aria-hidden="true">&#x1F504;</span>
+      <button class="ribbon-btn" id="view-toggle-btn" data-tip="지금은 파일 단위로 보고 있습니다. 누르면 함수 단위로 바뀝니다" aria-label="파일 뷰">
+        <span class="ribbon-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/></svg></span>
         <span class="ribbon-label">파일 뷰</span>
       </button>
-      <button class="ribbon-btn" id="diagnostics-btn" data-tip="코드 진단 — 순환 참조, 과한 결합도 등 개선할 점을 보여줍니다" aria-label="진단">
-        <span class="ribbon-icon" aria-hidden="true">&#x26A0;</span>
+      <button class="ribbon-btn" id="diagnostics-btn" data-tip="순환 참조, 높은 결합도처럼 손볼 곳을 모아 보여줍니다" aria-label="진단">
+        <span class="ribbon-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></span>
         <span class="ribbon-label">진단</span>
       </button>
       <div class="ribbon-spacer"></div>
-      <button class="ribbon-btn hidden" id="toggle-edges-btn" data-tip="연결선 보기 — 함수 사이의 호출 관계 선을 표시합니다" aria-label="선 보기">
-        <span class="ribbon-icon" aria-hidden="true">&#x1F517;</span>
+      <button class="ribbon-btn hidden" id="toggle-edges-btn" data-tip="함수끼리 호출하는 선을 보여줍니다" aria-label="선 보기">
+        <span class="ribbon-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.59 13.51 6.83 3.98"/><path d="m15.41 6.51-6.82 3.98"/></svg></span>
         <span class="ribbon-label">선 보기</span>
       </button>
-      <button class="ribbon-btn hidden" id="collapse-all-btn" data-tip="전체 접기 — 모든 파일 그룹을 접거나 펼칩니다" aria-label="전체 접기">
-        <span class="ribbon-icon" aria-hidden="true">&#x2261;</span>
+      <button class="ribbon-btn hidden" id="collapse-all-btn" data-tip="모든 파일 그룹을 접거나 펼칩니다" aria-label="전체 접기">
+        <span class="ribbon-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m7 20 5-5 5 5"/><path d="m7 4 5 5 5-5"/></svg></span>
         <span class="ribbon-label">전체 접기</span>
       </button>
     </div>
@@ -94,9 +95,9 @@
     </div>
     <div id="graph-container">
       <div id="empty-state">
-        <div class="empty-state-icon">&#x1F50D;</div>
-        <div class="empty-state-title">CodeDiagram</div>
-        <div class="empty-state-desc">Git URL 또는 로컬 경로를 입력하고 분석 버튼을 클릭하세요</div>
+        <div class="empty-state-title">분석할 프로젝트를 입력하세요</div>
+        <div class="empty-state-desc">위 입력칸에 Git 저장소 주소나 내 컴퓨터의 폴더 경로를 넣고 분석을 누르면, 파일끼리 어떻게 연결되어 있는지 그래프로 보여줍니다.</div>
+        <div class="empty-state-example">예: https://github.com/pallets/flask</div>
       </div>
       <div id="cy"></div>
       <!--그래프 설정 패널 (우측 상단)-->
@@ -149,8 +150,15 @@
     <div id="code-viewer-panel" class="collapsed">
       <div class="code-viewer-header">
         <span id="code-viewer-filename">소스코드</span>
-        <button id="code-viewer-close">&times;</button>
+        <div class="code-viewer-actions">
+          <!--파일 전체 코드 보기 (함수 코드 ↔ 전체 코드 전환)-->
+          <button id="code-viewer-full-btn" class="cv-action-btn hidden" title="이 파일의 전체 코드를 봅니다">코드 보기</button>
+          <button id="code-viewer-close" aria-label="닫기">&times;</button>
+        </div>
       </div>
+      <!--파일 클릭 시 함수 목록 (코드 영역 위에 표시)-->
+      <div id="code-viewer-fnlist" class="hidden"></div>
+      <div id="code-viewer-status" class="hidden"></div>
       <div id="code-viewer-content">
         <pre><code id="code-viewer-code"></code></pre>
       </div>
@@ -185,10 +193,18 @@
       <span id="diagnostics-title">코드 진단 결과</span>
       <button id="diagnostics-close">&times;</button>
     </div>
-    <div id="diagnostics-content"></div>
-    <div id="suggestions-section">
-      <div class="suggestions-header">리팩토링 제안</div>
-      <div id="suggestions-content"></div>
+    <!--진단 검색: 파일명·함수명·메시지로 필터링-->
+    <div class="diag-search">
+      <svg class="diag-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input type="search" id="diag-search-input" placeholder="파일명·함수명으로 검색" autocomplete="off" aria-label="진단 결과 검색" />
+      <span id="diag-search-count" aria-live="polite"></span>
+    </div>
+    <div class="diag-scroll">
+      <div id="diagnostics-content"></div>
+      <div id="suggestions-section">
+        <div class="suggestions-header">리팩토링 제안</div>
+        <div id="suggestions-content"></div>
+      </div>
     </div>
   </div>
 
@@ -203,16 +219,16 @@
     </div>
   </div>
 
-  <script src="js/graph.js?v=13"></script>
+  <script src="js/graph.js?v=15"></script>
   <script src="js/forceSim.js?v=4"></script>
-  <script src="js/codeEffects.js?v=1"></script>
-  <script src="js/codeViewer.js"></script>
-  <script src="js/canvasCard.js"></script>
+  <script src="js/codeEffects.js?v=2"></script>
+  <script src="js/codeViewer.js?v=6"></script>
+  <script src="js/canvasCard.js?v=3"></script>
   <script src="js/localGraph.js"></script>
-  <script src="js/minimap.js"></script>
-  <script src="js/interactions.js?v=2"></script>
+  <script src="js/minimap.js?v=2"></script>
+  <script src="js/interactions.js?v=5"></script>
   <script src="js/diffPreview.js"></script>
-  <script src="js/fileTree.js"></script>
-  <script src="js/app.js?v=5"></script>
+  <script src="js/fileTree.js?v=2"></script>
+  <script src="js/app.js?v=8"></script>
 </body>
 </html>

@@ -142,8 +142,9 @@ document.addEventListener('DOMContentLoaded', () => {
       setRibbonLabel('view-toggle-btn', '파일 뷰', RIBBON_TIPS.fileView);
       setRibbonLabel('toggle-edges-btn', '선 보기', RIBBON_TIPS.edgesHidden);
 
-      //localStorage에서 패널 상태 복원
+      //localStorage에서 패널 상태 복원 (코드 뷰어는 제외 — 새 분석은 그래프 전체를 먼저 보여준다)
       restorePanelState();
+      if (typeof hideCodeViewer === 'function') hideCodeViewer();
 
     } catch (err) {
       hideLoadingState(status);
@@ -206,14 +207,11 @@ function restorePanelState() {
   try {
     const state = JSON.parse(localStorage.getItem('codediagram-panels') || '{}');
     const fileTree = document.getElementById('file-tree-panel');
-    const codeViewer = document.getElementById('code-viewer-panel');
 
     if (fileTree && state.fileTree === false) {
       fileTree.classList.remove('collapsed');
     }
-    if (codeViewer && state.codeViewer === false) {
-      codeViewer.classList.remove('collapsed');
-    }
+    //코드 뷰어는 파일/함수를 눌렀을 때만 열리므로 열림 상태를 복원하지 않는다
   } catch (e) { /* noop */ }
 }
 
@@ -238,25 +236,18 @@ document.addEventListener('DOMContentLoaded', () => {
     observer.observe(fileTreePanel, { attributes: true, attributeFilter: ['class'] });
   }
 
-  const codeViewerPanel = document.getElementById('code-viewer-panel');
-  if (codeViewerPanel) {
-    const observer = new MutationObserver(() => {
-      savePanelState('codeViewer', !codeViewerPanel.classList.contains('collapsed'));
-    });
-    observer.observe(codeViewerPanel, { attributes: true, attributeFilter: ['class'] });
-  }
 });
 
 /* ── 동적 범례 렌더링 ── */
 
 const LANG_LEGEND = {
-  python:     { color: '#F7C948', label: 'Python' },
-  javascript: { color: '#FBBF24', label: 'JavaScript' },
-  typescript: { color: '#3B82F6', label: 'TypeScript' },
-  cpp:        { color: '#06B6D4', label: 'C++' },
-  csharp:     { color: '#22C55E', label: 'C#' },
-  html:       { color: '#F97316', label: 'HTML' },
-  css:        { color: '#A855F7', label: 'CSS' },
+  python:     { color: LANG_COLORS.python.bg, label: 'Python' },
+  javascript: { color: LANG_COLORS.javascript.bg, label: 'JavaScript' },
+  typescript: { color: LANG_COLORS.typescript.bg, label: 'TypeScript' },
+  cpp:        { color: LANG_COLORS.cpp.bg, label: 'C++' },
+  csharp:     { color: LANG_COLORS.csharp.bg, label: 'C#' },
+  html:       { color: LANG_COLORS.html.bg, label: 'HTML' },
+  css:        { color: LANG_COLORS.css.bg, label: 'CSS' },
 };
 
 //범례에 표시할 관계 유형 (같은 색은 한 줄로 묶음). 색은 graph.js의 EDGE_TYPE_COLORS와 같다.
@@ -304,15 +295,24 @@ function renderDynamicLegend(data) {
   const hasWarning = [...(diag.couplingIssues || []), ...(diag.antiPatterns || [])]
     .some(i => i.severity === 'warning' || i.severity === 'error');
   const diagItems = [];
-  if (hasCycle) diagItems.push(_legendRow(_legendDot('#EF4444', true), '순환 참조 (서로를 참조하는 파일)'));
-  if (hasWarning) diagItems.push(_legendRow(_legendDot('#F59E0B', true), '주의 필요 (과한 결합도 등)'));
-  if (diagItems.length) fileView.appendChild(_legendSection('진단 (깜빡이는 빛)', diagItems));
+  if (hasCycle) diagItems.push(_legendRow(_legendRing('#E06666'), '서로를 참조하는 파일 (순환 참조)'));
+  if (hasWarning) diagItems.push(_legendRow(_legendRing('#D6A547'), '결합도가 높은 등 살펴볼 파일'));
+  if (diagItems.length) fileView.appendChild(_legendSection('진단 표시 (원 테두리)', diagItems));
 
   //4) 읽는 법
   fileView.appendChild(_legendSection('읽는 법', [
     _legendRow(_legendSymbol('●'), '원이 클수록 함수가 많은 파일'),
     _legendRow(_legendSymbol('─'), '선이 굵을수록 참조가 많음'),
-    _legendRow(_legendSymbol('↗'), '클릭: 주변 파일만 보기 · 더블클릭: 코드 열기'),
+    _legendRow(_legendSymbol('↗'), '클릭하면 주변 파일만, 더블클릭하면 코드 카드'),
+  ]));
+
+  //5) 파일을 클릭하면 오른쪽에 뜨는 함수 목록의 기호
+  fileView.appendChild(_legendSection('함수 목록 (파일 클릭 시)', [
+    _legendRow(_legendSymbol('ƒ'), '함수'),
+    _legendRow(_legendSymbol('◆'), '변수'),
+    _legendRow(_legendSymbol('3↓', 'refs'), '다른 코드가 이 함수를 부른 횟수. 많을수록 여기저기서 쓰는 함수'),
+    _legendRow(_legendSymbol('2↑', 'refs out'), '이 함수가 다른 함수를 부른 횟수. 많을수록 의존하는 곳이 많음'),
+    _legendRow(_legendSymbol('</>', 'btn'), '코드 보기: 파일 전체 코드를 엽니다'),
   ]));
 
   //함수 뷰 범례
@@ -333,6 +333,10 @@ function renderDynamicLegend(data) {
     swatch.className = 'legend-swatch ' + fi.cls;
     return _legendRow(swatch, fi.label);
   })));
+  funcView.appendChild(_legendSection('함수 이름 옆 숫자', [
+    _legendRow(_legendSymbol('3↓', 'refs'), '다른 코드가 이 함수를 부른 횟수'),
+    _legendRow(_legendSymbol('2↑', 'refs out'), '이 함수가 다른 함수를 부른 횟수'),
+  ]));
 
   //범례 접기/펼치기 — 처음 쓰는 사람을 위해 기본은 펼침, 접은 상태는 기억
   const toggle = document.getElementById('legend-toggle');
@@ -398,6 +402,14 @@ function _legendDot(color, glow) {
   return dot;
 }
 
+//진단 표시용 고리 (그래프에서 파일 원의 테두리 색과 같음)
+function _legendRing(color) {
+  const ring = document.createElement('span');
+  ring.className = 'legend-ring';
+  ring.style.borderColor = color;
+  return ring;
+}
+
 function _legendLine(color) {
   const line = document.createElement('span');
   line.className = 'legend-line';
@@ -405,9 +417,9 @@ function _legendLine(color) {
   return line;
 }
 
-function _legendSymbol(symbol) {
+function _legendSymbol(symbol, variant) {
   const span = document.createElement('span');
-  span.className = 'legend-symbol';
+  span.className = 'legend-symbol' + (variant ? ' ' + variant : '');
   span.textContent = symbol;
   return span;
 }

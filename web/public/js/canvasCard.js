@@ -26,12 +26,13 @@ function openCanvasCard(fileId, nodeData) {
   card.dataset.fileId = fileId;
   card.style.zIndex = ++_cardZCounter;
 
-  //초기 위치: 그래프 노드의 화면 좌표 기반
-  const pos = _getCardInitialPosition(fileId);
+  //초기 크기/위치: 그래프 영역 크기에 맞춰 줄이고, 노드의 화면 좌표 기반으로 배치
+  const size = _getCardInitialSize();
+  const pos = _getCardInitialPosition(fileId, size);
   card.style.left = pos.x + 'px';
   card.style.top = pos.y + 'px';
-  card.style.width = '500px';
-  card.style.height = '400px';
+  card.style.width = size.w + 'px';
+  card.style.height = size.h + 'px';
 
   //포커스: 카드 클릭 시 최상위로
   card.addEventListener('mousedown', () => focusCard(fileId));
@@ -57,8 +58,20 @@ function openCanvasCard(fileId, nodeData) {
     closeCanvasCard(fileId);
   });
 
+  //코드 보기: 파일 전체 코드 ↔ 선택한 함수 코드 전환
+  const fullBtn = document.createElement('button');
+  fullBtn.className = 'canvas-card-full-btn';
+  fullBtn.textContent = '코드 보기';
+  fullBtn.title = '이 파일의 전체 코드를 봅니다';
+  fullBtn.addEventListener('mousedown', (e) => e.stopPropagation());
+  fullBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    _toggleCardFullCode(card, nodeData, fullBtn);
+  });
+
   header.appendChild(title);
   header.appendChild(badge);
+  header.appendChild(fullBtn);
   header.appendChild(closeBtn);
 
   //── 바디 ──
@@ -112,6 +125,9 @@ function openCanvasCard(fileId, nodeData) {
   } else if (nodeData.code) {
     //함수가 없으면 파일 전체 코드 표시
     showCodeInCard(card, nodeData);
+  } else {
+    //함수도 코드도 없으면 서버에서 전체 코드를 받아 보여준다
+    _toggleCardFullCode(card, nodeData, fullBtn);
   }
 }
 
@@ -167,22 +183,35 @@ function hasOpenCards() {
    내부 헬퍼 함수들
    ══════════════════════════════════════════════════ */
 
-/* 카드 초기 위치 계산 */
-function _getCardInitialPosition(fileId) {
+function _getGraphRect() {
   const container = document.getElementById('graph-container');
-  const rect = container ? container.getBoundingClientRect() : { left: 0, top: 0, width: 800, height: 600 };
+  return container ? container.getBoundingClientRect() : { left: 0, top: 0, width: 800, height: 600 };
+}
+
+/* 카드 초기 크기: 기본 500x400, 그래프 영역이 작으면 그에 맞춰 줄인다 */
+function _getCardInitialSize() {
+  const rect = _getGraphRect();
+  return {
+    w: Math.max(280, Math.min(500, rect.width - 20)),
+    h: Math.max(220, Math.min(400, rect.height - 20)),
+  };
+}
+
+/* 카드 초기 위치 계산 */
+function _getCardInitialPosition(fileId, size) {
+  const rect = _getGraphRect();
 
   if (typeof cy !== 'undefined' && cy) {
     const node = cy.getElementById(fileId);
     if (node && node.length > 0) {
       const rPos = node.renderedPosition();
-      //그래프 컨테이너 기준 좌표 → canvas-cards-layer 기준 좌표
-      let x = rPos.x - 250; // 카드 너비의 절반
-      let y = rPos.y - 200; // 카드 높이의 절반
+      //그래프 컨테이너 기준 좌표 → canvas-cards-layer 기준 좌표 (카드 중심을 노드에 맞춤)
+      let x = rPos.x - size.w / 2;
+      let y = rPos.y - size.h / 2;
 
       //화면 밖으로 나가지 않도록 클램프
-      x = Math.max(10, Math.min(x, rect.width - 520));
-      y = Math.max(10, Math.min(y, rect.height - 420));
+      x = Math.max(10, Math.min(x, rect.width - size.w - 10));
+      y = Math.max(10, Math.min(y, rect.height - size.h - 10));
       return { x, y };
     }
   }
@@ -190,10 +219,29 @@ function _getCardInitialPosition(fileId) {
   //노드를 못 찾으면 중앙에 약간 오프셋
   const offset = _openCards.size * 30;
   return {
-    x: Math.max(10, (rect.width / 2 - 250) + offset),
-    y: Math.max(10, (rect.height / 2 - 200) + offset),
+    x: Math.max(10, (rect.width - size.w) / 2 + offset),
+    y: Math.max(10, (rect.height - size.h) / 2 + offset),
   };
 }
+
+/* 창 크기가 바뀌면 열린 카드를 그래프 영역 안으로 다시 넣는다 */
+function _clampCardsToView() {
+  const rect = _getGraphRect();
+  for (const [, card] of _openCards) {
+    const w = Math.min(card.offsetWidth, rect.width - 16);
+    const h = Math.min(card.offsetHeight, rect.height - 16);
+    const left = parseInt(card.style.left, 10) || 0;
+    const top = parseInt(card.style.top, 10) || 0;
+    card.style.left = Math.max(8, Math.min(left, rect.width - w - 8)) + 'px';
+    card.style.top = Math.max(8, Math.min(top, rect.height - h - 8)) + 'px';
+  }
+}
+
+let _cardResizeTimer = null;
+window.addEventListener('resize', () => {
+  clearTimeout(_cardResizeTimer);
+  _cardResizeTimer = setTimeout(_clampCardsToView, 120);
+});
 
 /* 드래그 이동 설정 */
 function _setupCardDrag(card, handle) {
@@ -265,7 +313,7 @@ function _renderFnSidebar(card, nodeData) {
 
   if (functions.length === 0) {
     const empty = document.createElement('div');
-    empty.style.cssText = 'padding: 10px 8px; color: #64748b; font-size: 12px; font-style: italic;';
+    empty.style.cssText = 'padding: 10px 8px; color: #6F737A; font-size: 12px; font-style: italic;';
     empty.textContent = '\uD568\uC218 \uC5C6\uC74C';
     sidebar.appendChild(empty);
     return;
@@ -282,17 +330,13 @@ function _renderFnSidebar(card, nodeData) {
 
     const nameSpan = document.createElement('span');
     nameSpan.className = 'canvas-card-fn-name';
-    nameSpan.textContent = fn.name;
+    nameSpan.textContent = fnDisplayName(fn);
+    nameSpan.title = fnDisplayName(fn);
 
     item.appendChild(iconSpan);
     item.appendChild(nameSpan);
 
-    if (fn.inboundRefCount > 0) {
-      const refSpan = document.createElement('span');
-      refSpan.className = 'canvas-card-fn-refs';
-      refSpan.textContent = fn.inboundRefCount + '\u2191';
-      item.appendChild(refSpan);
-    }
+    appendRefBadges(item, fn, 'canvas-card-fn-refs');
 
     item.addEventListener('click', () => {
       _selectFunction(card, nodeData, fn, item);
@@ -310,6 +354,13 @@ function _selectFunction(card, nodeData, fn, itemEl) {
     sidebar.querySelectorAll('.canvas-card-fn-item').forEach(el => el.classList.remove('active'));
   }
   if (itemEl) itemEl.classList.add('active');
+  card._activeFn = fn;
+
+  //"코드 보기"로 전체 코드를 보고 있으면 전체 코드에서 해당 함수 위치로 이동
+  if (card._fullCode && fn.startLine) {
+    _scrollCardToLine(card, fn.startLine);
+    return;
+  }
 
   //전체 파일 코드가 있으면 그것을 표시하고 해당 함수 범위 하이라이트
   const fileCode = nodeData.code || '';
@@ -337,6 +388,54 @@ function _selectFunction(card, nodeData, fn, itemEl) {
       }
     }
   }
+}
+
+/* "코드 보기" 버튼: 전체 코드를 받아와 표시하거나, 선택한 함수 코드로 되돌린다 */
+async function _toggleCardFullCode(card, nodeData, btn) {
+  if (card._fullCode) {
+    card._fullCode = null;
+    btn.textContent = '코드 보기';
+    btn.classList.remove('active');
+    btn.title = '이 파일의 전체 코드를 봅니다';
+    const fn = card._activeFn;
+    if (fn) {
+      const items = card.querySelectorAll('.canvas-card-fn-item');
+      const idx = (nodeData.functions || []).indexOf(fn);
+      _selectFunction(card, nodeData, fn, items[idx] || null);
+    }
+    return;
+  }
+
+  const filePath = nodeData.fullPath || nodeData.filePath;
+  btn.disabled = true;
+  btn.textContent = '불러오는 중...';
+  try {
+    const code = await fetchFileCode(filePath);
+    card._fullCode = code;
+    showCodeInCard(card, { code: code || ' ', filePath, startLine: 1 });
+    btn.textContent = '함수만 보기';
+    btn.classList.add('active');
+    btn.title = '선택한 함수 코드로 돌아갑니다';
+    if (card._activeFn && card._activeFn.startLine) _scrollCardToLine(card, card._activeFn.startLine);
+  } catch (err) {
+    btn.textContent = '코드 보기';
+    btn.title = err.message || '파일을 불러오지 못했습니다';
+    btn.classList.add('error');
+    setTimeout(() => btn.classList.remove('error'), 1500);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+/* 전체 코드에서 특정 줄이 보이도록 스크롤 (hljs가 줄 span을 다시 그리므로 줄 높이로 계산) */
+function _scrollCardToLine(card, line) {
+  const codeArea = card.querySelector('.canvas-card-code');
+  const codeEl = codeArea && codeArea.querySelector('code');
+  if (!codeEl) return;
+  const style = getComputedStyle(codeEl);
+  const lineHeight = parseFloat(style.lineHeight) || 18;
+  const padTop = parseFloat(style.paddingTop) || 0;
+  codeArea.scrollTo({ top: Math.max(0, padTop + (line - 1) * lineHeight - lineHeight * 2), behavior: 'smooth' });
 }
 
 /* 외부 파일 함수 점프 */

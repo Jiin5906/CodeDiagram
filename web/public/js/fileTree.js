@@ -1,18 +1,20 @@
 //파일 트리 탐색기 코드
 //분석된 파일 목록에서 디렉토리 트리를 구축하고 패널에 표시한다.
 
-//확장자별 아이콘 매핑
+//확장자별 아이콘 매핑 — 이모지 대신 짧은 글자 표식, 색은 그래프의 언어 색(LANG_COLORS)과 같다
 const fileIcons = {
-  '.py': { icon: '\u{1F40D}', color: '#3b82f6' },
-  '.js': { icon: 'JS', color: '#fbbf24' },
-  '.ts': { icon: 'TS', color: '#3b82f6' },
-  '.html': { icon: '\u{1F310}', color: '#4ade80' },
-  '.css': { icon: '\u{1F3A8}', color: '#a78bfa' },
-  '.cpp': { icon: 'C+', color: '#67e8f9' },
-  '.cc': { icon: 'C+', color: '#67e8f9' },
-  '.h': { icon: 'H', color: '#67e8f9' },
-  '.hpp': { icon: 'H+', color: '#67e8f9' },
-  '.cs': { icon: 'C#', color: '#86efac' },
+  '.py': { icon: 'py', color: LANG_COLORS.python.bg },
+  '.js': { icon: 'js', color: LANG_COLORS.javascript.bg },
+  '.ts': { icon: 'ts', color: LANG_COLORS.typescript.bg },
+  '.tsx': { icon: 'tsx', color: LANG_COLORS.typescript.bg },
+  '.html': { icon: '<>', color: LANG_COLORS.html.bg },
+  '.htm': { icon: '<>', color: LANG_COLORS.html.bg },
+  '.css': { icon: '{}', color: LANG_COLORS.css.bg },
+  '.cpp': { icon: 'c++', color: LANG_COLORS.cpp.bg },
+  '.cc': { icon: 'c++', color: LANG_COLORS.cpp.bg },
+  '.h': { icon: 'h', color: LANG_COLORS.cpp.bg },
+  '.hpp': { icon: 'h', color: LANG_COLORS.cpp.bg },
+  '.cs': { icon: 'c#', color: LANG_COLORS.csharp.bg },
 };
 
 //현재 선택된 파일 경로
@@ -102,7 +104,7 @@ function buildFileTree(data) {
           iconSpan.textContent = iconInfo.icon;
           iconSpan.style.color = iconInfo.color;
         } else {
-          iconSpan.textContent = '\u{1F4C4}';
+          iconSpan.textContent = '·';
         }
 
         //파일명
