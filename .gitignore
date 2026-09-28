@@ -17,6 +17,8 @@ local.properties
 # Claude Code
 .claude/
 # 스크린샷 / 문서
+# 개인 보고서·작업 문서는 docs/ 폴더에 두면 통째로 제외된다.
+# README 등 저장소 문서는 추적해야 하므로 *.md 전역 제외는 쓰지 않는다.
 \docs
 *.png
 *.jpg
@@ -25,7 +27,6 @@ local.properties
 *.bmp
 *.svg
 *.pdf
-*.md
 *.pptx
 *.ppt
 *.docx
