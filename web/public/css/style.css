@@ -33,7 +33,9 @@
   --font-code: 'D2Coding', 'JetBrains Mono', Consolas, monospace;
 
   --panel-tree-w: clamp(200px, 18vw, 300px);
-  --panel-code-w: clamp(320px, 32vw, 600px);
+  /* 코드 뷰어는 화면 너비의 비율(기본 26%)을 따르고, 사용자가 끌어서 바꾼 비율은 JS가 --panel-code-ratio로 덮어쓴다 */
+  --panel-code-ratio: 26vw;
+  --panel-code-w: clamp(280px, var(--panel-code-ratio), 60vw);
   --overlay-w: clamp(320px, 30vw, 460px);
   --diff-w: min(960px, calc(100vw - 40px));
   --legend-w: clamp(210px, 16vw, 270px);
@@ -320,10 +322,22 @@ body {
   gap: 5px;
 }
 
+/* 언어 목록: 라벨이 줄바꿈되지 않을 만큼 칸이 넓을 때만 2열, 좁으면 1열 */
 .legend-section-body.legend-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
   gap: 5px 12px;
+}
+
+.legend-grid .legend-item {
+  min-width: 0;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.legend-grid .legend-item > span:nth-child(2) {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .legend-count {
@@ -349,6 +363,11 @@ body {
   border: 2px solid;
   flex-shrink: 0;
   box-sizing: border-box;
+}
+
+/* 빛나는 점: 복잡도 글로우 범례 */
+.legend-dot.glow {
+  box-shadow: 0 0 6px 3px color-mix(in srgb, var(--dot-color) 55%, transparent);
 }
 
 .legend-line {
@@ -690,6 +709,30 @@ body {
   transition-delay: 0.25s;
 }
 
+/* 보기 단위 선택 (파일 | 함수) — 테두리로 묶어 둘 중 하나를 고르는 버튼임을 보여준다 */
+.ribbon-seg {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 2px;
+  margin: 2px 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.ribbon-seg .ribbon-btn {
+  width: 50px;
+  min-height: 50px;
+}
+
+.ribbon-seg .ribbon-btn.active {
+  color: var(--accent-text);
+}
+
+.ribbon-seg .ribbon-btn.active .ribbon-icon {
+  background: var(--accent-tint);
+}
+
 .ribbon-spacer {
   flex: 1;
 }
@@ -708,11 +751,12 @@ body {
   align-items: flex-end;
 }
 
-#graph-settings-toggle {
+#hierarchy-toggle {
   background: var(--bg-panel);
   border: 1px solid var(--border);
   border-radius: 4px;
-  color: var(--text);
+  color: var(--text-2);
+  font: inherit;
   font-size: 12px;
   font-weight: 600;
   height: 30px;
@@ -721,91 +765,24 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
-  transition: color 0.15s, border-color 0.15s;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
 }
 
-#graph-settings-toggle span {
-  font-size: 14px;
+#hierarchy-toggle svg {
+  width: 15px;
+  height: 15px;
 }
 
-#graph-settings-toggle.active {
+#hierarchy-toggle:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+/* 켜진 상태 */
+#hierarchy-toggle.active {
   color: var(--accent-text);
+  background: var(--accent-tint);
   border-color: var(--accent);
-}
-
-#graph-settings-toggle:hover {
-  color: var(--text);
-  border-color: var(--accent);
-}
-
-#graph-settings-content {
-  margin-top: 6px;
-  background: var(--bg-panel);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 12px 14px;
-  width: 240px;
-}
-
-.gs-section {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 0;
-}
-
-.gs-section-stack {
-  flex-direction: column;
-  align-items: stretch;
-  gap: 4px;
-  margin-top: 6px;
-  padding-top: 10px;
-  border-top: 1px solid var(--border);
-}
-
-.gs-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.gs-help {
-  font-size: 11px;
-  line-height: 1.45;
-  color: var(--text-3);
-}
-
-.gs-label {
-  font-size: 12px;
-  color: var(--text);
-  font-weight: 600;
-  min-width: 56px;
-}
-
-.gs-select {
-  flex: 1;
-  padding: 3px 6px;
-  background: var(--bg-hover);
-  border: 1px solid var(--border);
-  color: var(--text);
-  border-radius: 4px;
-  font-size: 12px;
-  cursor: pointer;
-  outline: none;
-}
-
-.gs-range {
-  flex: 1;
-  accent-color: var(--accent-text);
-  cursor: pointer;
-}
-
-.gs-value {
-  min-width: 32px;
-  text-align: right;
-  font-size: 11px;
-  color: var(--text);
-  font-variant-numeric: tabular-nums;
 }
 
 /* ── 메인 콘텐츠 래퍼 (좌우 분할) ── */
@@ -951,6 +928,7 @@ body {
 
 /* ── 소스코드 뷰어 패널 ── */
 #code-viewer-panel {
+  position: relative;
   width: var(--panel-code-w);
   min-width: var(--panel-code-w);
   background: var(--bg-panel);
@@ -966,6 +944,37 @@ body {
   min-width: 0;
   opacity: 0;
   border-left: none;
+}
+
+/* 드래그로 너비를 바꾸는 동안에는 애니메이션을 끄고 글자 선택을 막는다 */
+#code-viewer-panel.resizing {
+  transition: none;
+}
+
+body.cv-resizing {
+  cursor: col-resize;
+  user-select: none;
+}
+
+#code-viewer-resizer {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 6px;
+  z-index: 5;
+  cursor: col-resize;
+  background: transparent;
+  transition: background 0.15s;
+}
+
+#code-viewer-resizer:hover,
+#code-viewer-panel.resizing #code-viewer-resizer {
+  background: var(--accent);
+}
+
+#code-viewer-panel.collapsed #code-viewer-resizer {
+  display: none;
 }
 
 .code-viewer-header {
@@ -998,13 +1007,17 @@ body {
   color: var(--text);
 }
 
+/* flex로 두면 줄번호 칸이 '보이는 높이'까지만 늘어나 스크롤해 내려간 줄부터 배경색이 끊긴다.
+   grid 행은 내용 높이(=전체 코드 높이)만큼 커지므로 줄번호 칸이 끝까지 이어진다 */
 #code-viewer-content {
   position: relative;
   flex: 1;
   min-height: 0;
   overflow: auto;
-  display: flex;
-  align-items: flex-start;
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  grid-template-rows: minmax(100%, max-content);
+  background: var(--bg-editor);
   font-size: var(--code-font);
   line-height: 1.6;
   font-family: var(--font-code);
@@ -1012,7 +1025,6 @@ body {
 
 .code-line-numbers {
   padding: 12px 8px 12px 12px;
-  align-self: stretch;
   /* 가로 스크롤 시에도 줄번호는 왼쪽에 고정 */
   position: sticky;
   left: 0;
@@ -1033,7 +1045,7 @@ body {
   position: relative;
   z-index: 1;
   margin: 0;
-  flex: 1 0 auto;
+  min-width: max-content;
   overflow: visible;
 }
 
@@ -1076,76 +1088,19 @@ body {
   height: 100%;
 }
 
-/* ── 팝업 (엣지 참조 위치) ── */
-.popup {
-  position: fixed;
-  background: var(--bg-hover);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  box-shadow: var(--shadow-float);
-  z-index: 100;
-  min-width: 260px;
-  max-width: 400px;
+/* 복잡도 글로우 레이어 — 그래프(#cy) 뒤에 깔아 원 뒤로 빛이 번지게 한다 */
+#complexity-glow-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
 }
 
-
-.popup-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--border);
-  font-weight: 600;
-  font-size: 15px;
-  color: var(--text);
-}
-
-.popup-header button {
-  background: none;
-  border: none;
-  color: var(--text-3);
-  font-size: 20px;
-  cursor: pointer;
-  padding: 0 4px;
-  line-height: 1;
-  transition: color 0.15s;
-}
-
-.popup-header button:hover {
-  color: var(--text);
-}
-
-#ref-popup-content {
-  padding: 8px 14px 12px;
-  font-size: 14px;
-  max-height: 260px;
-  overflow-y: auto;
-}
-
-.ref-item {
-  padding: 5px 8px;
-  margin: 2px 0;
-  border-radius: 4px;
-  color: var(--text-2);
-  background: var(--bg-field);
-}
-
-.ref-item .ref-file {
-  color: var(--accent-text);
-  font-weight: 500;
-}
-
-.ref-item .ref-caller {
-  color: #A58BD6;
-}
-
-.ref-item {
-  cursor: pointer;
-  transition: background 0.15s;
-}
-
-.ref-item:hover {
-  background: var(--bg-hover);
+#graph-container > #cy {
+  position: relative;
+  z-index: 1;
 }
 
 /* ── 오버레이 (AI 설명 + 진단 패널) ── */
@@ -1192,64 +1147,6 @@ body {
 
 .overlay-header button:hover {
   color: var(--text);
-}
-
-#explain-content {
-  padding: 14px 16px;
-  font-size: 15px;
-  line-height: 1.7;
-  color: var(--text);
-}
-
-#explain-content p {
-  margin-bottom: 8px;
-}
-
-#explain-content .loading {
-  color: var(--text-3);
-  font-style: italic;
-}
-
-#explain-code-section {
-  border-top: 1px solid var(--border);
-  padding: 10px 16px 16px;
-}
-
-#toggle-code-btn {
-  background: var(--bg-field);
-  border: 1px solid var(--border);
-  color: var(--text-2);
-  padding: 5px 14px;
-  border-radius: 4px;
-  font-size: 14px;
-  cursor: pointer;
-  margin-bottom: 8px;
-  transition: color 0.15s, border-color 0.15s;
-}
-
-#toggle-code-btn:hover {
-  color: var(--text);
-  border-color: var(--accent);
-}
-
-#explain-code {
-  background: var(--bg-field);
-  padding: 14px;
-  border-radius: 4px;
-  font-size: 14px;
-  font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
-  overflow-x: auto;
-  white-space: pre;
-  color: var(--text);
-  display: none;
-  max-height: 360px;
-  overflow-y: auto;
-  line-height: 1.5;
-  border: 1px solid var(--border);
-}
-
-#explain-code.visible {
-  display: block;
 }
 
 /* ── 진단 패널 ── */
@@ -1661,63 +1558,6 @@ body {
    Phase 2 스타일
    ══════════════════════════════════════════════ */
 
-/* ── 로컬 그래프 컨트롤 ── */
-#local-graph-controls {
-  position: absolute;
-  top: 12px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 14px;
-  background: var(--bg-panel);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  z-index: 20;
-  font-size: 13px;
-  color: var(--text-2);
-}
-
-
-#local-graph-controls label {
-  font-weight: 600;
-  color: var(--text);
-}
-
-#local-graph-depth {
-  width: 80px;
-  accent-color: var(--accent-text);
-  cursor: pointer;
-}
-
-#local-graph-depth-label {
-  font-weight: 700;
-  color: var(--accent-text);
-  min-width: 14px;
-  text-align: center;
-}
-
-#local-graph-exit {
-  background: var(--bg-hover);
-  border: 1px solid var(--border-strong);
-  color: var(--text-2);
-  width: 24px;
-  height: 24px;
-  border-radius: 4px;
-  font-size: 14px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: color 0.15s, border-color 0.15s;
-}
-
-#local-graph-exit:hover {
-  color: var(--text);
-  border-color: var(--accent);
-}
-
 /* ── 함수 프리뷰 툴팁 ── */
 .function-preview {
   position: fixed;
@@ -1781,6 +1621,26 @@ body {
   font-weight: 600;
 }
 
+.fn-preview-complex {
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #D6A547;
+  background: rgba(214, 165, 71, 0.14);
+}
+
+.fn-preview-complex.level-2 {
+  color: #E68046;
+  background: rgba(230, 128, 70, 0.14);
+}
+
+.fn-preview-complex.level-3 {
+  color: #E06666;
+  background: rgba(224, 102, 102, 0.14);
+}
+
 .fn-preview-more {
   color: var(--text-3);
   font-size: 11px;
@@ -1801,29 +1661,6 @@ body {
   gap: 6px;
   flex-shrink: 0;
   margin-left: 8px;
-}
-
-.code-viewer-header .cv-action-btn {
-  padding: 4px 10px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--accent-text);
-  background: var(--accent-tint);
-  border: 1px solid var(--accent);
-  border-radius: 4px;
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
-}
-
-.code-viewer-header .cv-action-btn:hover {
-  color: var(--text);
-  background: var(--accent-tint);
-  border-color: var(--accent);
-}
-
-.code-viewer-header .cv-action-btn.active {
-  color: var(--bg-editor);
-  background: var(--accent);
-  border-color: var(--accent);
 }
 
 /* 함수 목록 영역: 코드 위에 두고 높이를 제한해 코드가 항상 보이게 한다 */
@@ -1874,6 +1711,165 @@ body {
 
 #code-viewer-status.error {
   color: var(--error);
+}
+
+/* ── 코드 뷰어 내 AI 해설 (함수 뷰) ── */
+#code-viewer-explain {
+  flex-shrink: 0;
+  max-height: 35%;
+  display: flex;
+  flex-direction: column;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-field);
+}
+
+.cv-explain-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 7px 14px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-2);
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+}
+
+.cv-explain-head:hover {
+  color: var(--text);
+}
+
+#code-viewer-explain.collapsed #cv-explain-body {
+  display: none;
+}
+
+#code-viewer-explain.collapsed .cv-explain-chevron {
+  transform: rotate(-90deg);
+}
+
+#cv-explain-body {
+  overflow-y: auto;
+  padding: 0 14px 10px;
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--text);
+}
+
+#cv-explain-body p {
+  margin-bottom: 6px;
+}
+
+#cv-explain-body .cv-explain-note {
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+/* ── 범례 하단: 단축키 안내 ── */
+.legend-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  margin-top: 10px;
+  padding: 8px 0 0;
+  border: none;
+  border-top: 1px solid var(--border);
+  background: none;
+  font: inherit;
+  font-size: 11px;
+  color: var(--text-3);
+  cursor: pointer;
+}
+
+.legend-footer:hover {
+  color: var(--text);
+}
+
+kbd {
+  display: inline-block;
+  min-width: 18px;
+  padding: 1px 5px;
+  font-family: var(--font-code);
+  font-size: 11px;
+  line-height: 1.4;
+  text-align: center;
+  color: var(--text);
+  background: var(--bg-field);
+  border: 1px solid var(--border-strong);
+  border-bottom-width: 2px;
+  border-radius: 3px;
+}
+
+/* ── 단축키 도움말 ── */
+#shortcuts-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.shortcuts-box {
+  width: min(460px, 100%);
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: var(--shadow-float);
+}
+
+.shortcuts-list {
+  margin: 0;
+  padding: 8px 16px 14px;
+}
+
+.shortcuts-list > div {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 12px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+
+.shortcuts-list > div:last-child {
+  border-bottom: none;
+}
+
+.shortcuts-list dt {
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.shortcuts-list dd {
+  margin: 0;
+  color: var(--text-2);
+}
+
+/* ── 참조 목록 (엣지 클릭 시 코드 뷰어 위쪽) ── */
+.ref-list-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ref-list-caller {
+  flex-shrink: 0;
+  max-width: 50%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  color: #A58BD6;
 }
 
 /* ── 함수 목록 (코드 뷰어 내) ── */
@@ -2274,8 +2270,8 @@ body {
     right: 0;
     bottom: 0;
     z-index: 60;
-    width: min(460px, 55vw);
-    min-width: min(460px, 55vw);
+    width: min(420px, 48vw);
+    min-width: min(420px, 48vw);
     box-shadow: var(--shadow-float);
   }
 
@@ -2283,6 +2279,11 @@ body {
     width: 0;
     min-width: 0;
     box-shadow: none;
+  }
+
+  /* 태블릿에서는 떠 있는 패널이라 너비를 고정한다 */
+  #code-viewer-resizer {
+    display: none;
   }
 
   #top-bar {
@@ -2392,6 +2393,10 @@ body {
     border-left: none;
   }
 
+  #code-viewer-resizer {
+    display: none;
+  }
+
   #code-viewer-panel.collapsed {
     width: 0 !important;
     min-width: 0 !important;
@@ -2463,12 +2468,6 @@ body {
     padding: 10px 12px;
   }
 
-  .ref-item {
-    min-height: 44px;
-    padding: 10px 8px;
-  }
-
-  .popup-header button,
   .overlay-header button,
   .file-tree-header button,
   .code-viewer-header button {
@@ -2480,6 +2479,11 @@ body {
   }
 
   /* 리본: 모바일에서 하단 수평 바로 전환 */
+  .ribbon-seg {
+    flex-direction: row;
+    margin: 0;
+  }
+
   #ribbon {
     width: 100%;
     min-width: 100%;
@@ -2502,11 +2506,6 @@ body {
   /* 미니맵: 모바일 숨김 */
   #minimap-container {
     display: none;
-  }
-
-  /* 그래프 설정: 모바일 축소 */
-  #graph-settings-content {
-    min-width: 140px;
   }
 }
 

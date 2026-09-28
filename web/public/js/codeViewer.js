@@ -42,18 +42,20 @@ function appendRefBadges(parent, fn, className) {
   }
 }
 
-//코드 뷰어의 "코드 보기" 버튼 상태
+//서버에서 받은 파일 원본 캐시
 const _fullCodeCache = new Map(); // analysisId::path -> code
-let _cvFilePath = null;      // 현재 보고 있는 파일 경로 (프로젝트 기준 상대 경로)
-let _cvShowingFull = false;  // 전체 코드를 보고 있는지
-let _cvLastPartial = null;   // 전체 코드 → 되돌아갈 때 보여줄 함수 코드
+//빠르게 여러 곳을 클릭했을 때 늦게 도착한 이전 파일이 화면을 덮어쓰지 않도록 하는 순번
+let _cvSeq = 0;
+//지금 화면에 그려진 파일 (같은 파일 안에서 이동할 때는 다시 하이라이팅하지 않고 스크롤만 한다)
+let _cvRenderedFile = null;
+let _cvRenderedCode = null;
 
+//함수/노드 코드를 보여준다. 파일 원본을 받을 수 있으면 파일 전체를 띄우고 해당 범위를 강조해 스크롤한다.
+//(함수 코드만 따로 보여주던 방식 → 앞뒤 코드도 함께 보이도록 통일)
 //options.keepFnList: 파일 클릭으로 연 함수 목록을 그대로 둔다
 function showCodeViewer(nodeData, options) {
   const panel = document.getElementById('code-viewer-panel');
-  const filename = document.getElementById('code-viewer-filename');
   const codeEl = document.getElementById('code-viewer-code');
-
   if (!panel || !codeEl) return;
 
   const code = nodeData.code;
@@ -71,21 +73,63 @@ function showCodeViewer(nodeData, options) {
     }
   }
 
-  //파일명 표시
   const name = nodeData.qualifiedName || nodeData.label || '';
   const file = nodeData.filePath || '';
-  filename.textContent = file ? `${file} - ${name}` : name;
-  filename.title = filename.textContent;
-
-  _renderViewerCode(code, file, nodeData.startLine || 1);
-
-  //함수 코드를 보여줄 때는 "코드 보기"로 전체 파일을 열 수 있게 한다
-  if (!options || !options.isFullFile) {
-    _cvLastPartial = { nodeData, options };
-    _setFullCodeState(file, false);
-  }
+  const startLine = nodeData.startLine || 1;
+  const endLine = nodeData.endLine || (startLine + code.split('\n').length - 1);
 
   _openCodeViewerPanel(panel);
+  _loadViewerLocation(file, nodeData.startLine ? startLine : 0, endLine, name, { code, startLine });
+}
+
+//파일 전체를 불러와 [startLine, endLine]을 강조한다.
+//파일을 받을 수 없으면 fallback 코드 조각(함수 코드)만 보여준다.
+async function _loadViewerLocation(filePath, startLine, endLine, name, fallback) {
+  const filename = document.getElementById('code-viewer-filename');
+  const seq = ++_cvSeq;
+
+  const setTitle = () => {
+    if (!filename) return;
+    //에디터처럼 '파일:줄' 형식으로 표시하고 이름은 뒤에 붙인다
+    const where = startLine ? (startLine === endLine || !endLine ? `:${startLine}` : `:${startLine}-${endLine}`) : '';
+    filename.textContent = (filePath || '') + where + (name ? '  ' + name : '');
+    filename.title = filename.textContent;
+  };
+
+  const canFetch = !!(filePath && typeof graphData !== 'undefined' && graphData && graphData.analysisId);
+  if (canFetch) {
+    const cached = _fullCodeCache.get(graphData.analysisId + '::' + filePath);
+    if (!cached) _setViewerStatus('코드를 불러오는 중...');
+    try {
+      const code = cached !== undefined ? cached : await fetchFileCode(filePath);
+      if (seq !== _cvSeq) return;
+      setTitle();
+      if (_cvRenderedFile === filePath && _cvRenderedCode === code) {
+        _clearViewerLineHighlight();
+        _setViewerStatus('');
+      } else {
+        _renderViewerCode(code || ' ', filePath, 1);
+        _cvRenderedFile = filePath;
+        _cvRenderedCode = code;
+      }
+      //패널이 열리는 중이면 폭이 바뀐 뒤에 강조 띠 너비가 맞도록 다음 프레임에 처리
+      if (startLine) requestAnimationFrame(() => _highlightViewerLines(startLine, endLine));
+      return;
+    } catch (err) {
+      if (seq !== _cvSeq) return;
+      if (!fallback) {
+        _setViewerStatus(err.message || '파일을 불러오지 못했습니다', true);
+        return;
+      }
+    }
+  }
+
+  if (!fallback) return;
+  setTitle();
+  _renderViewerCode(fallback.code, filePath, fallback.startLine || 1);
+  _cvRenderedFile = null;
+  _cvRenderedCode = null;
+  if (canFetch) _setViewerStatus('파일 전체를 불러오지 못해 해당 코드만 보여줍니다', true);
 }
 
 //코드 + 줄번호를 코드 뷰어에 그린다
@@ -154,49 +198,25 @@ function _clearViewerLineHighlight() {
   if (content) content.querySelectorAll('.cv-line-highlight').forEach(el => el.remove());
 }
 
-//진단 등에서 "이 파일의 몇 번째 줄"로 바로 이동한다.
-//fnData가 있으면 "함수만 보기"로 그 함수 코드만 볼 수도 있게 한다.
-async function showCodeAtLocation(filePath, startLine, endLine, name, fnData) {
+//진단·참조 목록 등에서 "이 파일의 몇 번째 줄"로 바로 이동한다.
+//options.keepList: 코드 위의 목록(참조 목록 등)을 그대로 둔다
+function showCodeAtLocation(filePath, startLine, endLine, name, options) {
   const panel = document.getElementById('code-viewer-panel');
-  const filename = document.getElementById('code-viewer-filename');
   if (!panel || !filePath) return;
 
-  const fnList = document.getElementById('code-viewer-fnlist');
-  if (fnList) fnList.classList.add('hidden');
+  if (!options || !options.keepList) {
+    const fnList = document.getElementById('code-viewer-fnlist');
+    if (fnList) fnList.classList.add('hidden');
+  }
+  hideViewerExplain();
   _openCodeViewerPanel(panel);
-  _setViewerStatus('코드를 불러오는 중...');
-
-  let code;
-  try {
-    code = await fetchFileCode(filePath);
-  } catch (err) {
-    _setViewerStatus(err.message || '파일을 불러오지 못했습니다', true);
-    return;
-  }
-
-  if (filename) {
-    //에디터처럼 '파일:줄' 형식으로 표시하고 함수 이름은 뒤에 붙인다
-    const where = startLine ? (startLine === endLine || !endLine ? `:${startLine}` : `:${startLine}-${endLine}`) : '';
-    filename.textContent = filePath + where + (name ? '  ' + name : '');
-    filename.title = filename.textContent;
-  }
-  _renderViewerCode(code || ' ', filePath, 1);
-
-  _cvLastPartial = fnData && fnData.code
-    ? { nodeData: { ...fnData, filePath, label: fnData.qualifiedName || fnData.name } }
-    : null;
-  if (_cvLastPartial) {
-    _setFullCodeState(filePath, true);
-  } else {
-    //되돌아갈 함수 코드가 없으면 버튼을 숨긴다 (이미 전체 코드를 보고 있음)
-    _setFullCodeState(null, false);
-  }
-
-  //패널이 열리는 중이면 폭이 바뀐 뒤에 강조 띠 너비가 맞도록 다음 프레임에 처리
-  requestAnimationFrame(() => _highlightViewerLines(startLine, endLine));
+  _loadViewerLocation(filePath, startLine, endLine || startLine, name, null);
 }
 
 function _openCodeViewerPanel(panel) {
+  //파일 노드 위에 떠 있던 함수 미리보기가 코드 창을 가리지 않게 먼저 닫는다
+  if (typeof hideFunctionPreview === 'function') hideFunctionPreview();
+  if (typeof hideEdgePreview === 'function') hideEdgePreview();
   if (!panel.classList.contains('collapsed')) return;
   panel.classList.remove('collapsed');
 
@@ -217,25 +237,6 @@ function _setViewerStatus(message, isError) {
   el.classList.toggle('error', !!isError);
 }
 
-//"코드 보기" 버튼 표시/라벨 갱신
-function _setFullCodeState(filePath, showingFull) {
-  _cvFilePath = filePath || null;
-  _cvShowingFull = showingFull;
-  const btn = document.getElementById('code-viewer-full-btn');
-  if (!btn) return;
-  const canFetch = !!(_cvFilePath && typeof graphData !== 'undefined' && graphData && graphData.analysisId);
-  btn.classList.toggle('hidden', !canFetch);
-  btn.classList.toggle('active', showingFull);
-  btn.textContent = showingFull ? '함수만 보기' : '코드 보기';
-  btn.title = showingFull ? '선택한 함수 코드로 돌아갑니다' : '이 파일의 전체 코드를 봅니다';
-}
-
-//파일 목록/함수 목록 헤더에서 파일 경로만 지정 (보여줄 함수 코드가 없을 때)
-function setCodeViewerFile(filePath) {
-  _cvLastPartial = null;
-  _setFullCodeState(filePath, false);
-}
-
 //서버에서 파일 원본을 받아온다 (분석 id + 경로 기준으로 캐싱). 실패하면 에러를 던진다.
 async function fetchFileCode(filePath) {
   if (!filePath || typeof graphData === 'undefined' || !graphData || !graphData.analysisId) {
@@ -252,45 +253,18 @@ async function fetchFileCode(filePath) {
   return data.code;
 }
 
-//서버에서 파일 원본을 받아 전체 코드를 보여준다
-async function showFullFileCode(filePath) {
-  if (!filePath || typeof graphData === 'undefined' || !graphData || !graphData.analysisId) return;
+//서버에서 파일 원본을 받아 전체 코드를 보여준다 (함수가 없는 파일 등)
+function showFullFileCode(filePath) {
   const panel = document.getElementById('code-viewer-panel');
-  const filename = document.getElementById('code-viewer-filename');
-  let code;
-  _setViewerStatus('전체 코드를 불러오는 중...');
-  try {
-    code = await fetchFileCode(filePath);
-  } catch (err) {
-    _setViewerStatus(err.message || '파일을 불러오지 못했습니다', true);
-    return;
-  }
-
-  if (filename) {
-    filename.textContent = `${filePath} - 전체 코드`;
-    filename.title = filename.textContent;
-  }
-  _renderViewerCode(code || ' ', filePath, 1);
-  _setFullCodeState(filePath, true);
-  //함수 목록에서 선택 표시 해제
-  document.querySelectorAll('#code-viewer-fnlist .fn-list-item.active').forEach(el => el.classList.remove('active'));
-  if (panel) _openCodeViewerPanel(panel);
-}
-
-//"코드 보기" 버튼: 전체 코드 ↔ 직전 함수 코드 전환
-function toggleFullFileCode() {
-  if (_cvShowingFull) {
-    if (_cvLastPartial) {
-      showCodeViewer(_cvLastPartial.nodeData, _cvLastPartial.options);
-    }
-    return;
-  }
-  showFullFileCode(_cvFilePath);
+  if (!panel || !filePath) return;
+  _openCodeViewerPanel(panel);
+  _loadViewerLocation(filePath, 0, 0, '전체 코드', null);
 }
 
 function hideCodeViewer() {
   const panel = document.getElementById('code-viewer-panel');
   if (!panel || panel.classList.contains('collapsed')) return;
+  hideViewerExplain();
   panel.classList.add('collapsed');
   setTimeout(() => {
     if (typeof cy !== 'undefined' && cy) {
@@ -298,6 +272,98 @@ function hideCodeViewer() {
       cy.fit(undefined, 30);
     }
   }, 310);
+}
+
+/* ── 코드 뷰어 내 AI 해설 영역 ── */
+
+//해설 영역을 비우고 보여준다. 내용을 채울 본문 요소를 돌려준다.
+function showViewerExplain() {
+  const box = document.getElementById('code-viewer-explain');
+  const body = document.getElementById('cv-explain-body');
+  if (!box || !body) return null;
+  box.classList.remove('hidden');
+  body.textContent = '';
+  return body;
+}
+
+function hideViewerExplain() {
+  const box = document.getElementById('code-viewer-explain');
+  if (box) box.classList.add('hidden');
+}
+
+/* ── 코드 뷰어 너비 조절 ──
+   너비를 px가 아닌 화면 너비 비율로 저장해 창 크기가 바뀌어도 같은 비율을 유지한다 */
+
+const CV_RATIO_KEY = 'codediagram-code-ratio';
+const CV_RATIO_MIN = 0.18;
+const CV_RATIO_MAX = 0.6;
+
+function _applyCodeViewerRatio(ratio) {
+  const root = document.documentElement;
+  if (ratio) {
+    root.style.setProperty('--panel-code-ratio', (ratio * 100).toFixed(2) + 'vw');
+  } else {
+    root.style.removeProperty('--panel-code-ratio');
+  }
+}
+
+function _setupCodeViewerResizer() {
+  const panel = document.getElementById('code-viewer-panel');
+  const handle = document.getElementById('code-viewer-resizer');
+  if (!panel || !handle) return;
+
+  try {
+    const saved = parseFloat(localStorage.getItem(CV_RATIO_KEY));
+    if (saved >= CV_RATIO_MIN && saved <= CV_RATIO_MAX) _applyCodeViewerRatio(saved);
+  } catch (e) { /* noop */ }
+
+  let dragging = false;
+  let rafId = 0;
+  let lastRatio = null;
+
+  const resizeGraph = () => {
+    rafId = 0;
+    if (typeof cy !== 'undefined' && cy) cy.resize();
+  };
+
+  handle.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return;
+    dragging = true;
+    handle.setPointerCapture(e.pointerId);
+    panel.classList.add('resizing');
+    document.body.classList.add('cv-resizing');
+    e.preventDefault();
+  });
+
+  handle.addEventListener('pointermove', (e) => {
+    if (!dragging) return;
+    const right = panel.getBoundingClientRect().right;
+    const ratio = Math.min(CV_RATIO_MAX, Math.max(CV_RATIO_MIN, (right - e.clientX) / window.innerWidth));
+    lastRatio = ratio;
+    _applyCodeViewerRatio(ratio);
+    if (!rafId) rafId = requestAnimationFrame(resizeGraph);
+  });
+
+  const endDrag = () => {
+    if (!dragging) return;
+    dragging = false;
+    panel.classList.remove('resizing');
+    document.body.classList.remove('cv-resizing');
+    if (lastRatio) {
+      try { localStorage.setItem(CV_RATIO_KEY, String(lastRatio)); } catch (e) { /* noop */ }
+    }
+    resizeGraph();
+  };
+  handle.addEventListener('pointerup', endDrag);
+  handle.addEventListener('pointercancel', endDrag);
+
+  //더블클릭: 기본 비율로 되돌린다
+  handle.addEventListener('dblclick', () => {
+    lastRatio = null;
+    _applyCodeViewerRatio(null);
+    try { localStorage.removeItem(CV_RATIO_KEY); } catch (e) { /* noop */ }
+    resizeGraph();
+  });
 }
 
 /* ══════════════════════════════════════════════════
@@ -383,8 +449,14 @@ document.addEventListener('DOMContentLoaded', () => {
   if (closeBtn) {
     closeBtn.addEventListener('click', hideCodeViewer);
   }
-  const fullBtn = document.getElementById('code-viewer-full-btn');
-  if (fullBtn) {
-    fullBtn.addEventListener('click', toggleFullFileCode);
+  //AI 해설 접기/펼치기
+  const explainToggle = document.getElementById('cv-explain-toggle');
+  if (explainToggle) {
+    explainToggle.addEventListener('click', () => {
+      const box = document.getElementById('code-viewer-explain');
+      const collapsed = box.classList.toggle('collapsed');
+      explainToggle.setAttribute('aria-expanded', String(!collapsed));
+    });
   }
+  _setupCodeViewerResizer();
 });

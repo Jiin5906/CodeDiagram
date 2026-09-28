@@ -16,8 +16,8 @@ local.properties
 
 # Claude Code
 .claude/
-
 # 스크린샷 / 문서
+\docs
 *.png
 *.jpg
 *.jpeg

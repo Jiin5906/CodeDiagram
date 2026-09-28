@@ -122,7 +122,7 @@ document.addEventListener('DOMContentLoaded', () => {
         repoChip.classList.remove('hidden');
       }
 
-      //그래프 설정 패널 표시
+      //계층형 토글 버튼 표시
       const gs = document.getElementById('graph-settings');
       if (gs) gs.classList.remove('hidden');
 
@@ -137,9 +137,8 @@ document.addEventListener('DOMContentLoaded', () => {
       edgesVisible = false;
 
       //새 분석은 파일 뷰로 시작하므로 리본 라벨도 초기 상태로
-      document.getElementById('view-toggle-btn').classList.remove('active');
       document.getElementById('toggle-edges-btn').classList.remove('active');
-      setRibbonLabel('view-toggle-btn', '파일 뷰', RIBBON_TIPS.fileView);
+      syncViewButtons();
       setRibbonLabel('toggle-edges-btn', '선 보기', RIBBON_TIPS.edgesHidden);
 
       //localStorage에서 패널 상태 복원 (코드 뷰어는 제외 — 새 분석은 그래프 전체를 먼저 보여준다)
@@ -215,18 +214,8 @@ function restorePanelState() {
   } catch (e) { /* noop */ }
 }
 
-//그래프 설정 토글 + 범례 토글 설정
+//패널 상태 저장 설정
 document.addEventListener('DOMContentLoaded', () => {
-  const gsToggle = document.getElementById('graph-settings-toggle');
-  const gsContent = document.getElementById('graph-settings-content');
-  if (gsToggle && gsContent) {
-    gsToggle.addEventListener('click', () => {
-      const hidden = gsContent.classList.toggle('hidden');
-      gsToggle.setAttribute('aria-expanded', String(!hidden));
-      gsToggle.classList.toggle('active', !hidden);
-    });
-  }
-
   //패널 상태를 localStorage에 저장하도록 기존 토글 이벤트 보강
   const fileTreePanel = document.getElementById('file-tree-panel');
   if (fileTreePanel) {
@@ -297,13 +286,17 @@ function renderDynamicLegend(data) {
   const diagItems = [];
   if (hasCycle) diagItems.push(_legendRow(_legendRing('#E06666'), '서로를 참조하는 파일 (순환 참조)'));
   if (hasWarning) diagItems.push(_legendRow(_legendRing('#D6A547'), '결합도가 높은 등 살펴볼 파일'));
-  if (diagItems.length) fileView.appendChild(_legendSection('진단 표시 (원 테두리)', diagItems));
+  //복잡도 글로우 — codeEffects.js가 renderGraph 중에 이미 골라 두었다
+  if (typeof complexFileCount === 'function' && complexFileCount() > 0) {
+    diagItems.push(_legendRow(_legendDot('#E68046', true), '원 뒤로 빛이 나는 파일: 복잡도가 높음 (길거나 많은 함수, 높은 결합도). 빛이 넓고 붉을수록 복잡', complexFileCount()));
+  }
+  if (diagItems.length) fileView.appendChild(_legendSection('진단 표시', diagItems));
 
   //4) 읽는 법
   fileView.appendChild(_legendSection('읽는 법', [
     _legendRow(_legendSymbol('●'), '원이 클수록 함수가 많은 파일'),
     _legendRow(_legendSymbol('─'), '선이 굵을수록 참조가 많음'),
-    _legendRow(_legendSymbol('↗'), '클릭하면 주변 파일만, 더블클릭하면 코드 카드'),
+    _legendRow(_legendSymbol('↗'), '클릭하면 연결된 파일로 확대 (빈 곳 클릭: 전체 보기), 더블클릭하면 코드 카드'),
   ]));
 
   //5) 파일을 클릭하면 오른쪽에 뜨는 함수 목록의 기호
@@ -312,7 +305,6 @@ function renderDynamicLegend(data) {
     _legendRow(_legendSymbol('◆'), '변수'),
     _legendRow(_legendSymbol('3↓', 'refs'), '다른 코드가 이 함수를 부른 횟수. 많을수록 여기저기서 쓰는 함수'),
     _legendRow(_legendSymbol('2↑', 'refs out'), '이 함수가 다른 함수를 부른 횟수. 많을수록 의존하는 곳이 많음'),
-    _legendRow(_legendSymbol('</>', 'btn'), '코드 보기: 파일 전체 코드를 엽니다'),
   ]));
 
   //함수 뷰 범례
@@ -338,7 +330,7 @@ function renderDynamicLegend(data) {
     _legendRow(_legendSymbol('2↑', 'refs out'), '이 함수가 다른 함수를 부른 횟수'),
   ]));
 
-  //범례 접기/펼치기 — 처음 쓰는 사람을 위해 기본은 펼침, 접은 상태는 기억
+  //범례 접기/펼치기 — 분석 직후 그래프를 가리지 않도록 기본은 접힘, 펼친 상태는 기억
   const toggle = document.getElementById('legend-toggle');
   const panel = document.getElementById('legend-panel');
   if (toggle && panel) {
@@ -347,11 +339,11 @@ function renderDynamicLegend(data) {
       toggle.textContent = collapsed ? '범례 ▸' : '범례 ▾';
       toggle.setAttribute('aria-expanded', String(!collapsed));
     };
-    applyCollapsed(_loadPanelState().legendCollapsed === true);
+    applyCollapsed(_loadPanelState().legendOpen !== true);
     toggle.onclick = () => {
       const collapsed = !panel.classList.contains('collapsed');
       applyCollapsed(collapsed);
-      savePanelState('legendCollapsed', collapsed);
+      savePanelState('legendOpen', !collapsed);
     };
   }
 }

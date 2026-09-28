@@ -557,6 +557,26 @@ function initGraph(container) {
       //미리보기 모드에서 제거될 엣지
       { selector: 'edge.preview-removed', style: { 'line-color': '#E06666', 'line-style': 'dashed', 'line-opacity': 0.3, 'target-arrow-color': '#E06666', 'width': 1 } },
 
+      //함수 뷰에서 선택한 함수의 연결선 — 공통 edge 규칙(line-opacity: 0)보다 뒤에 있어야 선이 보인다
+      {
+        selector: 'edge.highlighted[type != "aggregated"]',
+        style: {
+          'line-color': '#D6A547',
+          'target-arrow-color': '#D6A547',
+          'width': 2.5,
+          'line-opacity': 1,
+          'z-index': 10,
+        },
+      },
+      //함수 뷰 디밍 — 관련 없는 박스는 어둡게만 하고 구조는 보이게 둔다 (파일 뷰의 0.06보다 진하게)
+      {
+        selector: 'node.dimmed[type != "file-node"]',
+        style: {
+          'opacity': 0.3,
+          'text-opacity': 0.6,
+        },
+      },
+
       /* ── 파일 뷰 엣지 스타일 ── */
       //주의: 함수 뷰의 공통 edge 규칙(display: none) 뒤에 선언해야 집약 엣지가 보인다.
 
@@ -768,6 +788,9 @@ function renderGraph(data) {
           code: node.data.code,
           filePath: node.data.filePath,
           qualifiedName: node.data.qualifiedName,
+          //코드 뷰어 줄 강조와 복잡도 글로우(codeEffects.js) 계산에 쓴다
+          startLine: node.data.startLine,
+          endLine: node.data.endLine,
           inboundRefCount: node.data.inboundRefCount || 0,
           outboundRefCount: node.data.outboundRefCount || 0,
         });
@@ -886,7 +909,7 @@ function renderGraph(data) {
         label: fileName,
         shortLabel: shortName,
         fullLabel: fileName,
-        detailLabel: `${fileName}\n${funcCount} functions`,
+        detailLabel: `${fileName}\n함수 ${funcCount}개`,
         type: 'file-node',
         language: lang,
         fullPath: fileInfo.fullPath,
@@ -1541,10 +1564,36 @@ function highlightNode(nodeId) {
       const keepVisible = node.union(neighborNodes).union(ancestors);
       let neighborAncestors = cy.collection();
       neighborNodes.forEach(n => { neighborAncestors = neighborAncestors.union(n.ancestors()); });
-      cy.nodes().not(keepVisible).not(neighborAncestors).addClass('dimmed');
+      dimNodesExcept(keepVisible.union(neighborAncestors));
     }
   }
 }
+
+//keep에 없는 노드를 흐리게 한다.
+//compound 노드는 부모 불투명도가 자식에 곱해지므로, 부모가 이미 흐려진 노드는 다시 흐리지 않는다
+//(겹겹이 흐려져 박스가 아예 안 보이는 것을 막는다)
+function dimNodesExcept(keep) {
+  const toDim = cy.nodes().not(keep);
+  toDim.filter(n => {
+    const parent = n.parent();
+    return !(parent.nonempty() && toDim.contains(parent));
+  }).addClass('dimmed');
+}
+
+//엣지 타입 → 사용자에게 보여줄 한국어 이름
+const EDGE_TYPE_LABELS = {
+  'call': '함수 호출',
+  'variable-ref': '변수 참조',
+  'inheritance': '상속',
+  'script-ref': '스크립트 포함',
+  'style-ref': '스타일 포함',
+  'dom-access': 'DOM 접근',
+  'css-target': 'CSS 적용',
+  'event-binding': '이벤트 연결',
+  'js-import': 'JS 임포트',
+  'css-import': 'CSS 임포트',
+  'css-var': 'CSS 변수',
+};
 
 function clearHighlights() {
   if (!cy) return;

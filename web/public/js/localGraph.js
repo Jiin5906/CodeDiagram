@@ -1,5 +1,5 @@
 //로컬 그래프 뷰 (Phase 2)
-//선택한 파일 노드의 N-depth 이웃만 표시
+//선택한 파일 노드의 이웃만 표시하고 확대한다. 빈 곳 클릭 또는 Esc로 전체 보기로 돌아간다.
 
 let _localGraphActive = false;
 let _localGraphCenterId = null;
@@ -24,7 +24,6 @@ function enterLocalGraph(nodeId, depth) {
   };
 
   applyLocalGraphFilter(nodeId, depth);
-  showLocalGraphUI();
 }
 
 function exitLocalGraph() {
@@ -45,7 +44,6 @@ function exitLocalGraph() {
     _localGraphSavedViewport = null;
   }
 
-  hideLocalGraphUI();
   _localGraphCenterId = null;
 }
 
@@ -83,22 +81,6 @@ function applyLocalGraphFilter(nodeId, depth) {
   cy.animate({
     fit: { eles: visible.nodes(), padding: 60 },
   }, { duration: 300, easing: 'ease-out-cubic' });
-}
-
-function showLocalGraphUI() {
-  const controls = document.getElementById('local-graph-controls');
-  if (controls) {
-    controls.classList.remove('hidden');
-    const slider = document.getElementById('local-graph-depth');
-    if (slider) slider.value = _localGraphDepth;
-    const label = document.getElementById('local-graph-depth-label');
-    if (label) label.textContent = _localGraphDepth;
-  }
-}
-
-function hideLocalGraphUI() {
-  const controls = document.getElementById('local-graph-controls');
-  if (controls) controls.classList.add('hidden');
 }
 
 function isLocalGraphActive() {

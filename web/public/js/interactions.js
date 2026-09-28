@@ -28,9 +28,9 @@ function setupInteractions() {
   cy.on('tap', function (evt) {
     if (evt.target === cy) {
       clearTimeout(dimTimeout);
-      hideRefPopup();
-      hideExplanation();
       clearHighlights();
+      //빈 곳을 누르면 주변 파일만 보던 로컬 그래프에서 전체 보기로 돌아간다
+      if (typeof isLocalGraphActive === 'function' && isLocalGraphActive()) exitLocalGraph();
     }
   });
 
@@ -39,6 +39,13 @@ function setupInteractions() {
     domListenersBound = true;
     setupDomListeners();
   }
+
+  //계층형은 파일 뷰 전용 — 함수 뷰는 박스가 겹겹이라 계층형으로 펼치면 읽을 수 없다.
+  //켜 둔 상태는 기억했다가 파일 뷰로 돌아오면 다시 적용한다.
+  const hierarchyBox = document.getElementById('graph-settings');
+  if (hierarchyBox && graphData) hierarchyBox.classList.toggle('hidden', currentViewMode !== 'file');
+  if (hierarchicalLayout && currentViewMode === 'file') applyHierarchicalLayout();
+  syncViewButtons();
 }
 
 /* ══════════════════════════════════════════════════════════════════
@@ -99,6 +106,8 @@ function setupFileViewInteractions() {
   cy.on('tap', 'node[type="file-node"]', function (evt) {
     const node = evt.target;
     clearTimeout(dimTimeout);
+    //클릭 후 레이아웃이 움직이면 mouseout이 오지 않아 미리보기가 남으므로 여기서 닫는다
+    hideFunctionPreview();
 
     //로컬 그래프 진입
     if (typeof enterLocalGraph === 'function') {
@@ -124,6 +133,9 @@ function setupFileViewInteractions() {
 
     evt.stopPropagation();
   });
+
+  //화면 이동/확대로 노드가 커서 밑에서 벗어나면 미리보기를 닫는다
+  cy.on('viewport', hideFunctionPreview);
 
   //파일 노드 더블클릭 → 캔버스 카드 오버레이 (Phase 3)
   cy.on('dbltap', 'node[type="file-node"]', function (evt) {
@@ -173,7 +185,7 @@ function setupFileViewInteractions() {
       }
     }
 
-    showRefPopup(evt.renderedPosition, refs, edge.data('source'), edge.data('target'));
+    showRefsInViewer(refs, edge.data('source'), edge.data('target'));
     evt.stopPropagation();
   });
 }
@@ -188,16 +200,15 @@ function setupFunctionViewInteractions() {
     const edge = evt.target;
     const refs = edge.data('references');
     if (!refs || refs.length === 0) return;
-    showRefPopup(evt.renderedPosition, refs, edge.data('source'), edge.data('target'));
+    showRefsInViewer(refs, edge.data('source'), edge.data('target'));
     evt.stopPropagation();
   });
 
-  //함수 노드 클릭 → AI 설명 + 코드 뷰어 표시
+  //함수 노드 클릭 → 코드 뷰어에 코드 + AI 해설 표시
   cy.on('tap', 'node[type="function"]', function (evt) {
     const node = evt.target;
     highlightNode(node.id());
-    showExplanation(node.data());
-    if (node.data('code') && typeof showCodeViewer === 'function') showCodeViewer(node.data());
+    showFunctionDetail(node.data());
     evt.stopPropagation();
   });
 
@@ -207,8 +218,7 @@ function setupFunctionViewInteractions() {
     highlightNode(node.id());
     const funcTypes = ['js-function', 'ts-function', 'cpp-function', 'csharp-function'];
     if (funcTypes.includes(node.data('type')) && node.data('code')) {
-      showExplanation(node.data());
-      if (typeof showCodeViewer === 'function') showCodeViewer(node.data());
+      showFunctionDetail(node.data());
     } else if (node.data('code') && typeof showCodeViewer === 'function') {
       showCodeViewer(node.data());
     }
@@ -234,7 +244,6 @@ function setupFunctionViewInteractions() {
   });
 
   setupEdgeToggle();
-  setupLayoutSelect();
   setupLongPress();
 }
 
@@ -244,8 +253,6 @@ function setupFunctionViewInteractions() {
 
 //리본 버튼 라벨/설명 갱신. textContent를 통째로 바꾸면 아이콘이 사라지므로 라벨 span만 바꾼다.
 const RIBBON_TIPS = {
-  fileView: '지금은 파일 단위로 보고 있습니다. 누르면 함수 단위로 바뀝니다',
-  functionView: '지금은 함수 단위로 보고 있습니다. 누르면 파일 단위로 돌아갑니다',
   edgesHidden: '함수끼리 호출하는 선을 보여줍니다',
   edgesShown: '함수끼리 호출하는 선을 감춥니다',
   collapse: '모든 파일 그룹을 접습니다',
@@ -261,75 +268,68 @@ function setRibbonLabel(id, label, tip) {
   if (tip) btn.dataset.tip = tip;
 }
 
+//보기 단위 선택 버튼의 선택 표시를 현재 뷰에 맞춘다 (파일 상세 뷰는 파일 쪽으로 표시)
+function syncViewButtons() {
+  const isFunction = currentViewMode === 'function';
+  const fileBtn = document.getElementById('view-file-btn');
+  const funcBtn = document.getElementById('view-function-btn');
+  if (fileBtn) {
+    fileBtn.classList.toggle('active', !isFunction);
+    fileBtn.setAttribute('aria-pressed', String(!isFunction));
+  }
+  if (funcBtn) {
+    funcBtn.classList.toggle('active', isFunction);
+    funcBtn.setAttribute('aria-pressed', String(isFunction));
+  }
+}
+
+//파일 뷰 ↔ 함수 뷰 전환 + 뷰 전용 버튼/범례 표시
+function setViewMode(mode) {
+  if (!graphData) return;
+  if (typeof isLocalGraphActive === 'function' && isLocalGraphActive()) exitLocalGraph();
+
+  const isFunction = mode === 'function';
+  if (isFunction) {
+    renderFunctionView(graphData);
+  } else {
+    renderGraph(graphData);
+  }
+  setupInteractions();
+
+  const edgesBtn = document.getElementById('toggle-edges-btn');
+  const collapseBtn = document.getElementById('collapse-all-btn');
+  const legendFileView = document.getElementById('legend-file-view');
+  const legendFuncView = document.getElementById('legend-function-view');
+  if (edgesBtn) edgesBtn.classList.toggle('hidden', !isFunction);
+  if (collapseBtn) collapseBtn.classList.toggle('hidden', !isFunction);
+  if (legendFileView) legendFileView.classList.toggle('hidden', isFunction);
+  if (legendFuncView) legendFuncView.classList.toggle('hidden', !isFunction);
+  document.getElementById('back-to-package-btn').classList.add('hidden');
+  syncViewButtons();
+}
+
 function setupDomListeners() {
   //뒤로가기 버튼 핸들러
   document.getElementById('back-to-package-btn').addEventListener('click', () => {
     if (!graphData) return;
     if (currentViewMode === 'file-detail') {
       //파일 뷰로 복귀
-      renderGraph(graphData);
-      setupInteractions();
-      document.getElementById('back-to-package-btn').classList.add('hidden');
-      setRibbonLabel('view-toggle-btn', '파일 뷰', RIBBON_TIPS.fileView);
-      document.getElementById('view-toggle-btn').classList.remove('active');
+      setViewMode('file');
     }
   });
 
-  //닫기 버튼
-  document.getElementById('ref-popup-close').addEventListener('click', hideRefPopup);
-  document.getElementById('explain-close').addEventListener('click', () => {
-    hideExplanation();
-    clearHighlights();
-  });
-
-  //코드 보기/숨기기 토글
-  document.getElementById('toggle-code-btn').addEventListener('click', () => {
-    const codeEl = document.getElementById('explain-code');
-    codeEl.classList.toggle('visible');
-    document.getElementById('toggle-code-btn').textContent =
-      codeEl.classList.contains('visible') ? '코드 숨기기' : '전체 코드 보기';
-  });
 
   //진단 패널 닫기
   document.getElementById('diagnostics-close').addEventListener('click', () => {
     document.getElementById('diagnostics-panel').classList.add('hidden');
   });
 
-  //뷰 모드 토글 버튼 (파일 뷰 ↔ 함수 뷰)
-  document.getElementById('view-toggle-btn').addEventListener('click', () => {
-    if (!graphData) return;
-
-    const viewBtn = document.getElementById('view-toggle-btn');
-    const edgesBtn = document.getElementById('toggle-edges-btn');
-    const collapseBtn = document.getElementById('collapse-all-btn');
-    const legendFileView = document.getElementById('legend-file-view');
-    const legendFuncView = document.getElementById('legend-function-view');
-
-    function switchToFileView() {
-      renderGraph(graphData);
-      setupInteractions();
-      viewBtn.classList.remove('active');
-      setRibbonLabel('view-toggle-btn', '파일 뷰', RIBBON_TIPS.fileView);
-      if (edgesBtn) edgesBtn.classList.add('hidden');
-      if (collapseBtn) collapseBtn.classList.add('hidden');
-      if (legendFileView) legendFileView.classList.remove('hidden');
-      if (legendFuncView) legendFuncView.classList.add('hidden');
-      document.getElementById('back-to-package-btn').classList.add('hidden');
-    }
-
-    if (currentViewMode === 'file') {
-      //함수 뷰로 전환
-      renderFunctionView(graphData);
-      setupInteractions();
-      viewBtn.classList.add('active');
-      setRibbonLabel('view-toggle-btn', '함수 뷰', RIBBON_TIPS.functionView);
-      if (edgesBtn) edgesBtn.classList.remove('hidden');
-      if (collapseBtn) collapseBtn.classList.remove('hidden');
-      if (legendFileView) legendFileView.classList.add('hidden');
-      if (legendFuncView) legendFuncView.classList.remove('hidden');
-    } else {
-      switchToFileView();
-    }
+  //보기 단위 선택 (파일 | 함수)
+  document.getElementById('view-file-btn').addEventListener('click', () => {
+    if (currentViewMode !== 'file') setViewMode('file');
+  });
+  document.getElementById('view-function-btn').addEventListener('click', () => {
+    if (currentViewMode !== 'function') setViewMode('function');
   });
 
   //전체 접기/펼치기 버튼
@@ -347,28 +347,12 @@ function setupDomListeners() {
     }
   });
 
-  //로컬 그래프 컨트롤 (그래프 설정 패널 내 Depth 슬라이더)
-  const localGraphDepthSlider = document.getElementById('local-graph-depth');
-  if (localGraphDepthSlider) {
-    localGraphDepthSlider.addEventListener('input', (e) => {
-      const depth = parseInt(e.target.value, 10);
-      const label = document.getElementById('local-graph-depth-label');
-      if (label) label.textContent = depth;
-      const display = document.getElementById('local-graph-depth-display');
-      if (display) display.textContent = depth;
-      if (typeof setLocalGraphDepth === 'function') setLocalGraphDepth(depth);
-    });
-  }
-  const localGraphExitBtn = document.getElementById('local-graph-exit');
-  if (localGraphExitBtn) {
-    localGraphExitBtn.addEventListener('click', () => {
-      if (typeof exitLocalGraph === 'function') exitLocalGraph();
-    });
-  }
+  setupHierarchyToggle();
 
   //검색과 키보드 단축키는 DOM 리스너이므로 한 번만 등록
   setupSearch();
   setupKeyboardShortcuts();
+  setupShortcutsHelp();
 }
 
 /* ── 접기/펼치기 (드릴다운) ── */
@@ -483,7 +467,7 @@ function _openDiagLocation(nodeId, message, itemEl) {
   const wasClosed = panel && panel.classList.contains('collapsed');
   const loc = _diagLocation(nodeId, message);
   if (loc.filePath && typeof showCodeAtLocation === 'function') {
-    showCodeAtLocation(loc.filePath, loc.startLine, loc.endLine, loc.name, loc.fnData);
+    showCodeAtLocation(loc.filePath, loc.startLine, loc.endLine, loc.name);
   }
   //코드 뷰어가 새로 열리면 그래프가 다시 맞춰지므로(0.31초 뒤) 그 다음에 대상 노드로 이동한다
   if (wasClosed) {
@@ -729,94 +713,115 @@ function showDiagnosticsPanel(diagnostics, suggestions) {
 
 /* ── 참조 팝업 ── */
 
-function showRefPopup(position, references, sourceId, targetId) {
-  const popup = document.getElementById('ref-popup');
-  const content = document.getElementById('ref-popup-content');
+//엣지 클릭 → 참조 위치 목록을 코드 뷰어 위쪽에 띄운다 (별도 팝업 대신 코드 창 하나로 통합)
+//항목을 누르면 그 줄로 이동해 강조한다. 처음에는 첫 번째 참조 위치를 바로 보여준다.
+function showRefsInViewer(references, sourceId, targetId) {
+  const listEl = document.getElementById('code-viewer-fnlist');
+  if (!listEl || !references.length) return;
 
-  const sourceName = sourceId.split('::').pop().replace('file__', '');
-  const targetName = targetId.split('::').pop().replace('file__', '');
-  document.getElementById('ref-popup-title').textContent = `${sourceName} → ${targetName}`;
+  const shortName = (id) => String(id).split('::').pop().replace('file__', '');
 
-  content.textContent = '';
-  references.forEach(ref => {
+  listEl.textContent = '';
+  listEl.classList.remove('hidden');
+
+  const head = document.createElement('div');
+  head.className = 'fn-list-head';
+  const title = document.createElement('span');
+  title.className = 'ref-list-title';
+  title.textContent = shortName(sourceId) + ' → ' + shortName(targetId);
+  title.title = sourceId + ' → ' + targetId;
+  const count = document.createElement('span');
+  count.className = 'fn-list-hint';
+  count.textContent = '참조 ' + references.length + '곳';
+  head.appendChild(title);
+  head.appendChild(count);
+  listEl.appendChild(head);
+
+  const list = document.createElement('div');
+  list.className = 'fn-list';
+
+  const openRef = (ref, item) => {
+    list.querySelectorAll('.fn-list-item.active').forEach(el => el.classList.remove('active'));
+    item.classList.add('active');
+    if (ref.file && typeof showCodeAtLocation === 'function') {
+      showCodeAtLocation(ref.file, ref.line || 0, ref.line || 0, ref.caller, { keepList: true });
+    }
+    //함수 뷰: 호출한 함수 노드를 강조하고 화면 가운데로
+    if (!cy || currentViewMode === 'file') return;
+    const callerNode = cy.nodes().filter(n => n.data('qualifiedName') === ref.caller || n.data('label') === ref.caller);
+    if (callerNode.length > 0) {
+      highlightNode(callerNode[0].id());
+      cy.animate({ center: { eles: callerNode[0] } }, { duration: 400, easing: 'ease-out-cubic' });
+    }
+  };
+
+  references.forEach((ref, i) => {
     const item = document.createElement('div');
-    item.className = 'ref-item';
+    item.className = 'fn-list-item';
 
-    const fileSpan = document.createElement('span');
-    fileSpan.className = 'ref-file';
-    fileSpan.textContent = ref.file;
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'fn-list-name';
+    const fileName = String(ref.file || '').split('/').pop();
+    nameSpan.textContent = fileName + (ref.line ? ':' + ref.line : '');
+    nameSpan.title = (ref.file || '') + (ref.line ? ':' + ref.line : '');
+    item.appendChild(nameSpan);
 
-    const lineText = document.createTextNode(`:${ref.line} `);
+    if (ref.caller) {
+      const caller = document.createElement('span');
+      caller.className = 'ref-list-caller';
+      caller.textContent = ref.caller + ' 안에서';
+      item.appendChild(caller);
+    }
 
-    const callerSpan = document.createElement('span');
-    callerSpan.className = 'ref-caller';
-    callerSpan.textContent = `(in ${ref.caller})`;
-
-    item.appendChild(fileSpan);
-    item.appendChild(lineText);
-    item.appendChild(callerSpan);
-
-    item.addEventListener('click', () => {
-      if (!cy) return;
-      const callerName = ref.caller;
-      const callerNode = cy.nodes().filter(n => {
-        return n.data('qualifiedName') === callerName || n.data('label') === callerName;
-      });
-      if (callerNode.length > 0) {
-        const target = callerNode[0];
-        highlightNode(target.id());
-        cy.animate({
-          center: { eles: target },
-          zoom: 2,
-        }, { duration: 400, easing: 'ease-out-cubic' });
-        hideRefPopup();
-      }
-    });
-
-    content.appendChild(item);
+    item.addEventListener('click', () => openRef(ref, item));
+    list.appendChild(item);
+    if (i === 0) setTimeout(() => openRef(ref, item), 0);
   });
 
-  popup.style.left = `${Math.min(position.x + 10, window.innerWidth - 440)}px`;
-  popup.style.top = `${Math.min(position.y + 10, window.innerHeight - 320)}px`;
-  popup.classList.remove('hidden');
+  listEl.appendChild(list);
 }
 
-function hideRefPopup() {
-  document.getElementById('ref-popup').classList.add('hidden');
+/* ── AI 해설 (코드 뷰어 안에 표시) ── */
+
+//API 키가 없다는 응답을 한 번 받으면 이후에는 요청하지 않는다
+let explainUnavailableMsg = null;
+//빠르게 여러 함수를 클릭했을 때 늦게 온 이전 응답이 덮어쓰지 않도록 요청 순번을 둔다
+let explainSeq = 0;
+
+//함수 코드와 AI 해설을 코드 뷰어 한 곳에 띄운다
+function showFunctionDetail(funcData) {
+  if (!funcData || !funcData.code) return;
+  if (typeof showCodeViewer === 'function') showCodeViewer(funcData);
+  showExplanation(funcData);
 }
 
-/* ── AI 설명 오버레이 ── */
+function _explainNote(body, text) {
+  body.textContent = '';
+  const note = document.createElement('div');
+  note.className = 'cv-explain-note';
+  note.textContent = text;
+  body.appendChild(note);
+}
 
 async function showExplanation(funcData) {
-  const overlay = document.getElementById('explain-overlay');
-  const title = document.getElementById('explain-title');
-  const content = document.getElementById('explain-content');
-  const codeSection = document.getElementById('explain-code-section');
-  const codeEl = document.getElementById('explain-code');
-  const toggleBtn = document.getElementById('toggle-code-btn');
+  if (typeof showViewerExplain !== 'function') return;
+  const body = showViewerExplain();
+  if (!body) return;
 
+  const seq = ++explainSeq;
   const nodeId = `${funcData.filePath}::${funcData.qualifiedName}`;
 
-  title.textContent = funcData.qualifiedName;
-
-  codeEl.textContent = funcData.code || '';
-  codeEl.classList.remove('visible');
-  toggleBtn.textContent = '전체 코드 보기';
-  codeSection.classList.remove('hidden');
-
-  overlay.classList.remove('hidden');
-
   if (explainCache[nodeId]) {
-    content.textContent = '';
-    content.appendChild(explainCache[nodeId].cloneNode(true));
+    body.appendChild(explainCache[nodeId].cloneNode(true));
+    return;
+  }
+  //API 키가 없다는 안내는 처음 한 번만 보여주고, 이후에는 해설 칸을 숨겨 코드 공간을 넓게 쓴다
+  if (explainUnavailableMsg) {
+    if (typeof hideViewerExplain === 'function') hideViewerExplain();
     return;
   }
 
-  content.textContent = '';
-  const loadingDiv = document.createElement('div');
-  loadingDiv.className = 'loading';
-  loadingDiv.textContent = 'AI 설명을 생성하고 있습니다...';
-  content.appendChild(loadingDiv);
+  _explainNote(body, 'AI 해설을 생성하고 있습니다...');
 
   try {
     const response = await fetch('/api/explain', {
@@ -830,28 +835,29 @@ async function showExplanation(funcData) {
         filePath: funcData.filePath,
       }),
     });
+    if (seq !== explainSeq) return;
 
     if (!response.ok) {
-      const err = await response.json();
-      content.textContent = '';
-      const errDiv = document.createElement('div');
-      errDiv.className = 'loading';
-      errDiv.textContent = `설명을 가져올 수 없습니다: ${err.error || '서버 오류'}`;
-      content.appendChild(errDiv);
+      const err = await response.json().catch(() => ({}));
+      if (seq !== explainSeq) return;
+      if (response.status === 503) {
+        explainUnavailableMsg = 'API 키가 설정되지 않아 AI 해설을 쓸 수 없습니다. (web/.env의 ANTHROPIC_API_KEY)';
+        _explainNote(body, explainUnavailableMsg);
+      } else {
+        _explainNote(body, `해설을 가져올 수 없습니다: ${err.error || '서버 오류'}`);
+      }
       return;
     }
 
     const data = await response.json();
+    if (seq !== explainSeq) return;
     const fragment = formatExplanation(data.explanation);
     explainCache[nodeId] = fragment;
-    content.textContent = '';
-    content.appendChild(fragment.cloneNode(true));
+    body.textContent = '';
+    body.appendChild(fragment.cloneNode(true));
   } catch (err) {
-    content.textContent = '';
-    const errDiv = document.createElement('div');
-    errDiv.className = 'loading';
-    errDiv.textContent = `네트워크 오류: ${err.message}`;
-    content.appendChild(errDiv);
+    if (seq !== explainSeq) return;
+    _explainNote(body, `네트워크 오류: ${err.message}`);
   }
 }
 
@@ -868,10 +874,6 @@ function formatExplanation(text) {
     fragment.appendChild(p);
   });
   return fragment;
-}
-
-function hideExplanation() {
-  document.getElementById('explain-overlay').classList.add('hidden');
 }
 
 /* ── 검색/필터 기능 ── */
@@ -908,7 +910,7 @@ function setupSearch() {
 
     cy.nodes().removeClass('highlighted dimmed');
     matched.addClass('highlighted');
-    cy.nodes().not(keepVisible).addClass('dimmed');
+    dimNodesExcept(keepVisible);
   });
 
   input.addEventListener('keydown', (e) => {
@@ -957,6 +959,12 @@ function setupKeyboardShortcuts() {
     const isInput = activeTag === 'INPUT' || activeTag === 'TEXTAREA';
 
     if (e.key === 'Escape') {
+      //단축키 도움말이 열려 있으면 그것만 닫는다
+      if (isShortcutsHelpOpen()) {
+        toggleShortcutsHelp(false);
+        return;
+      }
+
       //캔버스 카드가 열려있으면 최상위 카드 닫기
       if (typeof hasOpenCards === 'function' && hasOpenCards()) {
         closeTopCard();
@@ -969,8 +977,6 @@ function setupKeyboardShortcuts() {
         return;
       }
 
-      hideRefPopup();
-      hideExplanation();
       clearHighlights();
       hideFunctionPreview();
       hideEdgePreview();
@@ -1002,6 +1008,12 @@ function setupKeyboardShortcuts() {
       return;
     }
 
+    if (e.key === '?') {
+      e.preventDefault();
+      toggleShortcutsHelp();
+      return;
+    }
+
     if (e.key === 'f' || e.key === 'F') {
       if (cy) {
         cy.animate({ fit: { padding: 30 } }, { duration: 300, easing: 'ease-out-cubic' });
@@ -1009,6 +1021,35 @@ function setupKeyboardShortcuts() {
       return;
     }
   });
+}
+
+/* ── 단축키 도움말 ── */
+
+function isShortcutsHelpOpen() {
+  const el = document.getElementById('shortcuts-overlay');
+  return !!el && !el.classList.contains('hidden');
+}
+
+//force를 주지 않으면 열림/닫힘을 뒤집는다
+function toggleShortcutsHelp(force) {
+  const el = document.getElementById('shortcuts-overlay');
+  if (!el) return;
+  const open = force === undefined ? el.classList.contains('hidden') : force;
+  el.classList.toggle('hidden', !open);
+  if (open) {
+    const closeBtn = document.getElementById('shortcuts-close');
+    if (closeBtn) closeBtn.focus();
+  }
+}
+
+function setupShortcutsHelp() {
+  const el = document.getElementById('shortcuts-overlay');
+  const closeBtn = document.getElementById('shortcuts-close');
+  const legendBtn = document.getElementById('legend-shortcuts');
+  if (closeBtn) closeBtn.addEventListener('click', () => toggleShortcutsHelp(false));
+  if (legendBtn) legendBtn.addEventListener('click', () => toggleShortcutsHelp(true));
+  //바깥 어두운 영역을 누르면 닫는다
+  if (el) el.addEventListener('click', (e) => { if (e.target === el) toggleShortcutsHelp(false); });
 }
 
 /* ── 롱 프레스 (모바일 우클릭 대체) ── */
@@ -1028,10 +1069,7 @@ function setupLongPress() {
 
       if (funcTypes.includes(nodeType)) {
         highlightNode(node.id());
-        if (node.data('code')) {
-          showExplanation(node.data());
-          if (typeof showCodeViewer === 'function') showCodeViewer(node.data());
-        }
+        if (node.data('code')) showFunctionDetail(node.data());
       } else if (nodeType === 'file' || nodeType === 'file-node') {
         const filePath = node.data('fullPath');
         if (filePath && graphData && typeof renderFileDetailView === 'function') {
@@ -1052,30 +1090,68 @@ function setupLongPress() {
   });
 }
 
-/* ── 레이아웃 선택 ── */
+/* ── 계층형 배치 토글 ── */
 
-function setupLayoutSelect() {
-  const select = document.getElementById('layout-select');
-  if (!select) return;
+//true면 계층형(dagre) 배치
+let hierarchicalLayout = false;
 
-  select.addEventListener('change', () => {
-    if (!cy || !graphData) return;
-    const layout = select.value;
+//같은 층에 노드가 많으면 위→아래(TB) 배치가 옆으로 아주 넓어진다.
+//TB와 왼→오(LR)를 모두 계산해 화면에 더 크게 들어오는(맞춤 배율이 큰) 쪽을 쓴다.
+const HIERARCHY_COMPARE_LIMIT = 1500; // 이보다 크면 두 번 계산하지 않고 모양으로만 판단
 
-    if (layout === 'dagre') {
-      if (typeof stopForceSim === 'function') stopForceSim();
-      cy.layout({
-        name: 'dagre', animate: false, fit: true, padding: 40,
-        nodeDimensionsIncludeLabels: true, rankDir: 'TB',
-        rankSep: 80, nodeSep: 40, edgeSep: 20,
-      }).run();
+function _runDagre(eles, rankDir) {
+  eles.layout({
+    name: 'dagre', animate: false, fit: false, padding: 40,
+    nodeDimensionsIncludeLabels: true, rankDir,
+    rankSep: 80, nodeSep: 40, edgeSep: 20,
+  }).run();
+  const bb = eles.boundingBox({ includeLabels: true });
+  return Math.min(cy.width() / Math.max(1, bb.w), cy.height() / Math.max(1, bb.h));
+}
+
+function applyHierarchicalLayout() {
+  if (!cy || currentViewMode !== 'file') return;
+  //파일 뷰의 실시간 물리 배치가 계층형 위치를 다시 흩뜨리지 않도록 멈춘다
+  if (typeof stopForceSim === 'function') stopForceSim();
+  //접힌 노드 등 화면에 없는 요소는 빼고 배치한다
+  const eles = cy.elements(':visible');
+  if (eles.empty()) return;
+
+  const tbFit = _runDagre(eles, 'TB');
+  if (eles.nodes().length <= HIERARCHY_COMPARE_LIMIT) {
+    const lrFit = _runDagre(eles, 'LR');
+    //LR이 확실히 나을 때만 바꾼다 (비슷하면 익숙한 위→아래 유지)
+    if (lrFit <= tbFit * 1.15) _runDagre(eles, 'TB');
+  } else {
+    //노드가 아주 많으면 TB 결과가 화면보다 3배 이상 가로로 길 때만 LR로 다시 배치
+    const bb = eles.boundingBox();
+    if (bb.w / Math.max(1, bb.h) > (cy.width() / Math.max(1, cy.height())) * 3) _runDagre(eles, 'LR');
+  }
+  cy.fit(eles, 40);
+}
+
+//끄면 파일 뷰를 원래 방식(물리 배치)으로 다시 그린다
+function restoreDefaultLayout() {
+  if (!cy || !graphData) return;
+  renderGraph(graphData);
+  setupInteractions();
+}
+
+function setupHierarchyToggle() {
+  const btn = document.getElementById('hierarchy-toggle');
+  if (!btn) return;
+  btn.addEventListener('click', () => {
+    if (!cy || !graphData || currentViewMode !== 'file') return;
+    //로컬 그래프(일부만 표시) 상태에서 배치를 바꾸면 숨겨진 노드와 겹치므로 먼저 전체 보기로 돌아간다
+    if (typeof isLocalGraphActive === 'function' && isLocalGraphActive()) exitLocalGraph();
+    hierarchicalLayout = !hierarchicalLayout;
+    btn.classList.toggle('active', hierarchicalLayout);
+    btn.setAttribute('aria-pressed', String(hierarchicalLayout));
+    btn.title = hierarchicalLayout ? '원래 배치로 되돌립니다' : '호출 순서대로 층을 나눠 배치합니다 (화면에 맞게 위→아래 또는 왼→오른쪽)';
+    if (hierarchicalLayout) {
+      applyHierarchicalLayout();
     } else {
-      if (currentViewMode === 'function') {
-        renderFunctionView(graphData);
-      } else {
-        renderGraph(graphData);
-      }
-      setupInteractions();
+      restoreDefaultLayout();
     }
   });
 }
@@ -1102,8 +1178,16 @@ function showFunctionPreview(node, top3, position) {
   headerDiv.textContent = fileName + ' ';
   const countSpan = document.createElement('span');
   countSpan.className = 'fn-preview-count';
-  countSpan.textContent = funcCount + ' functions';
+  countSpan.textContent = '함수 ' + funcCount + '개';
   headerDiv.appendChild(countSpan);
+  //복잡도 글로우가 있는 파일이면 이유를 함께 알려준다
+  const complexity = node.data('complexityLevel');
+  if (complexity) {
+    const badge = document.createElement('span');
+    badge.className = 'fn-preview-complex level-' + complexity;
+    badge.textContent = ['', '복잡도 주의', '복잡도 높음', '복잡도 매우 높음'][complexity];
+    headerDiv.appendChild(badge);
+  }
   tooltip.appendChild(headerDiv);
 
   //함수 목록
@@ -1124,7 +1208,7 @@ function showFunctionPreview(node, top3, position) {
   if (funcCount > 3) {
     const more = document.createElement('div');
     more.className = 'fn-preview-more';
-    more.textContent = '+' + (funcCount - 3) + ' more...';
+    more.textContent = '외 ' + (funcCount - 3) + '개';
     listDiv.appendChild(more);
   }
   tooltip.appendChild(listDiv);
@@ -1156,9 +1240,9 @@ function showFunctionList(node) {
 
   header.textContent = fileName;
   header.title = filePath || fileName;
+  if (typeof hideViewerExplain === 'function') hideViewerExplain();
   fnListEl.textContent = '';
   fnListEl.classList.remove('hidden');
-  if (typeof setCodeViewerFile === 'function') setCodeViewerFile(filePath);
 
   //목록 머리: 개수 + 숫자↑ 설명 (범례와 같은 내용)
   const head = document.createElement('div');
@@ -1256,7 +1340,7 @@ function showEdgePreview(edge, position) {
   //참조 수
   const countDiv = document.createElement('div');
   countDiv.className = 'edge-preview-count';
-  countDiv.textContent = refCount + ' references';
+  countDiv.textContent = '참조 ' + refCount + '곳';
   tooltip.appendChild(countDiv);
 
   //타입별 카운트
@@ -1269,7 +1353,7 @@ function showEdgePreview(edge, position) {
       const typeSpan = document.createElement('span');
       typeSpan.className = 'edge-preview-type';
       typeSpan.style.borderLeft = '3px solid ' + color;
-      typeSpan.textContent = type + ': ' + count;
+      typeSpan.textContent = (EDGE_TYPE_LABELS[type] || type) + ' ' + count;
       typesDiv.appendChild(typeSpan);
     }
     tooltip.appendChild(typesDiv);
@@ -1291,7 +1375,7 @@ function showEdgePreview(edge, position) {
     if (functionEdges.length > 5) {
       const more = document.createElement('div');
       more.className = 'edge-preview-more';
-      more.textContent = '+' + (functionEdges.length - 5) + ' more...';
+      more.textContent = '외 ' + (functionEdges.length - 5) + '개';
       funcsDiv.appendChild(more);
     }
     tooltip.appendChild(funcsDiv);
