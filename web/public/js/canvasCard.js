@@ -156,14 +156,12 @@ function focusCard(fileId) {
 /* ── 최상위 카드 닫기 (Escape용) ── */
 function closeTopCard() {
   if (_openCards.size === 0) return false;
-  let topCard = null;
   let topZ = -1;
   let topFileId = null;
   for (const [fid, card] of _openCards) {
     const z = parseInt(card.style.zIndex, 10) || 0;
     if (z > topZ) {
       topZ = z;
-      topCard = card;
       topFileId = fid;
     }
   }

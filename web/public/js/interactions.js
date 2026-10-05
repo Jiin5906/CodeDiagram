@@ -165,7 +165,6 @@ function setupFileViewInteractions() {
   cy.on('tap', 'edge[type="aggregated"]', function (evt) {
     const edge = evt.target;
     const functionEdges = edge.data('functionEdges') || [];
-    const typeBreakdown = edge.data('typeBreakdown') || {};
 
     if (functionEdges.length === 0) return;
 

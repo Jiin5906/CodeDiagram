@@ -172,7 +172,7 @@ function resolveVariableRefs(allVariables, allVariableRefs, allImports) {
     const varName = ref.variable;
 
     //self.x 참조 → className.x로 변환하여 찾기
-    let target = null;
+    let target;
 
     //1. 같은 파일에서 찾기
     const fileVars = varByFile.get(ref.filePath) || [];

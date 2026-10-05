@@ -5,7 +5,8 @@ const JavaScript = require('tree-sitter-javascript');
 
 function createParser() {
   const p = new Parser();
-  p.setLanguage(JavaScript);
+  //문법 패키지의 타입 정의가 tree-sitter 0.22 타입과 맞지 않아 캐스팅한다 (런타임 동작은 같다)
+  p.setLanguage(/** @type {any} */ (JavaScript));
   return p;
 }
 
@@ -512,6 +513,7 @@ function getHandlerArg(argsNode) {
 function findEnclosingFunction(node, functions, filePath) {
   //노드의 줄 번호로 가장 가까운 함수 찾기
   const line = node.startPosition.row + 1;
+  /** @type {{ startLine: number, endLine: number, qualifiedName: string } | null} */
   let best = null;
   for (const func of functions) {
     if (func.filePath === filePath && func.startLine <= line && func.endLine >= line) {

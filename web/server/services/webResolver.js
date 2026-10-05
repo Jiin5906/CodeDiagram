@@ -4,7 +4,7 @@
 const path = require('path');
 
 //웹 파일들의 크로스 언어 관계를 모두 해석하여 엣지 배열로 반환한다.
-function resolveWebRelations(parsedFiles, projectPath) {
+function resolveWebRelations(parsedFiles, _projectPath) {
   const edges = [];
 
   //파일별 파싱 결과를 언어별로 분류
@@ -407,7 +407,7 @@ function deduplicateEdges(edges) {
 }
 
 //JS 함수 호출 관계를 해석한다 (Python resolver와 유사한 로직).
-function resolveJsCalls(allFunctions, allCalls, allImports) {
+function resolveJsCalls(allFunctions, allCalls, _allImports) {
   const funcByName = new Map();
   const funcByFile = new Map();
 

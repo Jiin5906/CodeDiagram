@@ -117,7 +117,7 @@ function detectCouplingIssues(edges) {
 /* ── 안티패턴 탐지 ── */
 
 //God Function(50줄 이상)과 God Class(메서드 10개 이상)를 탐지한다.
-function detectAntiPatterns(functions, classes) {
+function detectAntiPatterns(functions, _classes) {
   const issues = [];
 
   //God Function 탐지
@@ -160,8 +160,7 @@ function detectAntiPatterns(functions, classes) {
 /* ── 웹 전용 안티패턴 탐지 ── */
 
 //웹 파일에서 안티패턴을 탐지한다.
-const INLINE_STYLE_THRESHOLD = 10;
-const LARGE_JS_LINES = 300;
+//TODO: 인라인 스타일 과다(요소 10개 이상)·대형 JS 파일(300줄 이상) 탐지는 아직 구현되지 않았다
 const EVENT_LISTENER_THRESHOLD = 10;
 
 function detectWebAntiPatterns(webParsedFiles) {
@@ -184,7 +183,6 @@ function detectWebAntiPatterns(webParsedFiles) {
   for (const pf of webParsedFiles) {
     if (pf.language === 'html') {
       //인라인 스타일 과다 탐지
-      let inlineStyleCount = 0;
       for (const elem of (pf.parsed.elements || [])) {
         if (elem.id) htmlIds.add(elem.id);
         for (const cls of elem.classes) htmlClasses.add(cls);
