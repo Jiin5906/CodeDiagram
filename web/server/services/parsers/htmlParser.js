@@ -42,12 +42,31 @@ function parseHtml(code, filePath) {
 //HTML 요소들을 재귀적으로 순회하며 정보를 수집한다.
 const ELEMENT_TYPES = new Set(['element', 'self_closing_tag', 'script_element', 'style_element']);
 
-function collectElements(node, filePath, elements, imports, eventBindings, inlineScripts, inlineStyles) {
+function collectElements(
+  node,
+  filePath,
+  elements,
+  imports,
+  eventBindings,
+  inlineScripts,
+  inlineStyles,
+) {
   if (ELEMENT_TYPES.has(node.type)) {
-    const startTag = node.type === 'self_closing_tag' ? node : node.childForFieldName('start_tag') || findChildByType(node, 'start_tag');
+    const startTag =
+      node.type === 'self_closing_tag'
+        ? node
+        : node.childForFieldName('start_tag') || findChildByType(node, 'start_tag');
     if (!startTag) {
       for (let i = 0; i < node.childCount; i++) {
-        collectElements(node.child(i), filePath, elements, imports, eventBindings, inlineScripts, inlineStyles);
+        collectElements(
+          node.child(i),
+          filePath,
+          elements,
+          imports,
+          eventBindings,
+          inlineScripts,
+          inlineStyles,
+        );
       }
       return;
     }
@@ -82,14 +101,30 @@ function collectElements(node, filePath, elements, imports, eventBindings, inlin
       imports.push({ type: 'style-ref', href: attrs.href, filePath, line });
     } else if (tagName === 'link' && attrs.href) {
       imports.push({ type: 'link-ref', href: attrs.href, filePath, line });
-    } else if ((tagName === 'img' || tagName === 'source' || tagName === 'video' || tagName === 'audio') && attrs.src) {
+    } else if (
+      (tagName === 'img' || tagName === 'source' || tagName === 'video' || tagName === 'audio') &&
+      attrs.src
+    ) {
       imports.push({ type: 'resource-ref', href: attrs.src, filePath, line });
     }
 
     //인라인 이벤트 핸들러 수집
-    const eventAttrs = ['onclick', 'onload', 'onsubmit', 'onchange', 'oninput',
-      'onkeydown', 'onkeyup', 'onkeypress', 'onmouseover', 'onmouseout',
-      'onfocus', 'onblur', 'onscroll', 'onresize'];
+    const eventAttrs = [
+      'onclick',
+      'onload',
+      'onsubmit',
+      'onchange',
+      'oninput',
+      'onkeydown',
+      'onkeyup',
+      'onkeypress',
+      'onmouseover',
+      'onmouseout',
+      'onfocus',
+      'onblur',
+      'onscroll',
+      'onresize',
+    ];
     for (const evtAttr of eventAttrs) {
       if (attrs[evtAttr]) {
         eventBindings.push({
@@ -123,7 +158,15 @@ function collectElements(node, filePath, elements, imports, eventBindings, inlin
   }
 
   for (let i = 0; i < node.childCount; i++) {
-    collectElements(node.child(i), filePath, elements, imports, eventBindings, inlineScripts, inlineStyles);
+    collectElements(
+      node.child(i),
+      filePath,
+      elements,
+      imports,
+      eventBindings,
+      inlineScripts,
+      inlineStyles,
+    );
   }
 }
 
@@ -147,8 +190,12 @@ function getAttributes(startTag) {
   for (let i = 0; i < startTag.childCount; i++) {
     const child = startTag.child(i);
     if (child.type === 'attribute') {
-      const nameNode = child.childForFieldName('attribute_name') || findChildByType(child, 'attribute_name');
-      const valueNode = child.childForFieldName('attribute_value') || findChildByType(child, 'attribute_value') || findChildByType(child, 'quoted_attribute_value');
+      const nameNode =
+        child.childForFieldName('attribute_name') || findChildByType(child, 'attribute_name');
+      const valueNode =
+        child.childForFieldName('attribute_value') ||
+        findChildByType(child, 'attribute_value') ||
+        findChildByType(child, 'quoted_attribute_value');
       if (nameNode) {
         let val = '';
         if (valueNode) {

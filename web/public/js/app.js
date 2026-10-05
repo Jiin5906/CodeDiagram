@@ -54,12 +54,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
       lastAnalysisData = data;
 
-      const funcCount = data.nodes.filter(n => n.data.type === 'function').length;
-      const jsFuncCount = data.nodes.filter(n => n.data.type === 'js-function').length;
-      const tsFuncCount = data.nodes.filter(n => n.data.type === 'ts-function').length;
-      const cppFuncCount = data.nodes.filter(n => n.data.type === 'cpp-function').length;
-      const csFuncCount = data.nodes.filter(n => n.data.type === 'csharp-function').length;
-      const fileCount = data.nodes.filter(n => n.data.type === 'file').length;
+      const funcCount = data.nodes.filter((n) => n.data.type === 'function').length;
+      const jsFuncCount = data.nodes.filter((n) => n.data.type === 'js-function').length;
+      const tsFuncCount = data.nodes.filter((n) => n.data.type === 'ts-function').length;
+      const cppFuncCount = data.nodes.filter((n) => n.data.type === 'cpp-function').length;
+      const csFuncCount = data.nodes.filter((n) => n.data.type === 'csharp-function').length;
+      const fileCount = data.nodes.filter((n) => n.data.type === 'file').length;
       const tierCount = data.tiers ? data.tiers.length : 0;
 
       //언어별 파일 카운트
@@ -144,7 +144,6 @@ document.addEventListener('DOMContentLoaded', () => {
       //localStorage에서 패널 상태 복원 (코드 뷰어는 제외 — 새 분석은 그래프 전체를 먼저 보여준다)
       restorePanelState();
       if (typeof hideCodeViewer === 'function') hideCodeViewer();
-
     } catch (err) {
       hideLoadingState(status);
       showErrorMessage(status, err);
@@ -157,10 +156,7 @@ document.addEventListener('DOMContentLoaded', () => {
   //진단 버튼 클릭
   document.getElementById('diagnostics-btn').addEventListener('click', () => {
     if (!lastAnalysisData) return;
-    showDiagnosticsPanel(
-      lastAnalysisData.diagnostics,
-      lastAnalysisData.suggestions
-    );
+    showDiagnosticsPanel(lastAnalysisData.diagnostics, lastAnalysisData.suggestions);
   });
 });
 
@@ -199,7 +195,9 @@ function savePanelState(key, collapsed) {
     const state = JSON.parse(localStorage.getItem('codediagram-panels') || '{}');
     state[key] = collapsed;
     localStorage.setItem('codediagram-panels', JSON.stringify(state));
-  } catch (e) { /* noop */ }
+  } catch (e) {
+    /* noop */
+  }
 }
 
 function restorePanelState() {
@@ -211,7 +209,9 @@ function restorePanelState() {
       fileTree.classList.remove('collapsed');
     }
     //코드 뷰어는 파일/함수를 눌렀을 때만 열리므로 열림 상태를 복원하지 않는다
-  } catch (e) { /* noop */ }
+  } catch (e) {
+    /* noop */
+  }
 }
 
 //패널 상태 저장 설정
@@ -224,19 +224,18 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     observer.observe(fileTreePanel, { attributes: true, attributeFilter: ['class'] });
   }
-
 });
 
 /* ── 동적 범례 렌더링 ── */
 
 const LANG_LEGEND = {
-  python:     { color: LANG_COLORS.python.bg, label: 'Python' },
+  python: { color: LANG_COLORS.python.bg, label: 'Python' },
   javascript: { color: LANG_COLORS.javascript.bg, label: 'JavaScript' },
   typescript: { color: LANG_COLORS.typescript.bg, label: 'TypeScript' },
-  cpp:        { color: LANG_COLORS.cpp.bg, label: 'C++' },
-  csharp:     { color: LANG_COLORS.csharp.bg, label: 'C#' },
-  html:       { color: LANG_COLORS.html.bg, label: 'HTML' },
-  css:        { color: LANG_COLORS.css.bg, label: 'CSS' },
+  cpp: { color: LANG_COLORS.cpp.bg, label: 'C++' },
+  csharp: { color: LANG_COLORS.csharp.bg, label: 'C#' },
+  html: { color: LANG_COLORS.html.bg, label: 'HTML' },
+  css: { color: LANG_COLORS.css.bg, label: 'CSS' },
 };
 
 //범례에 표시할 관계 유형 (같은 색은 한 줄로 묶음). 색은 graph.js의 EDGE_TYPE_COLORS와 같다.
@@ -265,47 +264,71 @@ function renderDynamicLegend(data) {
   const langItems = Object.entries(LANG_LEGEND)
     .filter(([key]) => fc[key] > 0)
     .map(([key, info]) => _legendRow(_legendDot(info.color), info.label, fc[key]));
-  if (langItems.length) fileView.appendChild(_legendSection('언어 (원 색)', langItems, 'legend-grid'));
+  if (langItems.length)
+    fileView.appendChild(_legendSection('언어 (원 색)', langItems, 'legend-grid'));
 
   //2) 선 색 — 실제로 존재하는 관계 유형만. 기본은 회색이고 마우스를 올리면 이 색으로 바뀐다.
   const present = new Set();
   if (data.edges && data.edges.length) present.add('call');
   if (data.inheritanceEdges && data.inheritanceEdges.length) present.add('inheritance');
   if (data.variableEdges && data.variableEdges.length) present.add('variable-ref');
-  for (const e of (data.webEdges || [])) present.add(e.type);
-  const edgeItems = EDGE_LEGEND
-    .filter(item => item.types.some(t => present.has(t)))
-    .map(item => _legendRow(_legendLine(EDGE_TYPE_COLORS[item.types[0]]), item.label));
-  if (edgeItems.length) fileView.appendChild(_legendSection('선 색 (마우스를 올리면 표시)', edgeItems));
+  for (const e of data.webEdges || []) present.add(e.type);
+  const edgeItems = EDGE_LEGEND.filter((item) => item.types.some((t) => present.has(t))).map(
+    (item) => _legendRow(_legendLine(EDGE_TYPE_COLORS[item.types[0]]), item.label),
+  );
+  if (edgeItems.length)
+    fileView.appendChild(_legendSection('선 색 (마우스를 올리면 표시)', edgeItems));
 
   //3) 진단 표시 — codeEffects.js의 글로우와 같은 기준
   const diag = data.diagnostics || {};
   const hasCycle = ((diag.cycles && diag.cycles.files) || []).length > 0;
-  const hasWarning = [...(diag.couplingIssues || []), ...(diag.antiPatterns || [])]
-    .some(i => i.severity === 'warning' || i.severity === 'error');
+  const hasWarning = [...(diag.couplingIssues || []), ...(diag.antiPatterns || [])].some(
+    (i) => i.severity === 'warning' || i.severity === 'error',
+  );
   const diagItems = [];
-  if (hasCycle) diagItems.push(_legendRow(_legendRing('#E06666'), '서로를 참조하는 파일 (순환 참조)'));
-  if (hasWarning) diagItems.push(_legendRow(_legendRing('#D6A547'), '결합도가 높은 등 살펴볼 파일'));
+  if (hasCycle)
+    diagItems.push(_legendRow(_legendRing('#E06666'), '서로를 참조하는 파일 (순환 참조)'));
+  if (hasWarning)
+    diagItems.push(_legendRow(_legendRing('#D6A547'), '결합도가 높은 등 살펴볼 파일'));
   //복잡도 글로우 — codeEffects.js가 renderGraph 중에 이미 골라 두었다
   if (typeof complexFileCount === 'function' && complexFileCount() > 0) {
-    diagItems.push(_legendRow(_legendDot('#E68046', true), '원 뒤로 빛이 나는 파일: 복잡도가 높음 (길거나 많은 함수, 높은 결합도). 빛이 넓고 붉을수록 복잡', complexFileCount()));
+    diagItems.push(
+      _legendRow(
+        _legendDot('#E68046', true),
+        '원 뒤로 빛이 나는 파일: 복잡도가 높음 (길거나 많은 함수, 높은 결합도). 빛이 넓고 붉을수록 복잡',
+        complexFileCount(),
+      ),
+    );
   }
   if (diagItems.length) fileView.appendChild(_legendSection('진단 표시', diagItems));
 
   //4) 읽는 법
-  fileView.appendChild(_legendSection('읽는 법', [
-    _legendRow(_legendSymbol('●'), '원이 클수록 함수가 많은 파일'),
-    _legendRow(_legendSymbol('─'), '선이 굵을수록 참조가 많음'),
-    _legendRow(_legendSymbol('↗'), '클릭하면 연결된 파일로 확대 (빈 곳 클릭: 전체 보기), 더블클릭하면 코드 카드'),
-  ]));
+  fileView.appendChild(
+    _legendSection('읽는 법', [
+      _legendRow(_legendSymbol('●'), '원이 클수록 함수가 많은 파일'),
+      _legendRow(_legendSymbol('─'), '선이 굵을수록 참조가 많음'),
+      _legendRow(
+        _legendSymbol('↗'),
+        '클릭하면 연결된 파일로 확대 (빈 곳 클릭: 전체 보기), 더블클릭하면 코드 카드',
+      ),
+    ]),
+  );
 
   //5) 파일을 클릭하면 오른쪽에 뜨는 함수 목록의 기호
-  fileView.appendChild(_legendSection('함수 목록 (파일 클릭 시)', [
-    _legendRow(_legendSymbol('ƒ'), '함수'),
-    _legendRow(_legendSymbol('◆'), '변수'),
-    _legendRow(_legendSymbol('3↓', 'refs'), '다른 코드가 이 함수를 부른 횟수. 많을수록 여기저기서 쓰는 함수'),
-    _legendRow(_legendSymbol('2↑', 'refs out'), '이 함수가 다른 함수를 부른 횟수. 많을수록 의존하는 곳이 많음'),
-  ]));
+  fileView.appendChild(
+    _legendSection('함수 목록 (파일 클릭 시)', [
+      _legendRow(_legendSymbol('ƒ'), '함수'),
+      _legendRow(_legendSymbol('◆'), '변수'),
+      _legendRow(
+        _legendSymbol('3↓', 'refs'),
+        '다른 코드가 이 함수를 부른 횟수. 많을수록 여기저기서 쓰는 함수',
+      ),
+      _legendRow(
+        _legendSymbol('2↑', 'refs out'),
+        '이 함수가 다른 함수를 부른 횟수. 많을수록 의존하는 곳이 많음',
+      ),
+    ]),
+  );
 
   //함수 뷰 범례
   const funcItems = [
@@ -320,15 +343,22 @@ function renderDynamicLegend(data) {
   if (fc.typescript > 0) funcItems.splice(3, 0, { cls: 'ts-function', label: 'TS 함수' });
   if (fc.cpp > 0) funcItems.splice(3, 0, { cls: 'cpp-function', label: 'C++ 함수' });
   if (fc.csharp > 0) funcItems.splice(3, 0, { cls: 'csharp-function', label: 'C# 함수' });
-  funcView.appendChild(_legendSection('함수 뷰', funcItems.map(fi => {
-    const swatch = document.createElement('span');
-    swatch.className = 'legend-swatch ' + fi.cls;
-    return _legendRow(swatch, fi.label);
-  })));
-  funcView.appendChild(_legendSection('함수 이름 옆 숫자', [
-    _legendRow(_legendSymbol('3↓', 'refs'), '다른 코드가 이 함수를 부른 횟수'),
-    _legendRow(_legendSymbol('2↑', 'refs out'), '이 함수가 다른 함수를 부른 횟수'),
-  ]));
+  funcView.appendChild(
+    _legendSection(
+      '함수 뷰',
+      funcItems.map((fi) => {
+        const swatch = document.createElement('span');
+        swatch.className = 'legend-swatch ' + fi.cls;
+        return _legendRow(swatch, fi.label);
+      }),
+    ),
+  );
+  funcView.appendChild(
+    _legendSection('함수 이름 옆 숫자', [
+      _legendRow(_legendSymbol('3↓', 'refs'), '다른 코드가 이 함수를 부른 횟수'),
+      _legendRow(_legendSymbol('2↑', 'refs out'), '이 함수가 다른 함수를 부른 횟수'),
+    ]),
+  );
 
   //범례 접기/펼치기 — 분석 직후 그래프를 가리지 않도록 기본은 접힘, 펼친 상태는 기억
   const toggle = document.getElementById('legend-toggle');
@@ -364,7 +394,7 @@ function _legendSection(title, rows, extraClass) {
   heading.textContent = title;
   const body = document.createElement('div');
   body.className = 'legend-section-body' + (extraClass ? ' ' + extraClass : '');
-  rows.forEach(row => body.appendChild(row));
+  rows.forEach((row) => body.appendChild(row));
   section.appendChild(heading);
   section.appendChild(body);
   return section;
@@ -422,7 +452,11 @@ function showErrorMessage(statusEl, err) {
   const message = err.message || '알 수 없는 오류';
   let hint = '';
 
-  if (message.includes('fetch') || message.includes('network') || message.includes('Failed to fetch')) {
+  if (
+    message.includes('fetch') ||
+    message.includes('network') ||
+    message.includes('Failed to fetch')
+  ) {
     hint = ' (서버 연결을 확인하세요)';
   } else if (message.includes('404') || message.includes('찾을 수 없')) {
     hint = ' (경로나 URL을 확인하세요)';

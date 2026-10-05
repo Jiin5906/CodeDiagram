@@ -64,7 +64,7 @@ function applyLocalGraphFilter(nodeId, depth) {
   }
 
   //연결된 엣지도 포함
-  const connectedEdges = neighborhood.connectedEdges().filter(edge => {
+  const connectedEdges = neighborhood.connectedEdges().filter((edge) => {
     return neighborhood.contains(edge.source()) && neighborhood.contains(edge.target());
   });
 
@@ -78,9 +78,12 @@ function applyLocalGraphFilter(nodeId, depth) {
   });
 
   //보이는 노드에 맞춰 뷰 조정
-  cy.animate({
-    fit: { eles: visible.nodes(), padding: 60 },
-  }, { duration: 300, easing: 'ease-out-cubic' });
+  cy.animate(
+    {
+      fit: { eles: visible.nodes(), padding: 60 },
+    },
+    { duration: 300, easing: 'ease-out-cubic' },
+  );
 }
 
 function isLocalGraphActive() {

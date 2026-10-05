@@ -15,9 +15,9 @@ let _forceHandlers = null;
 //실제 저장소(requests, cpp-projects, 50projects50days, thefuck)로 측정해 정한 값:
 //원 사이 간격 중간값 약 60px, 원형도 0.84~0.91, 연결된 파일끼리의 근접도는 유지
 const FORCE_PARAMS = {
-  repel: 700,        //척력 (노드끼리 밀어내는 힘)
-  linkDistance: 90,  //선의 기본 길이 (참조가 많을수록 최대 35%까지 짧아짐)
-  center: 0.09,      //중심 인력 (높을수록 둥글게 뭉침)
+  repel: 700, //척력 (노드끼리 밀어내는 힘)
+  linkDistance: 90, //선의 기본 길이 (참조가 많을수록 최대 35%까지 짧아짐)
+  center: 0.09, //중심 인력 (높을수록 둥글게 뭉침)
 };
 
 //선의 당김을 약하게 두어야 척력과 중심 인력이 모양을 결정해 옵시디언처럼 둥근 원판이 된다.
@@ -41,19 +41,25 @@ function _seededRandom(seed) {
 }
 
 function _createForceSim(nodes, links) {
-  return d3.forceSimulation(nodes)
+  return d3
+    .forceSimulation(nodes)
     .randomSource(_seededRandom(42))
     .alphaDecay(0.035)
     .velocityDecay(0.4)
-    .force('link', d3.forceLink(links).id(d => d.id)
-      //중심 간 거리이므로 두 노드의 반지름을 더해 원 사이 간격을 일정하게 유지
-      .distance(l => {
-        const base = FORCE_PARAMS.linkDistance;
-        return Math.max(base * 0.65, base - l.refCount * 3) + l.source.r + l.target.r;
-      })
-      .strength(FORCE_LINK_STRENGTH))
+    .force(
+      'link',
+      d3
+        .forceLink(links)
+        .id((d) => d.id)
+        //중심 간 거리이므로 두 노드의 반지름을 더해 원 사이 간격을 일정하게 유지
+        .distance((l) => {
+          const base = FORCE_PARAMS.linkDistance;
+          return Math.max(base * 0.65, base - l.refCount * 3) + l.source.r + l.target.r;
+        })
+        .strength(FORCE_LINK_STRENGTH),
+    )
     .force('charge', d3.forceManyBody().strength(-FORCE_PARAMS.repel))
-    .force('collide', d3.forceCollide(d => d.r + FORCE_COLLIDE_PADDING).strength(0.9))
+    .force('collide', d3.forceCollide((d) => d.r + FORCE_COLLIDE_PADDING).strength(0.9))
     .force('x', d3.forceX(0).strength(FORCE_PARAMS.center))
     .force('y', d3.forceY(0).strength(FORCE_PARAMS.center))
     .stop();
@@ -69,12 +75,13 @@ function runForceLayout() {
   if (cyNodes.empty()) return;
 
   //x/y를 비워두면 d3가 중심 근처 나선형으로 초기 배치한다 (퍼져나가는 애니메이션의 시작점)
-  const makeNodes = () => cyNodes.map(n => ({ id: n.id(), r: (n.data('size') || 20) / 2 }));
-  const makeLinks = () => cyEdges.map(e => ({
-    source: e.data('source'),
-    target: e.data('target'),
-    refCount: e.data('refCount') || 1,
-  }));
+  const makeNodes = () => cyNodes.map((n) => ({ id: n.id(), r: (n.data('size') || 20) / 2 }));
+  const makeLinks = () =>
+    cyEdges.map((e) => ({
+      source: e.data('source'),
+      target: e.data('target'),
+      refCount: e.data('refCount') || 1,
+    }));
 
   //1) 최종 배치를 미리 계산해 뷰포트를 맞춘다 (애니메이션 중 화면이 흔들리지 않게)
   const preNodes = makeNodes();
@@ -102,7 +109,7 @@ function runForceLayout() {
     _forceNodes = preNodes;
     _forceSim = preSim;
   }
-  _forceNodeById = new Map(_forceNodes.map(d => [d.id, d]));
+  _forceNodeById = new Map(_forceNodes.map((d) => [d.id, d]));
   _forceSim.on('tick', _applyForcePositions);
 
   if (live) {

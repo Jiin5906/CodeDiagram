@@ -57,7 +57,10 @@ function collectImports(node, imports) {
 
     //using namespace xxx; 또는 using xxx::yyy;
     if (child.type === 'using_declaration') {
-      const text = child.text.replace(/^using\s+/, '').replace(/;$/, '').trim();
+      const text = child.text
+        .replace(/^using\s+/, '')
+        .replace(/;$/, '')
+        .trim();
       if (text.startsWith('namespace ')) {
         const ns = text.replace('namespace ', '');
         imports.push({ module: ns, name: ns });
@@ -84,7 +87,8 @@ function collectDefinitions(node, code, filePath, functions, calls, classes, cla
       if (!clsName) continue;
 
       const superclasses = [];
-      const baseClause = child.childForFieldName('base_clause') || findChildByType(child, 'base_class_clause');
+      const baseClause =
+        child.childForFieldName('base_clause') || findChildByType(child, 'base_class_clause');
       if (baseClause) {
         extractBaseClasses(baseClause, superclasses);
       }
@@ -131,8 +135,12 @@ function collectDefinitions(node, code, filePath, functions, calls, classes, cla
     }
 
     //전처리기 블록 내부 탐색 (#ifdef, #ifndef, #if, #else, #elif)
-    if (child.type === 'preproc_ifdef' || child.type === 'preproc_if' ||
-        child.type === 'preproc_else' || child.type === 'preproc_elif') {
+    if (
+      child.type === 'preproc_ifdef' ||
+      child.type === 'preproc_if' ||
+      child.type === 'preproc_else' ||
+      child.type === 'preproc_elif'
+    ) {
       collectDefinitions(child, code, filePath, functions, calls, classes, className);
     }
   }
@@ -280,14 +288,51 @@ function collectCalls(node, callerName, filePath, calls) {
 /* ── 변수 수집 ── */
 
 const CPP_BUILTINS = new Set([
-  'std', 'cout', 'cin', 'endl', 'cerr', 'clog',
-  'string', 'vector', 'map', 'set', 'list', 'deque', 'queue', 'stack',
-  'pair', 'tuple', 'array', 'unordered_map', 'unordered_set',
-  'shared_ptr', 'unique_ptr', 'weak_ptr', 'make_shared', 'make_unique',
-  'nullptr', 'true', 'false', 'this',
-  'int', 'float', 'double', 'char', 'bool', 'void', 'long', 'short',
-  'unsigned', 'signed', 'size_t', 'auto',
-  'printf', 'scanf', 'malloc', 'free', 'sizeof',
+  'std',
+  'cout',
+  'cin',
+  'endl',
+  'cerr',
+  'clog',
+  'string',
+  'vector',
+  'map',
+  'set',
+  'list',
+  'deque',
+  'queue',
+  'stack',
+  'pair',
+  'tuple',
+  'array',
+  'unordered_map',
+  'unordered_set',
+  'shared_ptr',
+  'unique_ptr',
+  'weak_ptr',
+  'make_shared',
+  'make_unique',
+  'nullptr',
+  'true',
+  'false',
+  'this',
+  'int',
+  'float',
+  'double',
+  'char',
+  'bool',
+  'void',
+  'long',
+  'short',
+  'unsigned',
+  'signed',
+  'size_t',
+  'auto',
+  'printf',
+  'scanf',
+  'malloc',
+  'free',
+  'sizeof',
 ]);
 
 function collectVariables(node, filePath, variables, className) {
@@ -339,8 +384,12 @@ function collectVariables(node, filePath, variables, className) {
     }
 
     //전처리기 블록 내부 탐색
-    if (child.type === 'preproc_ifdef' || child.type === 'preproc_if' ||
-        child.type === 'preproc_else' || child.type === 'preproc_elif') {
+    if (
+      child.type === 'preproc_ifdef' ||
+      child.type === 'preproc_if' ||
+      child.type === 'preproc_else' ||
+      child.type === 'preproc_elif'
+    ) {
       collectVariables(child, filePath, variables, className);
     }
   }

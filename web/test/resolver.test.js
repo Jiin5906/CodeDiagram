@@ -28,24 +28,24 @@ describe('resolver', () => {
 
   test('resolves same-file calls', () => {
     const edges = resolveCalls(allFunctions, allCalls, allImports);
-    const cleanEdge = edges.find(e =>
-      e.source === 'main.py::process_data' && e.target === 'main.py::clean'
+    const cleanEdge = edges.find(
+      (e) => e.source === 'main.py::process_data' && e.target === 'main.py::clean',
     );
     expect(cleanEdge).toBeDefined();
   });
 
   test('resolves cross-file calls via imports', () => {
     const edges = resolveCalls(allFunctions, allCalls, allImports);
-    const helperEdge = edges.find(e =>
-      e.source === 'main.py::main' && e.target === 'utils.py::helper_func'
+    const helperEdge = edges.find(
+      (e) => e.source === 'main.py::main' && e.target === 'utils.py::helper_func',
     );
     expect(helperEdge).toBeDefined();
   });
 
   test('resolves cross-file call to add function', () => {
     const edges = resolveCalls(allFunctions, allCalls, allImports);
-    const addEdge = edges.find(e =>
-      e.source === 'main.py::main' && e.target === 'math_ops.py::add'
+    const addEdge = edges.find(
+      (e) => e.source === 'main.py::main' && e.target === 'math_ops.py::add',
     );
     expect(addEdge).toBeDefined();
   });
@@ -61,7 +61,7 @@ describe('resolver', () => {
 
   test('does not create edges for built-in calls', () => {
     const edges = resolveCalls(allFunctions, allCalls, allImports);
-    const printEdge = edges.find(e => e.target && e.target.includes('print'));
+    const printEdge = edges.find((e) => e.target && e.target.includes('print'));
     expect(printEdge).toBeUndefined();
   });
 });

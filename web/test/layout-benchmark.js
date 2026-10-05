@@ -97,7 +97,9 @@ function runBenchmark() {
   console.log('| Nodes | Total Elements | Edges | Time (ms) | Overlaps |');
   console.log('|-------|---------------|-------|-----------|----------|');
   for (const r of results) {
-    console.log(`| ${r.size.toString().padStart(5)} | ${r.nodes.toString().padStart(13)} | ${r.edges.toString().padStart(5)} | ${r.time.padStart(9)} | ${r.overlaps.toString().padStart(8)} |`);
+    console.log(
+      `| ${r.size.toString().padStart(5)} | ${r.nodes.toString().padStart(13)} | ${r.edges.toString().padStart(5)} | ${r.time.padStart(9)} | ${r.overlaps.toString().padStart(8)} |`,
+    );
   }
 
   console.log('\n* 실제 레이아웃 성능은 브라우저에서 render-benchmark.html로 측정하세요.');

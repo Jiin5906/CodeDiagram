@@ -74,9 +74,14 @@ function findPythonFiles(dirPath) {
 
       //숨김 폴더, __pycache__, venv, node_modules, .git 등은 건너뜀
       if (entry.isDirectory()) {
-        if (entry.name.startsWith('.') || entry.name === '__pycache__' ||
-            entry.name === 'venv' || entry.name === 'node_modules' ||
-            entry.name === '.git' || entry.name === 'env') {
+        if (
+          entry.name.startsWith('.') ||
+          entry.name === '__pycache__' ||
+          entry.name === 'venv' ||
+          entry.name === 'node_modules' ||
+          entry.name === '.git' ||
+          entry.name === 'env'
+        ) {
           continue;
         }
         walk(fullPath);
@@ -84,7 +89,9 @@ function findPythonFiles(dirPath) {
         // eslint-disable-next-line security/detect-non-literal-fs-filename -- 프로젝트 루트 아래 디렉터리 순회
         const stat = fs.statSync(fullPath);
         if (stat.size > MAX_SIZE) {
-          warnings.push(`Skipped ${path.relative(dirPath, fullPath)}: file too large (${Math.round(stat.size / 1024)}KB)`);
+          warnings.push(
+            `Skipped ${path.relative(dirPath, fullPath)}: file too large (${Math.round(stat.size / 1024)}KB)`,
+          );
           continue;
         }
         files.push({
@@ -146,14 +153,24 @@ function findFiles(dirPath) {
       const fullPath = path.join(dir, entry.name);
 
       if (entry.isDirectory()) {
-        if (entry.name.startsWith('.') || entry.name === '__pycache__' ||
-            entry.name === 'venv' || entry.name === 'node_modules' ||
-            entry.name === '.git' || entry.name === 'env' ||
-            entry.name === 'dist' || entry.name === 'build' ||
-            entry.name === 'vendor' || entry.name === 'bower_components' ||
-            entry.name === 'bin' || entry.name === 'obj' ||
-            entry.name === 'Debug' || entry.name === 'Release' ||
-            entry.name === 'cmake-build-debug' || entry.name === 'cmake-build-release') {
+        if (
+          entry.name.startsWith('.') ||
+          entry.name === '__pycache__' ||
+          entry.name === 'venv' ||
+          entry.name === 'node_modules' ||
+          entry.name === '.git' ||
+          entry.name === 'env' ||
+          entry.name === 'dist' ||
+          entry.name === 'build' ||
+          entry.name === 'vendor' ||
+          entry.name === 'bower_components' ||
+          entry.name === 'bin' ||
+          entry.name === 'obj' ||
+          entry.name === 'Debug' ||
+          entry.name === 'Release' ||
+          entry.name === 'cmake-build-debug' ||
+          entry.name === 'cmake-build-release'
+        ) {
           continue;
         }
         walk(fullPath);
@@ -165,7 +182,9 @@ function findFiles(dirPath) {
         // eslint-disable-next-line security/detect-non-literal-fs-filename -- 프로젝트 루트 아래 디렉터리 순회
         const stat = fs.statSync(fullPath);
         if (stat.size > MAX_SIZE) {
-          warnings.push(`Skipped ${path.relative(dirPath, fullPath)}: file too large (${Math.round(stat.size / 1024)}KB)`);
+          warnings.push(
+            `Skipped ${path.relative(dirPath, fullPath)}: file too large (${Math.round(stat.size / 1024)}KB)`,
+          );
           continue;
         }
         files.push({

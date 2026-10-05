@@ -57,7 +57,7 @@ function generateJsCode(numFunctions, numClasses) {
 function generateTsCode(numFunctions, numClasses) {
   let code = '// Auto-generated TypeScript benchmark file\n\n';
   code += 'interface BenchItem {\n  id: number;\n  name: string;\n}\n\n';
-  code += "type BenchResult<T> = { data: T; ok: boolean };\n\n";
+  code += 'type BenchResult<T> = { data: T; ok: boolean };\n\n';
   for (let c = 0; c < numClasses; c++) {
     const parent = c > 0 ? ` extends BenchClass${c - 1}` : '';
     code += `class BenchClass${c}${parent} {\n`;
@@ -80,7 +80,8 @@ function generateTsCode(numFunctions, numClasses) {
 }
 
 function generateHtmlCode(numElements) {
-  let code = '<!DOCTYPE html>\n<html>\n<head>\n  <link rel="stylesheet" href="style.css">\n</head>\n<body>\n';
+  let code =
+    '<!DOCTYPE html>\n<html>\n<head>\n  <link rel="stylesheet" href="style.css">\n</head>\n<body>\n';
   for (let i = 0; i < numElements; i++) {
     code += `  <div id="elem-${i}" class="item item-${i % 10}" data-index="${i}">\n`;
     code += `    <span class="label">Item ${i}</span>\n`;
@@ -192,8 +193,10 @@ async function runParserBenchmark(label, code, filePath, language) {
   const classCount = result.classes ? result.classes.length : 0;
   const callCount = result.calls ? result.calls.length : 0;
 
-  console.log(`  ${label}: ${lines} lines → ${durationMs.toFixed(1)}ms | ` +
-    `heap Δ${heapDelta.toFixed(1)}MB | ${funcCount} funcs, ${classCount} classes, ${callCount} calls`);
+  console.log(
+    `  ${label}: ${lines} lines → ${durationMs.toFixed(1)}ms | ` +
+      `heap Δ${heapDelta.toFixed(1)}MB | ${funcCount} funcs, ${classCount} classes, ${callCount} calls`,
+  );
 
   return { durationMs, lines, funcCount, classCount, callCount };
 }
@@ -209,8 +212,10 @@ async function runGraphBuildBenchmark(label, projectDir) {
   const durationMs = Number(end - start) / 1e6;
   const heapDelta = (memAfter.heapUsed - memBefore.heapUsed) / 1024 / 1024;
 
-  console.log(`  ${label}: ${durationMs.toFixed(1)}ms | ` +
-    `heap Δ${heapDelta.toFixed(1)}MB | ${graph.nodes.length} nodes, ${graph.edges.length} edges`);
+  console.log(
+    `  ${label}: ${durationMs.toFixed(1)}ms | ` +
+      `heap Δ${heapDelta.toFixed(1)}MB | ${graph.nodes.length} nodes, ${graph.edges.length} edges`,
+  );
 
   return { durationMs, nodes: graph.nodes.length, edges: graph.edges.length };
 }
@@ -322,7 +327,7 @@ async function main() {
   console.log('\n=== Benchmark Complete ===');
 }
 
-main().catch(err => {
+main().catch((err) => {
   console.error('Benchmark failed:', err);
   cleanup();
   process.exit(1);

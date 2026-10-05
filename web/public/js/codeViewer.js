@@ -76,7 +76,7 @@ function showCodeViewer(nodeData, options) {
   const name = nodeData.qualifiedName || nodeData.label || '';
   const file = nodeData.filePath || '';
   const startLine = nodeData.startLine || 1;
-  const endLine = nodeData.endLine || (startLine + code.split('\n').length - 1);
+  const endLine = nodeData.endLine || startLine + code.split('\n').length - 1;
 
   _openCodeViewerPanel(panel);
   _loadViewerLocation(file, nodeData.startLine ? startLine : 0, endLine, name, { code, startLine });
@@ -91,12 +91,21 @@ async function _loadViewerLocation(filePath, startLine, endLine, name, fallback)
   const setTitle = () => {
     if (!filename) return;
     //에디터처럼 '파일:줄' 형식으로 표시하고 이름은 뒤에 붙인다
-    const where = startLine ? (startLine === endLine || !endLine ? `:${startLine}` : `:${startLine}-${endLine}`) : '';
+    const where = startLine
+      ? startLine === endLine || !endLine
+        ? `:${startLine}`
+        : `:${startLine}-${endLine}`
+      : '';
     filename.textContent = (filePath || '') + where + (name ? '  ' + name : '');
     filename.title = filename.textContent;
   };
 
-  const canFetch = !!(filePath && typeof graphData !== 'undefined' && graphData && graphData.analysisId);
+  const canFetch = !!(
+    filePath &&
+    typeof graphData !== 'undefined' &&
+    graphData &&
+    graphData.analysisId
+  );
   if (canFetch) {
     const cached = _fullCodeCache.get(graphData.analysisId + '::' + filePath);
     if (!cached) _setViewerStatus('코드를 불러오는 중...');
@@ -152,7 +161,10 @@ function _renderViewerCode(code, file, startLine) {
   }
 
   //줄번호 오버레이 생성
-  const lineNumbers = code.split('\n').map((_, i) => startLine + i).join('\n');
+  const lineNumbers = code
+    .split('\n')
+    .map((_, i) => startLine + i)
+    .join('\n');
   let lineNumEl = content.querySelector('.code-line-numbers');
   if (!lineNumEl) {
     lineNumEl = document.createElement('div');
@@ -195,7 +207,7 @@ function _highlightViewerLines(startLine, endLine) {
 
 function _clearViewerLineHighlight() {
   const content = document.getElementById('code-viewer-content');
-  if (content) content.querySelectorAll('.cv-line-highlight').forEach(el => el.remove());
+  if (content) content.querySelectorAll('.cv-line-highlight').forEach((el) => el.remove());
 }
 
 //진단·참조 목록 등에서 "이 파일의 몇 번째 줄"로 바로 이동한다.
@@ -315,7 +327,9 @@ function _setupCodeViewerResizer() {
   try {
     const saved = parseFloat(localStorage.getItem(CV_RATIO_KEY));
     if (saved >= CV_RATIO_MIN && saved <= CV_RATIO_MAX) _applyCodeViewerRatio(saved);
-  } catch (e) { /* noop */ }
+  } catch (e) {
+    /* noop */
+  }
 
   let dragging = false;
   let rafId = 0;
@@ -338,7 +352,10 @@ function _setupCodeViewerResizer() {
   handle.addEventListener('pointermove', (e) => {
     if (!dragging) return;
     const right = panel.getBoundingClientRect().right;
-    const ratio = Math.min(CV_RATIO_MAX, Math.max(CV_RATIO_MIN, (right - e.clientX) / window.innerWidth));
+    const ratio = Math.min(
+      CV_RATIO_MAX,
+      Math.max(CV_RATIO_MIN, (right - e.clientX) / window.innerWidth),
+    );
     lastRatio = ratio;
     _applyCodeViewerRatio(ratio);
     if (!rafId) rafId = requestAnimationFrame(resizeGraph);
@@ -350,7 +367,11 @@ function _setupCodeViewerResizer() {
     panel.classList.remove('resizing');
     document.body.classList.remove('cv-resizing');
     if (lastRatio) {
-      try { localStorage.setItem(CV_RATIO_KEY, String(lastRatio)); } catch (e) { /* noop */ }
+      try {
+        localStorage.setItem(CV_RATIO_KEY, String(lastRatio));
+      } catch (e) {
+        /* noop */
+      }
     }
     resizeGraph();
   };
@@ -361,7 +382,11 @@ function _setupCodeViewerResizer() {
   handle.addEventListener('dblclick', () => {
     lastRatio = null;
     _applyCodeViewerRatio(null);
-    try { localStorage.removeItem(CV_RATIO_KEY); } catch (e) { /* noop */ }
+    try {
+      localStorage.removeItem(CV_RATIO_KEY);
+    } catch (e) {
+      /* noop */
+    }
     resizeGraph();
   });
 }
@@ -421,7 +446,7 @@ function highlightLines(cardElement, startLine, endLine) {
   const lines = codeArea.querySelectorAll('.code-line');
   let firstHighlighted = null;
 
-  lines.forEach(span => {
+  lines.forEach((span) => {
     const lineNum = parseInt(span.dataset.line, 10);
     if (lineNum >= startLine && lineNum <= endLine) {
       span.classList.add('line-highlighted');
@@ -438,7 +463,7 @@ function highlightLines(cardElement, startLine, endLine) {
 function clearLineHighlights(cardElement) {
   const codeArea = cardElement.querySelector('.canvas-card-code');
   if (!codeArea) return;
-  codeArea.querySelectorAll('.line-highlighted').forEach(el => {
+  codeArea.querySelectorAll('.line-highlighted').forEach((el) => {
     el.classList.remove('line-highlighted');
   });
 }
