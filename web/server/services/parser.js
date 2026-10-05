@@ -12,7 +12,8 @@ const { parseTs } = require('./parsers/tsParser');
 
 function createParser() {
   const p = new Parser();
-  p.setLanguage(Python);
+  //문법 패키지의 타입 정의가 tree-sitter 0.22 타입과 맞지 않아 캐스팅한다 (런타임 동작은 같다)
+  p.setLanguage(/** @type {any} */ (Python));
   return p;
 }
 

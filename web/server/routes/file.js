@@ -30,12 +30,15 @@ router.get('/', (req, res) => {
 
   try {
     //심볼릭 링크까지 풀어서 프로젝트 루트 밖으로 나가는 경로(../ 등)를 차단한다
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- 루트 경로는 projectRegistry에 등록된 값
     const realRoot = fs.realpathSync(root);
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- realpath 후 아래에서 루트 밖 경로를 차단
     const realFile = fs.realpathSync(path.resolve(realRoot, relPath));
     if (!realFile.startsWith(realRoot + path.sep)) {
       return res.status(403).json({ error: '허용되지 않은 경로입니다' });
     }
 
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- 루트 내부로 검증된 경로
     const stat = fs.statSync(realFile);
     if (!stat.isFile()) {
       return res.status(404).json({ error: '파일을 찾을 수 없습니다' });
@@ -44,6 +47,7 @@ router.get('/', (req, res) => {
       return res.status(413).json({ error: '파일이 너무 커서 표시할 수 없습니다' });
     }
 
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- 루트 내부로 검증된 경로
     res.json({ path: relPath, code: fs.readFileSync(realFile, 'utf-8') });
   } catch (err) {
     if (err.code === 'ENOENT') {

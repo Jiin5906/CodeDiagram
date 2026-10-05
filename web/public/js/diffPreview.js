@@ -70,8 +70,8 @@ function showDiffView(suggestion) {
   content.textContent = '';
   title.textContent = `Diff: ${suggestion.title}`;
 
-  let beforeLines = [];
-  let afterLines = [];
+  const beforeLines = [];
+  const afterLines = [];
 
   if (suggestion.type === 'cycle') {
     //순환 경로 엣지 제거 전후

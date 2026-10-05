@@ -48,7 +48,6 @@ describe('graphBuilder', () => {
   });
 
   test('throws on empty directory', () => {
-    const emptyDir = path.join(__dirname, 'fixtures');
     // fixtures dir itself has no .py files at root, but has sample_project subdir
     // Let's use a truly empty path concept
     expect(() => buildGraph(path.join(__dirname, 'fixtures', 'nonexistent_empty'))).toThrow();

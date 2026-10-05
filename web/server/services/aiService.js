@@ -1,7 +1,8 @@
 //파일명 그대로 AI와 연동을 해주는 서비스이나. 일단 임시적으로 클로드를 사용을 했다. 추후에 바꿔도 상관 없을 듯.
 
-const Anthropic = require('@anthropic-ai/sdk');
+const { Anthropic } = require('@anthropic-ai/sdk');
 
+/** @type {Anthropic | null} */
 let client = null;
 
 function getClient() {
@@ -42,7 +43,9 @@ ${code}
     messages: [{ role: 'user', content: prompt }],
   });
 
-  return message.content[0].text;
+  //첫 블록이 텍스트가 아니면 기존과 같이 undefined를 돌려준다
+  const block = message.content[0];
+  return block.type === 'text' ? block.text : undefined;
 }
 
 module.exports = { explainFunction };

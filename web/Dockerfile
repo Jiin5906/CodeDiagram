@@ -25,9 +25,13 @@ RUN npm ci --omit=dev && npm cache clean --force
 FROM ${NODE_IMAGE} AS prod
 ENV NODE_ENV=production
 # Git URL 분석 시 simple-git이 git 바이너리로 clone한다
+# 베이스 이미지 이후 나온 OS 보안 업데이트를 반영하고, 실행에 필요 없는 npm/corepack은 지운다(Trivy 지적 대상)
 RUN apt-get update \
+ && apt-get upgrade -y --no-install-recommends \
  && apt-get install -y --no-install-recommends git ca-certificates \
- && rm -rf /var/lib/apt/lists/*
+ && rm -rf /var/lib/apt/lists/* \
+ && rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack \
+           /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack
 WORKDIR /app
 COPY --from=deps-prod --chown=node:node /app/node_modules ./node_modules
 COPY --chown=node:node package.json ./
