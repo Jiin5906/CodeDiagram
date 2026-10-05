@@ -144,7 +144,7 @@
     },
     "ImportInfo": {
       "type": "object",
-      "description": "파일 의존성 정보. 언어별로 필드 구성이 다르다.",
+      "description": "파일 의존성 정보. 언어별로 필드 구성이 다르다. Python/JS/C++/C#는 name, HTML/CSS는 href를 반드시 가진다.",
       "properties": {
         "module": {
           "type": "string",
@@ -161,7 +161,18 @@
         "type": {
           "type": "string",
           "description": "import 유형. JS: 'es6-import', 'commonjs-require', 'es6-reexport'. HTML: 'script-ref', 'style-ref', 'link-ref', 'resource-ref'. CSS: 'css-import'. C++: 'include', 'using'. C#: 'using'.",
-          "enum": ["es6-import", "commonjs-require", "es6-reexport", "script-ref", "style-ref", "link-ref", "resource-ref", "css-import", "include", "using"]
+          "enum": [
+            "es6-import",
+            "commonjs-require",
+            "es6-reexport",
+            "script-ref",
+            "style-ref",
+            "link-ref",
+            "resource-ref",
+            "css-import",
+            "include",
+            "using"
+          ]
         },
         "href": {
           "type": "string",
@@ -177,7 +188,7 @@
           "description": "import 선언 줄 번호 (1-based)"
         }
       },
-      "required": ["name"]
+      "anyOf": [{ "required": ["name"] }, { "required": ["href"] }]
     },
     "ClassInfo": {
       "type": "object",
@@ -457,20 +468,32 @@
             "comment": ""
           }
         ],
-        "calls": [
-          { "caller": "main", "callee": "add", "filePath": "main.py", "line": 10 }
-        ],
-        "imports": [
-          { "module": "math_ops", "name": "add" }
-        ],
+        "calls": [{ "caller": "main", "callee": "add", "filePath": "main.py", "line": 10 }],
+        "imports": [{ "module": "math_ops", "name": "add" }],
         "classes": [
-          { "name": "Calculator", "filePath": "math_ops.py", "superclasses": [], "startLine": 1, "endLine": 20 }
+          {
+            "name": "Calculator",
+            "filePath": "math_ops.py",
+            "superclasses": [],
+            "startLine": 1,
+            "endLine": 20
+          }
         ],
         "variables": [
-          { "name": "Calculator.value", "className": "Calculator", "filePath": "math_ops.py", "line": 3 }
+          {
+            "name": "Calculator.value",
+            "className": "Calculator",
+            "filePath": "math_ops.py",
+            "line": 3
+          }
         ],
         "variableRefs": [
-          { "caller": "Calculator.add", "variable": "self.value", "filePath": "math_ops.py", "line": 6 }
+          {
+            "caller": "Calculator.add",
+            "variable": "self.value",
+            "filePath": "math_ops.py",
+            "line": 6
+          }
         ]
       }
     }
