@@ -3,10 +3,16 @@
   "version": "1.0.0",
   "description": "Code structure visualizer (Python, HTML, CSS, JS)",
   "main": "server/index.js",
+  "engines": {
+    "node": ">=22.21.0 <23"
+  },
   "scripts": {
     "start": "node server/index.js",
     "test": "node test/runner.js",
-    "benchmark": "node test/benchmark.js"
+    "benchmark": "node test/benchmark.js",
+    "docker:build": "docker build --target prod -t code-diagram:local .",
+    "docker:test": "docker build --target test -t code-diagram:test . && docker run --rm code-diagram:test",
+    "docker:run": "docker run --rm -p 3000:3000 --env-file .env code-diagram:local"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",

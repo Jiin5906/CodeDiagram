@@ -1,0 +1,14 @@
+# 저장소에는 LF로 저장한다 (Windows 체크아웃 시 autocrlf가 변환)
+* text=auto
+
+# 리눅스 컨테이너/CI에서 실행되는 파일은 작업 트리에서도 LF 유지
+*.sh text eol=lf
+Dockerfile text eol=lf
+gradlew text eol=lf
+.husky/* text eol=lf
+*.bat text eol=crlf
+
+# 바이너리
+*.jar binary
+*.webp binary
+*.png binary
