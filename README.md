@@ -58,17 +58,19 @@ Python·C++·C#·TypeScript는 **참조 횟수(티어) 기반**으로 묶어서 
 
 ### 요구 사항
 
-- **Node.js 18 이상** (개발·검증은 v20.20.2에서 진행)
+- **Node.js 22** (`web/.nvmrc` 기준 22.23.3, 허용 범위 `>=22.21.0 <23`). 다른 메이저 버전이면 `npm install`이 `EBADENGINE`으로 실패합니다.
 - tree-sitter가 네이티브 모듈을 빌드하므로 C++ 컴파일러가 필요합니다. macOS는 Xcode Command Line Tools, Windows는 Visual Studio Build Tools.
 
 ### 설치
 
 ```bash
 cd web
-npm install --legacy-peer-deps
+npm install
 ```
 
-> `--legacy-peer-deps`가 필요합니다. `tree-sitter-c-sharp@0.21.3`이 peer로 `tree-sitter@^0.21.0`을 요구하는데 이 프로젝트는 `^0.22.4`를 쓰기 때문에, 플래그 없이 설치하면 `ERESOLVE` 오류가 납니다.
+> `tree-sitter-c-sharp@0.21.3`이 peer로 `tree-sitter@^0.21.0`을 요구하는데 이 프로젝트는 `^0.22.4`를 써서 `--legacy-peer-deps`가 필요합니다. 이 설정은 `web/.npmrc`에 들어 있으므로 플래그 없이 `npm install`만 하면 됩니다.
+>
+> `npm install`을 하면 커밋 전 검사(pre-commit 훅)도 함께 설치됩니다. 자세한 내용은 [`.github/PIPELINE_GUIDE.md`](.github/PIPELINE_GUIDE.md)를 참고하세요.
 
 ### 실행
 
@@ -115,9 +117,12 @@ ANTHROPIC_API_KEY=your-key-here
 
 ```bash
 cd web
-npm test        # 파서·resolver·graphBuilder 테스트 (242개)
+npm test            # Jest: 단위 · 계약 · 통합 테스트
+npm run check       # PR 전 전체 검사: 린트 · 포맷 · 타입 · 취약점 · 테스트 + 커버리지
 npm run benchmark   # 파싱 성능 측정
 ```
+
+테스트는 `test/unit`, `test/contract`, `test/integration`으로 나뉘어 있습니다. 실제 Anthropic API를 호출하는 `npm run test:live`는 비용이 들어서 기본 테스트에서 제외됩니다.
 
 `test/fixtures/`에 언어별 샘플 프로젝트가 들어 있습니다 — `sample_project`(Python), `cpp_project`, `csharp_project`, `ts_project`, `js_project`, `web_project`, `inline_script_project`.
 
@@ -135,7 +140,7 @@ npm run benchmark   # 파싱 성능 측정
 
 응답에는 `nodes`, `edges`, `inheritanceEdges`, `variableEdges`, `webEdges`, `packageNodes`, `tiers`, `langs`, `couplingScores`, `diagnostics`, `suggestions`, `cycleEdgeIds`, `fileCounts`, `warnings`, 그리고 파일 원본 조회에 쓰는 `analysisId`가 담깁니다.
 
-출력 스키마는 [`web/docs/parser-output-schema.json`](web/docs/parser-output-schema.json)에 정리되어 있습니다.
+출력 스키마는 [`web/schemas/parser-output-schema.json`](web/schemas/parser-output-schema.json)에 정리되어 있습니다.
 
 ### `GET /api/file?id={analysisId}&path={상대경로}`
 
@@ -183,14 +188,18 @@ CodeDiagram/
 │   │       ├── minimap.js        # 미니맵
 │   │       ├── fileTree.js       # 파일 트리 패널
 │   │       └── diffPreview.js    # 리팩토링 diff 미리보기
-│   ├── test/                     # 테스트 · 벤치마크 · 픽스처
-│   └── docs/                     # 파서 출력 스키마
+│   ├── test/                     # unit · contract · integration · live · 픽스처 · 벤치마크
+│   └── schemas/                  # 파서 출력 스키마
 │
-└── app/                          # Android 앱 (WebView 래퍼)
+├── .github/                      # CI/CD 워크플로 · Dependabot · PR 템플릿 · 파이프라인 가이드
+│
+└── app/                          # Android 앱 (WebView 래퍼, 현재 CI 보류)
     └── src/main/java/.../MainActivity.kt
 ```
 
 ## Android 앱
+
+> 앱 출시 계획이 현재 없어서 Android 빌드는 CI/CD에서 보류 중입니다. 라이브러리 버전 불일치로 지금은 빌드가 실패합니다(`.github/workflows/android.yml` 주석 참고).
 
 `app/`은 위 웹앱을 WebView로 띄우는 Jetpack Compose 앱입니다. 에뮬레이터에서 호스트의 `localhost:3000`을 가리키는 `http://10.0.2.2:3000`을 로드하므로, **웹 서버를 먼저 실행해 둬야** 합니다.
 

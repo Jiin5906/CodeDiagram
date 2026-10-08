@@ -75,7 +75,8 @@ Android(루트에서, 현재 보류): `./gradlew testDebugUnitTest lintDebug ass
 
 ## CI 구성 (`.github/workflows/ci.yml`)
 
-- 트리거: `master`, `ci/pipeline` 대상의 `pull_request`와 `push`. `release.yml`이 `workflow_call`로 재사용합니다.
+- 트리거: 모든 `pull_request`(대상 브랜치 무관), `master`·`feature/web-update`로의 `push`. `release.yml`이 `workflow_call`로 재사용합니다.
+- 열린 PR이 있는 `feature/web-update`에 push하면 push와 PR 실행이 각각 한 번씩 돕니다(정상).
 - job은 병렬로 실행되고, 같은 브랜치에 새 커밋이 오면 이전 실행은 취소됩니다.
 
 | job | 하는 일 |
@@ -110,7 +111,7 @@ Android(루트에서, 현재 보류): `./gradlew testDebugUnitTest lintDebug ass
 ## 저장소 운영
 
 - **Dependabot** (`.github/dependabot.yml`): npm(`web/`), github-actions, docker(`web/Dockerfile`) 모두 주 1회 (gradle은 Android 보류로 제외)(월요일 09:00 KST)입니다.
-  - PR은 `ci/pipeline`으로 갑니다. `master`로 병합한 뒤에는 `target-branch`를 `master`로 바꾸거나 지웁니다.
+  - PR은 기본 브랜치(`master`)로 갑니다.
   - Dependabot 설정은 **기본 브랜치(`master`)에 있어야** 동작합니다. 그 전까지는 적용되지 않습니다.
   - tree-sitter 계열과 Node 이미지의 메이저 업그레이드는 직접 합니다.
 - **PR 템플릿**: `.github/pull_request_template.md`

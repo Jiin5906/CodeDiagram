@@ -1,4 +1,5 @@
-# 의존성 자동 갱신: 주 1회(월요일, 한국 시간) PR을 연다. PR은 통합 브랜치 ci/pipeline으로 보낸다.
+# 의존성 자동 갱신: 주 1회(월요일, 한국 시간) PR을 연다. PR은 기본 브랜치(master)로 간다.
+# 주의: 이 설정은 기본 브랜치(master)에 병합된 뒤부터 동작한다.
 # 커밋 메시지는 Conventional Commits 형식(chore(deps): ...)을 따른다.
 version: 2
 
@@ -6,7 +7,6 @@ updates:
   # 웹 서버 npm 패키지
   - package-ecosystem: npm
     directory: /web
-    target-branch: ci/pipeline
     schedule:
       interval: weekly
       day: monday
@@ -29,7 +29,6 @@ updates:
   # GitHub Actions (SHA 고정을 유지한 채 갱신된다)
   - package-ecosystem: github-actions
     directory: /
-    target-branch: ci/pipeline
     schedule:
       interval: weekly
       day: monday
@@ -44,7 +43,6 @@ updates:
   # Docker 베이스 이미지 (web/Dockerfile의 태그 + digest)
   - package-ecosystem: docker
     directory: /web
-    target-branch: ci/pipeline
     schedule:
       interval: weekly
       day: monday

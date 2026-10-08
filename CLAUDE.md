@@ -69,7 +69,7 @@ npm run benchmark           # 대규모 코드 자동 생성 후 파싱 시간/�
 자세한 내용은 `.github/PIPELINE_GUIDE.md`(구성·명령·문제 해결)와 `.github/CONTRIBUTING.md`(브랜치·커밋 규칙)에 있다.
 
 - **pre-commit** (루트 `.husky/pre-commit`, `web/`의 `npm install`이 설치): 스테이징된 파일만 ESLint 자동 수정과 Prettier 포맷(lint-staged), gitleaks로 비밀값 검사(`scripts/scan.js staged`), `test:unit`. `git commit --no-verify`는 쓰지 않는다.
-- **CI** (`.github/workflows/ci.yml`): `master`와 `ci/pipeline` 대상 PR·push에서 lint, test(Docker test 스테이지), security(gitleaks, npm audit, Trivy) job이 병렬로 돈다. Android CI(`android.yml`)는 앱 출시 계획이 없어 보류 중이라 수동 실행만 된다.
+- **CI** (`.github/workflows/ci.yml`): 모든 PR과 `master`·`feature/web-update` push에서 lint, test(Docker test 스테이지), security(gitleaks, npm audit, Trivy) job이 병렬로 돈다. Android CI(`android.yml`)는 앱 출시 계획이 없어 보류 중이라 수동 실행만 된다.
 - **CD** (`.github/workflows/release.yml`): `v*` 태그를 푸시하면 CI를 다시 돌린 뒤, prod 이미지를 GHCR에 푸시하고 GitHub Release를 만든다.
 - 외부 GitHub 액션은 전체 커밋 SHA로 고정하고 `# vX.Y.Z` 주석을 단다. 권한은 최상단 `contents: read`, 필요한 job에만 추가한다.
 - 버전(npm, Docker 이미지, 액션)은 추측하지 말고 레지스트리나 릴리스에서 확인한다.

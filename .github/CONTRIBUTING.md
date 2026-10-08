@@ -16,7 +16,7 @@ CodeDiagram 저장소에서 함께 작업할 때 지키는 규칙입니다. 파�
 5. CI가 모두 통과하고 리뷰를 받은 뒤 병합합니다. 병합한 브랜치는 지웁니다.
 6. 배포는 `v*` 태그로 합니다 (`git tag v1.2.0` → `git push origin v1.2.0`).
 
-> 파이프라인 구축 기간에는 통합 브랜치 `ci/pipeline`을 기본 브랜치 대신 대상으로 씁니다.
+> `feature/web-update`가 `master`에 병합(PR #1)되기 전까지는 `feature/web-update`에서 브랜치를 만들고 그쪽으로 PR을 올립니다.
 
 ### 브랜치 이름
 

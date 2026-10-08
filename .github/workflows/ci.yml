@@ -4,10 +4,11 @@
 name: CI
 
 on:
+  # 모든 PR에서 실행한다 (대상 브랜치와 관계없이)
   pull_request:
-    branches: [master, ci/pipeline]
+  # PR 없이 바로 push해도 검사되도록 주요 브랜치는 push에서도 실행한다
   push:
-    branches: [master, ci/pipeline]
+    branches: [master, feature/web-update]
   # release.yml이 태그 배포 전에 같은 검사를 재사용한다
   workflow_call:
 
