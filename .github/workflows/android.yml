@@ -1,0 +1,50 @@
+# Android 앱(app/) CI: 앱이나 Gradle 설정이 바뀔 때만 실행한다.
+# 계측 테스트(androidTest)는 에뮬레이터가 필요해서 제외한다.
+name: Android
+
+on:
+  pull_request:
+    branches: [master, ci/pipeline]
+    paths:
+      - 'app/**'
+      - 'gradle/**'
+      - '*.gradle.kts'
+      - 'gradle.properties'
+      - 'gradlew'
+      - '.github/workflows/android.yml'
+  push:
+    branches: [master, ci/pipeline]
+    paths:
+      - 'app/**'
+      - 'gradle/**'
+      - '*.gradle.kts'
+      - 'gradle.properties'
+      - 'gradlew'
+      - '.github/workflows/android.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android:
+    name: 단위 테스트 · lint · debug 빌드
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '21'
+      # Gradle wrapper 체크섬 검증은 기본으로 켜져 있다
+      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+        with:
+          # 오픈소스 캐시(actions/cache)만 쓴다. 기본값 enhanced는 독점 컴포넌트다
+          cache-provider: basic
+      - run: ./gradlew testDebugUnitTest lintDebug assembleDebug
