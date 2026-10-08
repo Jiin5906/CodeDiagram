@@ -1,6 +1,7 @@
 # CD: v* 태그를 푸시하면 CI 검사를 다시 통과한 뒤
 #  1) 웹 서버 Docker 이미지를 GHCR(ghcr.io)에 푸시하고
-#  2) Android debug APK를 빌드해 GitHub Release에 첨부한다.
+#  2) GitHub Release를 만든다 (변경 내역 자동 생성).
+# Android APK 첨부는 앱 출시 계획이 없어 보류했다 (android.yml 주석 참고).
 # 실제 배포 대상은 아직 없다. deploy job은 GitHub Environments(production) 승인 자리만 만들어 둔 것이다.
 name: Release
 
@@ -69,46 +70,18 @@ jobs:
         if: always()
         run: docker logout ghcr.io
 
-  apk:
-    name: Android debug APK 빌드
-    needs: verify
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
-        with:
-          distribution: temurin
-          java-version: '21'
-      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
-        with:
-          cache-provider: basic
-      - run: ./gradlew testDebugUnitTest assembleDebug
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: apk
-          path: app/build/outputs/apk/debug/app-debug.apk
-          if-no-files-found: error
-          retention-days: 7
-
   release:
     name: GitHub Release 생성
-    needs: [image, apk]
+    needs: image
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     # Release 생성 권한은 빌드를 하지 않는 이 job에만 준다
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: apk
-      - name: Release 생성 + APK 첨부
+      - name: Release 생성
         run: >-
           gh release create "$GITHUB_REF_NAME"
-          "app-debug.apk#CodeDiagram-${GITHUB_REF_NAME}-debug.apk"
           --repo "$GITHUB_REPOSITORY"
           --title "$GITHUB_REF_NAME"
           --generate-notes

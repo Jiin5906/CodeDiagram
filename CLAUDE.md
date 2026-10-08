@@ -32,7 +32,7 @@ npm run benchmark           # 대규모 코드 자동 생성 후 파싱 시간/�
 - Jest는 커스텀 환경(`test/helpers/treeSitterEnvironment.js`)으로 tree-sitter를 워커당 한 번만 로드한다. tree-sitter 0.22 래퍼가 다시 로드되면 `rootNode`이 `undefined`가 되기 때문이다.
 - 언어별 테스트 픽스처는 `web/test/fixtures/<lang>_project/`에 있다.
 - AI 해설(`/api/explain`)은 `web/.env`에 `ANTHROPIC_API_KEY`가 필요하다(`.env.example` 참고). 없으면 503을 반환하고 나머지 기능은 정상 동작한다.
-- Android 앱은 루트에서 `./gradlew assembleDebug`로 빌드한다(웹 서버가 먼저 떠 있어야 의미가 있음).
+- Android 앱은 루트에서 `./gradlew assembleDebug`로 빌드한다(웹 서버가 먼저 떠 있어야 의미가 있음). 현재 출시 계획이 없어 CI에서 보류 중이며, 라이브러리 버전 불일치로 빌드가 실패하는 상태다.
 
 ## 아키텍처
 
@@ -69,8 +69,8 @@ npm run benchmark           # 대규모 코드 자동 생성 후 파싱 시간/�
 자세한 내용은 `.github/PIPELINE_GUIDE.md`(구성·명령·문제 해결)와 `.github/CONTRIBUTING.md`(브랜치·커밋 규칙)에 있다.
 
 - **pre-commit** (루트 `.husky/pre-commit`, `web/`의 `npm install`이 설치): 스테이징된 파일만 ESLint 자동 수정과 Prettier 포맷(lint-staged), gitleaks로 비밀값 검사(`scripts/scan.js staged`), `test:unit`. `git commit --no-verify`는 쓰지 않는다.
-- **CI** (`.github/workflows/ci.yml`): `master`와 `ci/pipeline` 대상 PR·push에서 lint, test(Docker test 스테이지), security(gitleaks, npm audit, Trivy) job이 병렬로 돈다. `android.yml`은 `app/`이나 Gradle 설정이 바뀔 때만 실행한다.
-- **CD** (`.github/workflows/release.yml`): `v*` 태그를 푸시하면 CI를 다시 돌린 뒤, prod 이미지를 GHCR에 푸시하고 debug APK를 GitHub Release에 첨부한다.
+- **CI** (`.github/workflows/ci.yml`): `master`와 `ci/pipeline` 대상 PR·push에서 lint, test(Docker test 스테이지), security(gitleaks, npm audit, Trivy) job이 병렬로 돈다. Android CI(`android.yml`)는 앱 출시 계획이 없어 보류 중이라 수동 실행만 된다.
+- **CD** (`.github/workflows/release.yml`): `v*` 태그를 푸시하면 CI를 다시 돌린 뒤, prod 이미지를 GHCR에 푸시하고 GitHub Release를 만든다.
 - 외부 GitHub 액션은 전체 커밋 SHA로 고정하고 `# vX.Y.Z` 주석을 단다. 권한은 최상단 `contents: read`, 필요한 job에만 추가한다.
 - 버전(npm, Docker 이미지, 액션)은 추측하지 말고 레지스트리나 릴리스에서 확인한다.
 - 커밋 메시지는 Conventional Commits 형식이고, Claude 공동 작성자 표기를 넣지 않는다.

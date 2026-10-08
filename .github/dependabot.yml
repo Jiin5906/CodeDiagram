@@ -57,15 +57,4 @@ updates:
       - dependency-name: node
         update-types: ['version-update:semver-major']
 
-  # Android 앱 Gradle 의존성 (gradle/libs.versions.toml)
-  - package-ecosystem: gradle
-    directory: /
-    target-branch: ci/pipeline
-    schedule:
-      interval: weekly
-      day: monday
-      time: '09:00'
-      timezone: Asia/Seoul
-    open-pull-requests-limit: 5
-    commit-message:
-      prefix: chore(deps)
+  # Android(gradle)는 앱 출시 계획이 없어 보류했다. 다시 쓸 때 package-ecosystem: gradle, directory: / 항목을 추가한다.
