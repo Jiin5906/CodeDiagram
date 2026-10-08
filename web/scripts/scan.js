@@ -1,6 +1,7 @@
 //보안 스캐너(gitleaks, Trivy)를 Docker 이미지로 실행하는 스크립트다.
 //로컬에 바이너리를 설치하지 않아도 되고, Windows/리눅스 어디서든 같은 명령으로 동작한다.
-//사용법: node scripts/scan.js secrets | image [이미지명]
+//사용법: node scripts/scan.js secrets | staged | image [이미지명]
+//- staged(pre-commit용)는 설치된 gitleaks가 있으면 그것을 먼저 쓴다 (Docker보다 빠름)
 const { spawnSync } = require('child_process');
 const path = require('path');
 
@@ -21,10 +22,11 @@ function docker(args) {
   process.exit(result.status ?? 1);
 }
 
-const [command, target] = process.argv.slice(2);
+//gitleaks 공통 옵션: 찾은 값은 출력에서 가리고(--redact), 하나라도 찾으면 실패
+const GITLEAKS_FLAGS = ['--redact', '--no-banner', '--exit-code', '1'];
 
-if (command === 'secrets') {
-  //저장소 전체 커밋 기록에서 비밀값을 찾는다. 찾은 값은 출력에서 가린다(--redact).
+//저장소 루트를 /repo로 마운트해서 gitleaks git 명령을 실행한다
+function gitleaksDocker(extra) {
   docker([
     '-v',
     `${REPO_ROOT}:/repo`,
@@ -37,11 +39,31 @@ if (command === 'secrets') {
     GITLEAKS_IMAGE,
     'git',
     '/repo',
-    '--redact',
-    '--no-banner',
-    '--exit-code',
-    '1',
+    ...extra,
+    ...GITLEAKS_FLAGS,
   ]);
+}
+
+const [command, target] = process.argv.slice(2);
+
+if (command === 'secrets') {
+  //저장소 전체 커밋 기록에서 비밀값을 찾는다
+  gitleaksDocker([]);
+} else if (command === 'staged') {
+  //스테이징된 변경(git add 한 내용)만 검사한다
+  const local = spawnSync('gitleaks', ['git', REPO_ROOT, '--staged', ...GITLEAKS_FLAGS], {
+    stdio: 'inherit',
+  });
+  if (!local.error) process.exit(local.status ?? 1);
+  if (local.error.code !== 'ENOENT') {
+    console.error('gitleaks 실행 실패:', local.error.message);
+    process.exit(1);
+  }
+  //로컬에 gitleaks가 없으면 Docker 이미지로 대신 실행한다
+  console.error(
+    'gitleaks가 설치되어 있지 않아 Docker로 실행합니다. (설치: winget install --id Gitleaks.Gitleaks -e)',
+  );
+  gitleaksDocker(['--staged']);
 } else if (command === 'image') {
   //빌드된 Docker 이미지의 OS/npm 패키지 취약점을 검사한다. 고칠 수 있는 HIGH 이상이면 실패.
   docker([
@@ -60,6 +82,6 @@ if (command === 'secrets') {
     target || 'code-diagram:local',
   ]);
 } else {
-  console.error('사용법: node scripts/scan.js secrets | image [이미지명]');
+  console.error('사용법: node scripts/scan.js secrets | staged | image [이미지명]');
   process.exit(2);
 }
