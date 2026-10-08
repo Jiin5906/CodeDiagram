@@ -1,8 +1,8 @@
 const fs = require('fs');
 const path = require('path');
-const { parseFile } = require('../server/services/parser');
+const { parseFile } = require('../../server/services/parser');
 
-const fixturesDir = path.join(__dirname, 'fixtures', 'sample_project');
+const fixturesDir = path.join(__dirname, '..', 'fixtures', 'sample_project');
 
 describe('parser', () => {
   test('extracts top-level functions from main.py', () => {

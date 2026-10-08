@@ -1,138 +1,137 @@
+//test/runner.js(자체 assert 러너)에서 옮겨 온 언어별 파서·그래프 회귀 테스트다.
+//섹션 하나가 test 하나이며, 섹션 안의 실패 메시지를 모두 모아 한 번에 보여준다.
 const fs = require('fs');
 const path = require('path');
-const { parseFile } = require('../server/services/parser');
-const { resolveCalls } = require('../server/services/resolver');
-const { buildGraph } = require('../server/services/graphBuilder');
+const { parseFile } = require('../../server/services/parser');
+const { resolveCalls } = require('../../server/services/resolver');
+const { buildGraph } = require('../../server/services/graphBuilder');
 
-const fixturesDir = path.join(__dirname, 'fixtures', 'sample_project');
-let passed = 0;
-let failed = 0;
+const FIXTURES = path.join(__dirname, '..', 'fixtures');
+const fixturesDir = path.join(FIXTURES, 'sample_project');
+const cppFixturesDir = path.join(FIXTURES, 'cpp_project');
+const csFixturesDir = path.join(FIXTURES, 'csharp_project');
+const jsFixturesDir = path.join(FIXTURES, 'js_project');
+const webFixturesDir = path.join(FIXTURES, 'web_project');
+const tsFixturesDir = path.join(FIXTURES, 'ts_project');
 
+/** @type {string[]} */
+let failures = [];
 function assert(condition, msg) {
-  if (!condition) {
-    failed++;
-    console.error(`  FAIL: ${msg}`);
-  } else {
-    passed++;
-    console.log(`  PASS: ${msg}`);
-  }
+  if (!condition) failures.push(msg);
 }
-
 function assertContains(arr, val, msg) {
   assert(arr.includes(val), msg);
 }
-
 function assertDefined(val, msg) {
   assert(val !== undefined && val !== null, msg);
 }
 
-// --- Parser Tests ---
-console.log('\n=== Parser Tests ===');
+beforeEach(() => {
+  failures = [];
+});
 
-const mainCode = fs.readFileSync(path.join(fixturesDir, 'main.py'), 'utf-8');
-const mainResult = parseFile(mainCode, 'main.py');
+test('Python Parser/Resolver/GraphBuilder', async () => {
+  const mainCode = fs.readFileSync(path.join(fixturesDir, 'main.py'), 'utf-8');
+  const mainResult = parseFile(mainCode, 'main.py');
 
-assertContains(
-  mainResult.functions.map((f) => f.name),
-  'main',
-  'extracts main function',
-);
-assertContains(
-  mainResult.functions.map((f) => f.name),
-  'process_data',
-  'extracts process_data function',
-);
-assertContains(
-  mainResult.functions.map((f) => f.name),
-  'clean',
-  'extracts clean function',
-);
+  assertContains(
+    mainResult.functions.map((f) => f.name),
+    'main',
+    'extracts main function',
+  );
+  assertContains(
+    mainResult.functions.map((f) => f.name),
+    'process_data',
+    'extracts process_data function',
+  );
+  assertContains(
+    mainResult.functions.map((f) => f.name),
+    'clean',
+    'extracts clean function',
+  );
 
-const mainFunc = mainResult.functions.find((f) => f.name === 'main');
-assert(mainFunc.docstring.includes('Entry point'), 'extracts main docstring');
+  const mainFunc = mainResult.functions.find((f) => f.name === 'main');
+  assert(mainFunc.docstring.includes('Entry point'), 'extracts main docstring');
 
-const cleanFunc = mainResult.functions.find((f) => f.name === 'clean');
-assert(cleanFunc.docstring.includes('whitespace'), 'extracts clean docstring');
+  const cleanFunc = mainResult.functions.find((f) => f.name === 'clean');
+  assert(cleanFunc.docstring.includes('whitespace'), 'extracts clean docstring');
 
-const mainCalls = mainResult.calls.filter((c) => c.caller === 'main');
-assertContains(
-  mainCalls.map((c) => c.callee),
-  'helper_func',
-  'main calls helper_func',
-);
-assertContains(
-  mainCalls.map((c) => c.callee),
-  'add',
-  'main calls add',
-);
+  const mainCalls = mainResult.calls.filter((c) => c.caller === 'main');
+  assertContains(
+    mainCalls.map((c) => c.callee),
+    'helper_func',
+    'main calls helper_func',
+  );
+  assertContains(
+    mainCalls.map((c) => c.callee),
+    'add',
+    'main calls add',
+  );
 
-assertContains(
-  mainResult.imports.map((i) => i.name),
-  'helper_func',
-  'imports helper_func',
-);
-assertContains(
-  mainResult.imports.map((i) => i.name),
-  'add',
-  'imports add',
-);
+  assertContains(
+    mainResult.imports.map((i) => i.name),
+    'helper_func',
+    'imports helper_func',
+  );
+  assertContains(
+    mainResult.imports.map((i) => i.name),
+    'add',
+    'imports add',
+  );
 
-const mathCode = fs.readFileSync(path.join(fixturesDir, 'math_ops.py'), 'utf-8');
-const mathResult = parseFile(mathCode, 'math_ops.py');
-assertContains(
-  mathResult.functions.map((f) => f.qualifiedName),
-  'Calculator.add',
-  'extracts Calculator.add',
-);
-assertContains(
-  mathResult.functions.map((f) => f.qualifiedName),
-  'Calculator.multiply',
-  'extracts Calculator.multiply',
-);
+  const mathCode = fs.readFileSync(path.join(fixturesDir, 'math_ops.py'), 'utf-8');
+  const mathResult = parseFile(mathCode, 'math_ops.py');
+  assertContains(
+    mathResult.functions.map((f) => f.qualifiedName),
+    'Calculator.add',
+    'extracts Calculator.add',
+  );
+  assertContains(
+    mathResult.functions.map((f) => f.qualifiedName),
+    'Calculator.multiply',
+    'extracts Calculator.multiply',
+  );
 
-assert(mainFunc.startLine > 0, 'start line > 0');
-assert(mainFunc.endLine >= mainFunc.startLine, 'end line >= start line');
+  assert(mainFunc.startLine > 0, 'start line > 0');
+  assert(mainFunc.endLine >= mainFunc.startLine, 'end line >= start line');
 
-// --- Resolver Tests ---
-console.log('\n=== Resolver Tests ===');
+  // --- Resolver Tests ---
 
-const utilsCode = fs.readFileSync(path.join(fixturesDir, 'utils.py'), 'utf-8');
-const utilsResult = parseFile(utilsCode, 'utils.py');
+  const utilsCode = fs.readFileSync(path.join(fixturesDir, 'utils.py'), 'utf-8');
+  const utilsResult = parseFile(utilsCode, 'utils.py');
 
-const allFunctions = [...mainResult.functions, ...utilsResult.functions, ...mathResult.functions];
-const allCalls = [...mainResult.calls, ...utilsResult.calls, ...mathResult.calls];
-const allImports = [
-  { filePath: 'main.py', imports: mainResult.imports },
-  { filePath: 'utils.py', imports: utilsResult.imports },
-  { filePath: 'math_ops.py', imports: mathResult.imports },
-];
+  const allFunctions = [...mainResult.functions, ...utilsResult.functions, ...mathResult.functions];
+  const allCalls = [...mainResult.calls, ...utilsResult.calls, ...mathResult.calls];
+  const allImports = [
+    { filePath: 'main.py', imports: mainResult.imports },
+    { filePath: 'utils.py', imports: utilsResult.imports },
+    { filePath: 'math_ops.py', imports: mathResult.imports },
+  ];
 
-const edges = resolveCalls(allFunctions, allCalls, allImports);
+  const edges = resolveCalls(allFunctions, allCalls, allImports);
 
-const cleanEdge = edges.find(
-  (e) => e.source === 'main.py::process_data' && e.target === 'main.py::clean',
-);
-assertDefined(cleanEdge, 'resolves same-file call process_data->clean');
+  const cleanEdge = edges.find(
+    (e) => e.source === 'main.py::process_data' && e.target === 'main.py::clean',
+  );
+  assertDefined(cleanEdge, 'resolves same-file call process_data->clean');
 
-const helperEdge = edges.find(
-  (e) => e.source === 'main.py::main' && e.target === 'utils.py::helper_func',
-);
-assertDefined(helperEdge, 'resolves cross-file call main->helper_func');
+  const helperEdge = edges.find(
+    (e) => e.source === 'main.py::main' && e.target === 'utils.py::helper_func',
+  );
+  assertDefined(helperEdge, 'resolves cross-file call main->helper_func');
 
-const addEdge = edges.find((e) => e.source === 'main.py::main' && e.target.includes('add'));
-assertDefined(addEdge, 'resolves cross-file call main->add');
+  const addEdge = edges.find((e) => e.source === 'main.py::main' && e.target.includes('add'));
+  assertDefined(addEdge, 'resolves cross-file call main->add');
 
-const printEdge = edges.find((e) => e.target && e.target.includes('print'));
-assert(!printEdge, 'no edge for built-in print');
+  const printEdge = edges.find((e) => e.target && e.target.includes('print'));
+  assert(!printEdge, 'no edge for built-in print');
 
-for (const edge of edges) {
-  assert(edge.references.length > 0, `edge ${edge.source}->${edge.target} has references`);
-}
+  for (const edge of edges) {
+    assert(edge.references.length > 0, `edge ${edge.source}->${edge.target} has references`);
+  }
 
-// --- GraphBuilder Tests ---
-console.log('\n=== GraphBuilder Tests ===');
+  // --- GraphBuilder Tests ---
 
-(async () => {
   const graph = await buildGraph(fixturesDir);
 
   assert(Array.isArray(graph.nodes), 'graph has nodes array');
@@ -156,10 +155,10 @@ console.log('\n=== GraphBuilder Tests ===');
   assertDefined(graph.webEdges, 'graph has webEdges');
 
   // --- C++ Parser Tests ---
-  console.log('\n=== C++ Parser Tests ===');
+  expect(failures).toEqual([]);
+});
 
-  const cppFixturesDir = path.join(__dirname, 'fixtures', 'cpp_project');
-
+test('C++ Parser', async () => {
   const cppMainCode = fs.readFileSync(path.join(cppFixturesDir, 'main.cpp'), 'utf-8');
   const cppMainResult = parseFile(cppMainCode, 'main.cpp', 'cpp');
 
@@ -252,8 +251,10 @@ console.log('\n=== GraphBuilder Tests ===');
   );
 
   // --- C++ GraphBuilder Test ---
-  console.log('\n=== C++ GraphBuilder Tests ===');
+  expect(failures).toEqual([]);
+});
 
+test('C++ GraphBuilder', async () => {
   const cppGraph = await buildGraph(cppFixturesDir);
   assert(Array.isArray(cppGraph.nodes), '[C++] graph has nodes');
   assert(
@@ -263,10 +264,10 @@ console.log('\n=== GraphBuilder Tests ===');
   assert(cppGraph.fileCounts.cpp > 0, '[C++] fileCounts has cpp');
 
   // --- C# Parser Tests ---
-  console.log('\n=== C# Parser Tests ===');
+  expect(failures).toEqual([]);
+});
 
-  const csFixturesDir = path.join(__dirname, 'fixtures', 'csharp_project');
-
+test('C# Parser', async () => {
   const csProgramCode = fs.readFileSync(path.join(csFixturesDir, 'Program.cs'), 'utf-8');
   const csProgramResult = parseFile(csProgramCode, 'Program.cs', 'csharp');
 
@@ -343,8 +344,10 @@ console.log('\n=== GraphBuilder Tests ===');
   );
 
   // --- C# GraphBuilder Test ---
-  console.log('\n=== C# GraphBuilder Tests ===');
+  expect(failures).toEqual([]);
+});
 
+test('C# GraphBuilder', async () => {
   const csGraph = await buildGraph(csFixturesDir);
   assert(Array.isArray(csGraph.nodes), '[C#] graph has nodes');
   assert(
@@ -354,10 +357,10 @@ console.log('\n=== GraphBuilder Tests ===');
   assert(csGraph.fileCounts.csharp > 0, '[C#] fileCounts has csharp');
 
   // --- JavaScript Parser Tests ---
-  console.log('\n=== JavaScript Parser Tests ===');
+  expect(failures).toEqual([]);
+});
 
-  const jsFixturesDir = path.join(__dirname, 'fixtures', 'js_project');
-
+test('JavaScript Parser', async () => {
   // app.js - ES6 imports, classes, arrow functions, async, DOM
   const jsAppCode = fs.readFileSync(path.join(jsFixturesDir, 'app.js'), 'utf-8');
   const jsAppResult = parseFile(jsAppCode, 'app.js', 'javascript');
@@ -554,9 +557,10 @@ console.log('\n=== GraphBuilder Tests ===');
   );
 
   // --- HTML Parser Tests ---
-  console.log('\n=== HTML Parser Tests ===');
+  expect(failures).toEqual([]);
+});
 
-  const webFixturesDir = path.join(__dirname, 'fixtures', 'web_project');
+test('HTML Parser', async () => {
   const htmlCode = fs.readFileSync(path.join(webFixturesDir, 'index.html'), 'utf-8');
   const htmlResult = parseFile(htmlCode, 'index.html', 'html');
 
@@ -672,8 +676,10 @@ console.log('\n=== GraphBuilder Tests ===');
   );
 
   // --- CSS Parser Tests ---
-  console.log('\n=== CSS Parser Tests ===');
+  expect(failures).toEqual([]);
+});
 
+test('CSS Parser', async () => {
   const cssCode = fs.readFileSync(path.join(webFixturesDir, 'style.css'), 'utf-8');
   const cssResult = parseFile(cssCode, 'style.css', 'css');
 
@@ -785,8 +791,10 @@ console.log('\n=== GraphBuilder Tests ===');
   );
 
   // --- Web Project GraphBuilder Test ---
-  console.log('\n=== Web Project GraphBuilder Tests ===');
+  expect(failures).toEqual([]);
+});
 
+test('Web Project GraphBuilder', async () => {
   const webGraph = await buildGraph(webFixturesDir);
   assert(Array.isArray(webGraph.nodes), '[Web] graph has nodes');
   assert(webGraph.fileCounts.html > 0, '[Web] fileCounts has html');
@@ -801,8 +809,10 @@ console.log('\n=== GraphBuilder Tests ===');
   assert(webGraph.inheritanceEdges.length >= 0, '[Web] graph has inheritanceEdges array');
 
   // --- JS Project GraphBuilder Test (cross-file resolution) ---
-  console.log('\n=== JS Project GraphBuilder Tests ===');
+  expect(failures).toEqual([]);
+});
 
+test('JS Project GraphBuilder', async () => {
   const jsGraph = await buildGraph(jsFixturesDir);
   assert(jsGraph.fileCounts.javascript > 0, '[JS Graph] fileCounts has javascript');
 
@@ -822,8 +832,10 @@ console.log('\n=== GraphBuilder Tests ===');
   );
 
   // --- Edge Case Tests ---
-  console.log('\n=== Edge Case Tests ===');
+  expect(failures).toEqual([]);
+});
 
+test('Edge Case', async () => {
   // Empty file parsing
   const emptyPyResult = parseFile('', 'empty.py');
   assert(emptyPyResult.functions.length === 0, '[Edge] empty Python file has no functions');
@@ -953,10 +965,10 @@ class Child(Base1, Base2):
   );
 
   // --- TypeScript Parser Tests ---
-  console.log('\n=== TypeScript Parser Tests ===');
+  expect(failures).toEqual([]);
+});
 
-  const tsFixturesDir = path.join(__dirname, 'fixtures', 'ts_project');
-
+test('TypeScript Parser', async () => {
   // models.ts - interfaces, type aliases, enums
   const tsModelsCode = fs.readFileSync(path.join(tsFixturesDir, 'models.ts'), 'utf-8');
   const tsModelsResult = parseFile(tsModelsCode, 'models.ts', 'typescript');
@@ -1151,8 +1163,10 @@ class Child(Base1, Base2):
   assert(emptyTsResult.classes.length === 0, '[TS] empty TS file has no classes');
 
   // --- TypeScript GraphBuilder Test ---
-  console.log('\n=== TypeScript GraphBuilder Tests ===');
+  expect(failures).toEqual([]);
+});
 
+test('TypeScript GraphBuilder', async () => {
   const tsGraph = await buildGraph(tsFixturesDir);
   assert(Array.isArray(tsGraph.nodes), '[TS] graph has nodes');
   assert(
@@ -1162,11 +1176,13 @@ class Child(Base1, Base2):
   assert(tsGraph.fileCounts.typescript > 0, '[TS] fileCounts has typescript');
 
   // --- Inline Script Event Binding Test (익명 핸들러 null 회귀) ---
-  console.log('\n=== Inline Script Event Binding Tests ===');
+  expect(failures).toEqual([]);
+});
 
+test('Inline Script Event Binding', async () => {
   let inlineGraph = null;
   try {
-    inlineGraph = await buildGraph(path.join(__dirname, 'fixtures', 'inline_script_project'));
+    inlineGraph = await buildGraph(path.join(FIXTURES, 'inline_script_project'));
   } catch (err) {
     console.error('  ERROR:', err.message);
   }
@@ -1181,7 +1197,5 @@ class Child(Base1, Base2):
     assert(onclickEdge !== undefined, '[Inline] onclick attribute still links to handleSave');
   }
 
-  // --- Summary ---
-  console.log(`\n=== Results: ${passed} passed, ${failed} failed ===`);
-  process.exit(failed > 0 ? 1 : 0);
-})();
+  expect(failures).toEqual([]);
+});
