@@ -19,12 +19,12 @@ function resolveWebRelations(parsedFiles, _projectPath) {
   }
 
   //HTML 요소 인덱스 구축 (id, class, tag 기반)
-  const elemById = new Map();    // id → { element, filePath }
+  const elemById = new Map(); // id → { element, filePath }
   const elemByClass = new Map(); // class → [{ element, filePath }]
-  const elemByTag = new Map();   // tag → [{ element, filePath }]
+  const elemByTag = new Map(); // tag → [{ element, filePath }]
 
   for (const hf of htmlFiles) {
-    for (const elem of (hf.parsed.elements || [])) {
+    for (const elem of hf.parsed.elements || []) {
       if (elem.id) {
         elemById.set(elem.id, { element: elem, filePath: hf.filePath });
       }
@@ -40,7 +40,7 @@ function resolveWebRelations(parsedFiles, _projectPath) {
   //CSS 변수 인덱스 구축
   const cssVarDefs = new Map(); // --var-name → { filePath, line }
   for (const cf of cssFiles) {
-    for (const v of (cf.parsed.variables || [])) {
+    for (const v of cf.parsed.variables || []) {
       cssVarDefs.set(v.name, { filePath: cf.filePath, line: v.line });
     }
   }
@@ -48,7 +48,7 @@ function resolveWebRelations(parsedFiles, _projectPath) {
   //JS 함수 인덱스 구축
   const jsFuncByName = new Map(); // name → [{ func, filePath }]
   for (const jf of jsFiles) {
-    for (const func of (jf.parsed.functions || [])) {
+    for (const func of jf.parsed.functions || []) {
       if (!jsFuncByName.has(func.name)) jsFuncByName.set(func.name, []);
       jsFuncByName.get(func.name).push({ func, filePath: jf.filePath });
       if (func.qualifiedName !== func.name) {
@@ -60,7 +60,7 @@ function resolveWebRelations(parsedFiles, _projectPath) {
 
   //1. HTML → JS/CSS 파일 참조 (script-ref, style-ref)
   for (const hf of htmlFiles) {
-    for (const imp of (hf.parsed.imports || [])) {
+    for (const imp of hf.parsed.imports || []) {
       if (imp.type === 'script-ref' || imp.type === 'style-ref') {
         const targetPath = resolveHref(imp.href, hf.filePath, parsedFiles);
         if (targetPath) {
@@ -79,10 +79,8 @@ function resolveWebRelations(parsedFiles, _projectPath) {
 
   //2. JS DOM 접근 → HTML 요소 매칭
   for (const jf of jsFiles) {
-    for (const access of (jf.parsed.domAccesses || [])) {
-      const sourceId = access.caller
-        ? `${jf.filePath}::${access.caller}`
-        : jf.filePath;
+    for (const access of jf.parsed.domAccesses || []) {
+      const sourceId = access.caller ? `${jf.filePath}::${access.caller}` : jf.filePath;
 
       if (access.queryType === 'id') {
         const target = elemById.get(access.query);
@@ -171,7 +169,7 @@ function resolveWebRelations(parsedFiles, _projectPath) {
 
   //3. CSS 셀렉터 → HTML 요소 매칭
   for (const cf of cssFiles) {
-    for (const sel of (cf.parsed.selectors || [])) {
+    for (const sel of cf.parsed.selectors || []) {
       //ID 셀렉터 매칭
       for (const id of sel.ids) {
         const target = elemById.get(id);
@@ -220,7 +218,7 @@ function resolveWebRelations(parsedFiles, _projectPath) {
   //4. 이벤트 바인딩 → JS 함수 매칭
   //HTML 인라인 이벤트
   for (const hf of htmlFiles) {
-    for (const evt of (hf.parsed.eventBindings || [])) {
+    for (const evt of hf.parsed.eventBindings || []) {
       //인라인 <script>의 addEventListener 결과도 graphBuilder에서 여기로 병합된다.
       //익명 함수 핸들러(addEventListener('click', () => {...}))는 handler가 null이므로 건너뛴다.
       if (typeof evt.handler !== 'string') continue;
@@ -250,14 +248,12 @@ function resolveWebRelations(parsedFiles, _projectPath) {
 
   //JS addEventListener
   for (const jf of jsFiles) {
-    for (const evt of (jf.parsed.eventBindings || [])) {
+    for (const evt of jf.parsed.eventBindings || []) {
       if (evt.handler) {
         const targetFuncs = jsFuncByName.get(evt.handler);
         if (targetFuncs && targetFuncs.length > 0) {
           const target = targetFuncs[0];
-          const sourceId = evt.caller
-            ? `${jf.filePath}::${evt.caller}`
-            : jf.filePath;
+          const sourceId = evt.caller ? `${jf.filePath}::${evt.caller}` : jf.filePath;
           edges.push({
             source: sourceId,
             target: `${target.filePath}::${target.func.qualifiedName}`,
@@ -274,7 +270,7 @@ function resolveWebRelations(parsedFiles, _projectPath) {
 
   //5. CSS @import 관계
   for (const cf of cssFiles) {
-    for (const imp of (cf.parsed.imports || [])) {
+    for (const imp of cf.parsed.imports || []) {
       if (imp.type === 'css-import') {
         const targetPath = resolveHref(imp.href, cf.filePath, parsedFiles);
         if (targetPath) {
@@ -293,7 +289,7 @@ function resolveWebRelations(parsedFiles, _projectPath) {
 
   //6. JS import/require 관계
   for (const jf of jsFiles) {
-    for (const imp of (jf.parsed.imports || [])) {
+    for (const imp of jf.parsed.imports || []) {
       const targetPath = resolveJsImport(imp.module, jf.filePath, parsedFiles);
       if (targetPath && targetPath !== jf.filePath) {
         edges.push({
@@ -310,7 +306,7 @@ function resolveWebRelations(parsedFiles, _projectPath) {
 
   //7. CSS 변수 참조 관계
   for (const cf of cssFiles) {
-    for (const ref of (cf.parsed.variableRefs || [])) {
+    for (const ref of cf.parsed.variableRefs || []) {
       if (ref.type === 'css-var-ref') {
         const varDef = cssVarDefs.get(ref.variable);
         if (varDef) {
@@ -339,16 +335,18 @@ function resolveHref(href, fromFile, parsedFiles) {
 
   //상대 경로 해석
   const fromDir = fromFile.split('/').slice(0, -1).join('/');
-  const resolved = href.startsWith('/')
-    ? href.substring(1)
-    : (fromDir ? fromDir + '/' + href : href);
+  const resolved = href.startsWith('/') ? href.substring(1) : fromDir ? fromDir + '/' + href : href;
 
   //정규화
   const normalized = path.normalize(resolved).replace(/\\/g, '/');
 
   //파싱된 파일 목록에서 매칭
   for (const pf of parsedFiles) {
-    if (pf.filePath === normalized || pf.filePath.endsWith('/' + normalized) || pf.filePath === href) {
+    if (
+      pf.filePath === normalized ||
+      pf.filePath.endsWith('/' + normalized) ||
+      pf.filePath === href
+    ) {
       return pf.filePath;
     }
   }
@@ -373,7 +371,9 @@ function resolveJsImport(modulePath, fromFile, parsedFiles) {
   const fromDir = fromFile.split('/').slice(0, -1).join('/');
   let resolved = modulePath.startsWith('/')
     ? modulePath.substring(1)
-    : (fromDir ? fromDir + '/' + modulePath : modulePath);
+    : fromDir
+      ? fromDir + '/' + modulePath
+      : modulePath;
 
   resolved = path.normalize(resolved).replace(/\\/g, '/');
 
@@ -436,15 +436,15 @@ function resolveJsCalls(allFunctions, allCalls, _allImports) {
 
     //1. 같은 파일
     const fileFuncs = funcByFile.get(call.filePath) || [];
-    let target = fileFuncs.find(f =>
-      f.qualifiedName === call.callee || f.name === call.callee || f.name === simpleCallee
+    let target = fileFuncs.find(
+      (f) => f.qualifiedName === call.callee || f.name === call.callee || f.name === simpleCallee,
     );
 
     //2. 전역 탐색
     if (!target) {
       const globals = funcByName.get(simpleCallee) || funcByName.get(call.callee) || [];
       if (globals.length > 0) {
-        target = globals.find(f => f.filePath !== call.filePath) || globals[0];
+        target = globals.find((f) => f.filePath !== call.filePath) || globals[0];
       }
     }
 

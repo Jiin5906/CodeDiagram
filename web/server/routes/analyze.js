@@ -21,7 +21,10 @@ router.post('/', async (req, res) => {
     graph.analysisId = registerProject(projectPath);
     res.json(graph);
   } catch (err) {
-    if (err.message.includes('does not exist') || err.message.includes('지원하는 파일을 찾을 수 없습니다')) {
+    if (
+      err.message.includes('does not exist') ||
+      err.message.includes('지원하는 파일을 찾을 수 없습니다')
+    ) {
       return res.status(400).json({ error: err.message });
     }
     console.error('Analyze error:', err);

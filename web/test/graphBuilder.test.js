@@ -16,10 +16,10 @@ describe('graphBuilder', () => {
 
   test('creates file nodes', () => {
     const graph = buildGraph(fixturesDir);
-    const fileNodes = graph.nodes.filter(n => n.data.type === 'file');
+    const fileNodes = graph.nodes.filter((n) => n.data.type === 'file');
 
     expect(fileNodes.length).toBeGreaterThanOrEqual(3);
-    const fileIds = fileNodes.map(n => n.data.id);
+    const fileIds = fileNodes.map((n) => n.data.id);
     expect(fileIds).toContain('main.py');
     expect(fileIds).toContain('utils.py');
     expect(fileIds).toContain('math_ops.py');
@@ -27,7 +27,7 @@ describe('graphBuilder', () => {
 
   test('creates function nodes with parent references', () => {
     const graph = buildGraph(fixturesDir);
-    const funcNodes = graph.nodes.filter(n => n.data.type === 'function');
+    const funcNodes = graph.nodes.filter((n) => n.data.type === 'function');
 
     expect(funcNodes.length).toBeGreaterThan(0);
     for (const node of funcNodes) {

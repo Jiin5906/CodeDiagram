@@ -21,13 +21,20 @@ function createParser() {
 function parseFile(code, filePath, language) {
   if (language && language !== 'python') {
     switch (language) {
-      case 'html': return parseHtml(code, filePath);
-      case 'css':  return parseCss(code, filePath);
-      case 'javascript': return parseJs(code, filePath);
-      case 'cpp': return parseCpp(code, filePath);
-      case 'csharp': return parseCsharp(code, filePath);
-      case 'typescript': return parseTs(code, filePath);
-      default: return null;
+      case 'html':
+        return parseHtml(code, filePath);
+      case 'css':
+        return parseCss(code, filePath);
+      case 'javascript':
+        return parseJs(code, filePath);
+      case 'cpp':
+        return parseCpp(code, filePath);
+      case 'csharp':
+        return parseCsharp(code, filePath);
+      case 'typescript':
+        return parseTs(code, filePath);
+      default:
+        return null;
     }
   }
   return parsePython(code, filePath);
@@ -224,15 +231,62 @@ function collectCalls(node, callerName, filePath, calls) {
 //변수/필드를 수집하는 함수다.
 //모듈 최상위 assignment와 클래스 body 내 assignment에서 변수명을 추출한다.
 const VARIABLE_BLACKLIST = new Set([
-  'self', 'cls', 'True', 'False', 'None', 'print', 'len', 'range',
-  'int', 'str', 'float', 'bool', 'list', 'dict', 'set', 'tuple',
-  'type', 'super', 'object', 'isinstance', 'issubclass', 'hasattr',
-  'getattr', 'setattr', 'delattr', 'property', 'staticmethod',
-  'classmethod', 'enumerate', 'zip', 'map', 'filter', 'sorted',
-  'reversed', 'min', 'max', 'sum', 'abs', 'round', 'input', 'open',
-  'Exception', 'ValueError', 'TypeError', 'KeyError', 'IndexError',
-  'AttributeError', 'RuntimeError', 'StopIteration', 'NotImplementedError',
-  '__name__', '__main__', '__init__', '__all__', '__file__', '__doc__',
+  'self',
+  'cls',
+  'True',
+  'False',
+  'None',
+  'print',
+  'len',
+  'range',
+  'int',
+  'str',
+  'float',
+  'bool',
+  'list',
+  'dict',
+  'set',
+  'tuple',
+  'type',
+  'super',
+  'object',
+  'isinstance',
+  'issubclass',
+  'hasattr',
+  'getattr',
+  'setattr',
+  'delattr',
+  'property',
+  'staticmethod',
+  'classmethod',
+  'enumerate',
+  'zip',
+  'map',
+  'filter',
+  'sorted',
+  'reversed',
+  'min',
+  'max',
+  'sum',
+  'abs',
+  'round',
+  'input',
+  'open',
+  'Exception',
+  'ValueError',
+  'TypeError',
+  'KeyError',
+  'IndexError',
+  'AttributeError',
+  'RuntimeError',
+  'StopIteration',
+  'NotImplementedError',
+  '__name__',
+  '__main__',
+  '__init__',
+  '__all__',
+  '__file__',
+  '__doc__',
 ]);
 
 function collectVariables(node, filePath, variables, className) {

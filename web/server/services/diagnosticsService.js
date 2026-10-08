@@ -183,7 +183,7 @@ function detectWebAntiPatterns(webParsedFiles) {
   for (const pf of webParsedFiles) {
     if (pf.language === 'html') {
       //인라인 스타일 과다 탐지
-      for (const elem of (pf.parsed.elements || [])) {
+      for (const elem of pf.parsed.elements || []) {
         if (elem.id) htmlIds.add(elem.id);
         for (const cls of elem.classes) htmlClasses.add(cls);
         allHtmlElements.push(elem);
@@ -204,14 +204,14 @@ function detectWebAntiPatterns(webParsedFiles) {
     }
 
     if (pf.language === 'css') {
-      for (const sel of (pf.parsed.selectors || [])) {
+      for (const sel of pf.parsed.selectors || []) {
         allSelectors.push({ ...sel, sourceFile: pf.filePath });
       }
     }
 
     if (pf.language === 'javascript') {
       //거대 JS 파일 탐지
-      for (const func of (pf.parsed.functions || [])) {
+      for (const func of pf.parsed.functions || []) {
         jsDefinedFuncs.add(func.name);
         const lineCount = func.endLine - func.startLine + 1;
         if (lineCount >= GOD_FUNCTION_LINES) {
@@ -224,7 +224,7 @@ function detectWebAntiPatterns(webParsedFiles) {
         }
       }
 
-      for (const call of (pf.parsed.calls || [])) {
+      for (const call of pf.parsed.calls || []) {
         jsCalledFuncs.add(call.callee.split('.').pop());
       }
 
@@ -245,11 +245,17 @@ function detectWebAntiPatterns(webParsedFiles) {
   for (const sel of allSelectors) {
     let isUsed = false;
     for (const id of sel.ids) {
-      if (htmlIds.has(id)) { isUsed = true; break; }
+      if (htmlIds.has(id)) {
+        isUsed = true;
+        break;
+      }
     }
     if (!isUsed) {
       for (const cls of sel.classes) {
-        if (htmlClasses.has(cls)) { isUsed = true; break; }
+        if (htmlClasses.has(cls)) {
+          isUsed = true;
+          break;
+        }
       }
     }
     if (!isUsed && sel.tags.length > 0) {
@@ -272,9 +278,13 @@ function detectWebAntiPatterns(webParsedFiles) {
   //미사용 JS 함수 탐지
   for (const pf of webParsedFiles) {
     if (pf.language === 'javascript') {
-      for (const func of (pf.parsed.functions || [])) {
-        if (!jsCalledFuncs.has(func.name) && func.name !== 'anonymous' &&
-            !func.name.startsWith('_') && func.name !== 'constructor') {
+      for (const func of pf.parsed.functions || []) {
+        if (
+          !jsCalledFuncs.has(func.name) &&
+          func.name !== 'anonymous' &&
+          !func.name.startsWith('_') &&
+          func.name !== 'constructor'
+        ) {
           issues.push({
             type: 'unused_js_function',
             nodeId: `${pf.filePath}::${func.qualifiedName}`,
@@ -310,4 +320,10 @@ function runDiagnostics(edges, functions, classes, webParsedFiles) {
   };
 }
 
-module.exports = { runDiagnostics, detectCycles, detectFileCycles, detectCouplingIssues, detectAntiPatterns };
+module.exports = {
+  runDiagnostics,
+  detectCycles,
+  detectFileCycles,
+  detectCouplingIssues,
+  detectAntiPatterns,
+};

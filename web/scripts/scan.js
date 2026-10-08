@@ -26,20 +26,37 @@ const [command, target] = process.argv.slice(2);
 if (command === 'secrets') {
   //저장소 전체 커밋 기록에서 비밀값을 찾는다. 찾은 값은 출력에서 가린다(--redact).
   docker([
-    '-v', `${REPO_ROOT}:/repo`,
-    '-e', 'GIT_CONFIG_COUNT=1',
-    '-e', 'GIT_CONFIG_KEY_0=safe.directory',
-    '-e', 'GIT_CONFIG_VALUE_0=/repo',
+    '-v',
+    `${REPO_ROOT}:/repo`,
+    '-e',
+    'GIT_CONFIG_COUNT=1',
+    '-e',
+    'GIT_CONFIG_KEY_0=safe.directory',
+    '-e',
+    'GIT_CONFIG_VALUE_0=/repo',
     GITLEAKS_IMAGE,
-    'git', '/repo', '--redact', '--no-banner', '--exit-code', '1',
+    'git',
+    '/repo',
+    '--redact',
+    '--no-banner',
+    '--exit-code',
+    '1',
   ]);
 } else if (command === 'image') {
   //빌드된 Docker 이미지의 OS/npm 패키지 취약점을 검사한다. 고칠 수 있는 HIGH 이상이면 실패.
   docker([
-    '-v', '/var/run/docker.sock:/var/run/docker.sock',
-    '-v', 'code-diagram-trivy-cache:/root/.cache/trivy',
+    '-v',
+    '/var/run/docker.sock:/var/run/docker.sock',
+    '-v',
+    'code-diagram-trivy-cache:/root/.cache/trivy',
     TRIVY_IMAGE,
-    'image', '--severity', 'HIGH,CRITICAL', '--ignore-unfixed', '--exit-code', '1', '--no-progress',
+    'image',
+    '--severity',
+    'HIGH,CRITICAL',
+    '--ignore-unfixed',
+    '--exit-code',
+    '1',
+    '--no-progress',
     target || 'code-diagram:local',
   ]);
 } else {

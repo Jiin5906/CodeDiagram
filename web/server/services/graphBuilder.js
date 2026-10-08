@@ -26,7 +26,7 @@ const CHUNK_SIZE = 20;
 
 //이벤트 루프 양보 유틸리티
 function yieldToEventLoop() {
-  return new Promise(resolve => setImmediate(resolve));
+  return new Promise((resolve) => setImmediate(resolve));
 }
 
 //프로젝트 디렉토리에서 그래프를 만드는 비동기 함수다.
@@ -34,15 +34,17 @@ async function buildGraph(projectPath) {
   const { files, warnings } = findFiles(projectPath);
 
   if (files.length === 0) {
-    throw new Error('지원하는 파일을 찾을 수 없습니다 (.py, .html, .css, .js, .ts, .tsx, .cpp, .h, .cs)');
+    throw new Error(
+      '지원하는 파일을 찾을 수 없습니다 (.py, .html, .css, .js, .ts, .tsx, .cpp, .h, .cs)',
+    );
   }
 
   //파일을 언어별로 분류
   //티어 기반 언어: Python, C++, C#, TypeScript (resolver.js로 해석)
   //웹 언어: HTML, CSS, JavaScript (webResolver.js로 해석)
   const TIERED_LANGUAGES = new Set(['python', 'cpp', 'csharp', 'typescript']);
-  const tieredFiles = files.filter(f => TIERED_LANGUAGES.has(f.language));
-  const webFiles = files.filter(f => !TIERED_LANGUAGES.has(f.language));
+  const tieredFiles = files.filter((f) => TIERED_LANGUAGES.has(f.language));
+  const webFiles = files.filter((f) => !TIERED_LANGUAGES.has(f.language));
 
   //티어 기반 언어 데이터 (Python, C++, C#, TypeScript)
   const tieredFunctions = [];
@@ -137,8 +139,14 @@ async function buildGraph(projectPath) {
               jsFunctions.push(...inlineResult.functions);
               jsCalls.push(...inlineResult.calls);
               //인라인 결과를 HTML 파일의 웹 데이터에 병합
-              pf.parsed.domAccesses = [...(pf.parsed.domAccesses || []), ...(inlineResult.domAccesses || [])];
-              pf.parsed.eventBindings = [...(pf.parsed.eventBindings || []), ...(inlineResult.eventBindings || [])];
+              pf.parsed.domAccesses = [
+                ...(pf.parsed.domAccesses || []),
+                ...(inlineResult.domAccesses || []),
+              ];
+              pf.parsed.eventBindings = [
+                ...(pf.parsed.eventBindings || []),
+                ...(inlineResult.eventBindings || []),
+              ];
             }
           } catch {
             //인라인 파싱 실패는 무시
@@ -152,9 +160,18 @@ async function buildGraph(projectPath) {
           try {
             const inlineResult = parseFile(inline.code, pf.filePath, 'css');
             if (inlineResult) {
-              pf.parsed.selectors = [...(pf.parsed.selectors || []), ...(inlineResult.selectors || [])];
-              pf.parsed.variables = [...(pf.parsed.variables || []), ...(inlineResult.variables || [])];
-              pf.parsed.variableRefs = [...(pf.parsed.variableRefs || []), ...(inlineResult.variableRefs || [])];
+              pf.parsed.selectors = [
+                ...(pf.parsed.selectors || []),
+                ...(inlineResult.selectors || []),
+              ];
+              pf.parsed.variables = [
+                ...(pf.parsed.variables || []),
+                ...(inlineResult.variables || []),
+              ];
+              pf.parsed.variableRefs = [
+                ...(pf.parsed.variableRefs || []),
+                ...(inlineResult.variableRefs || []),
+              ];
             }
           } catch {
             //인라인 파싱 실패는 무시
@@ -224,10 +241,24 @@ async function buildGraph(projectPath) {
   }
 
   //3단계 노드 생성 (티어 기반 언어 — 참조 횟수별 계층 구조)
-  const { nodes, tiers } = buildTieredNodes(tieredFunctions, tieredFiles, inboundCountMap, outboundCountMap, couplingScores, tieredVariables);
+  const { nodes, tiers } = buildTieredNodes(
+    tieredFunctions,
+    tieredFiles,
+    inboundCountMap,
+    outboundCountMap,
+    couplingScores,
+    tieredVariables,
+  );
 
   //웹 전용 노드 추가 (언어별 컨테이너: HTML, CSS, JS)
-  const { nodes: webNodes, langs } = buildWebNodes(webParsedFiles, webEdges, jsFunctions, inboundCountMap, outboundCountMap, couplingScores);
+  const { nodes: webNodes, langs } = buildWebNodes(
+    webParsedFiles,
+    webEdges,
+    jsFunctions,
+    inboundCountMap,
+    outboundCountMap,
+    couplingScores,
+  );
   nodes.push(...webNodes);
 
   //패키지 노드 생성
@@ -251,13 +282,13 @@ async function buildGraph(projectPath) {
     suggestions,
     cycleEdgeIds,
     fileCounts: {
-      python: files.filter(f => f.language === 'python').length,
-      html: files.filter(f => f.language === 'html').length,
-      css: files.filter(f => f.language === 'css').length,
-      javascript: files.filter(f => f.language === 'javascript').length,
-      cpp: files.filter(f => f.language === 'cpp').length,
-      csharp: files.filter(f => f.language === 'csharp').length,
-      typescript: files.filter(f => f.language === 'typescript').length,
+      python: files.filter((f) => f.language === 'python').length,
+      html: files.filter((f) => f.language === 'html').length,
+      css: files.filter((f) => f.language === 'css').length,
+      javascript: files.filter((f) => f.language === 'javascript').length,
+      cpp: files.filter((f) => f.language === 'cpp').length,
+      csharp: files.filter((f) => f.language === 'csharp').length,
+      typescript: files.filter((f) => f.language === 'typescript').length,
     },
   };
 }
@@ -267,7 +298,14 @@ async function buildGraph(projectPath) {
 //파일 노드는 하나만 생성되며, 파일의 "대표 티어"는 내부 함수 중 최대 참조 횟수로 결정된다.
 //개별 함수의 참조 횟수는 함수 노드의 inboundRefCount 데이터로 유지된다.
 //대상: Python, C++, C#, TypeScript
-function buildTieredNodes(functions, files, inboundCountMap, outboundCountMap, couplingScores, allVariables) {
+function buildTieredNodes(
+  functions,
+  files,
+  inboundCountMap,
+  outboundCountMap,
+  couplingScores,
+  allVariables,
+) {
   const nodes = [];
 
   //각 함수의 참조 횟수 결정 (inbound + outbound)
@@ -358,7 +396,8 @@ function buildTieredNodes(functions, files, inboundCountMap, outboundCountMap, c
       const refParts = [];
       if (inCount > 0) refParts.push(`${inCount}↓`);
       if (outCount > 0) refParts.push(`${outCount}↑`);
-      const label = refParts.length > 0 ? `${func.qualifiedName} (${refParts.join(' ')})` : func.qualifiedName;
+      const label =
+        refParts.length > 0 ? `${func.qualifiedName} (${refParts.join(' ')})` : func.qualifiedName;
 
       nodes.push({
         data: {
@@ -435,13 +474,13 @@ function buildTieredNodes(functions, files, inboundCountMap, outboundCountMap, c
       tiersWithChildren.add(node.data.parent);
     }
   }
-  const filteredNodes = nodes.filter(n => {
+  const filteredNodes = nodes.filter((n) => {
     if (n.data.type === 'tier') {
       return tiersWithChildren.has(n.data.id);
     }
     return true;
   });
-  const activeTiers = tiers.filter(t => tiersWithChildren.has(`tier__${t}`));
+  const activeTiers = tiers.filter((t) => tiersWithChildren.has(`tier__${t}`));
 
   return { nodes: filteredNodes, tiers: activeTiers };
 }
@@ -449,7 +488,14 @@ function buildTieredNodes(functions, files, inboundCountMap, outboundCountMap, c
 //웹 전용 노드를 생성한다 (HTML 요소, CSS 셀렉터, JS 함수).
 //언어별 컨테이너(lang) → 참조 횟수(tier) → 파일(file) → 리프 노드의 4단계 중첩 구조를 만든다.
 //파일 노드는 하나만 생성되며, 파일의 "대표 티어"는 내부 노드 중 최대 참조 횟수로 결정된다.
-function buildWebNodes(webParsedFiles, webEdges, jsFunctions, inboundCountMap, outboundCountMap, couplingScores) {
+function buildWebNodes(
+  webParsedFiles,
+  webEdges,
+  jsFunctions,
+  inboundCountMap,
+  outboundCountMap,
+  couplingScores,
+) {
   const nodes = [];
   const langs = [];
   const createdLangs = new Set();
@@ -478,35 +524,50 @@ function buildWebNodes(webParsedFiles, webEdges, jsFunctions, inboundCountMap, o
   for (const pf of webParsedFiles) {
     const langFileKey = `${pf.language}::${pf.filePath}`;
     if (pf.language === 'html') {
-      for (const elem of (pf.parsed.elements || [])) {
+      for (const elem of pf.parsed.elements || []) {
         if (elem.id) {
           const nodeId = `${pf.filePath}::elem#${elem.id}`;
           if (neededIds.has(nodeId)) {
-            fileMaxTier[langFileKey] = Math.max(fileMaxTier[langFileKey] || 0, webRefCount[nodeId] || 0);
+            fileMaxTier[langFileKey] = Math.max(
+              fileMaxTier[langFileKey] || 0,
+              webRefCount[nodeId] || 0,
+            );
           }
         }
         for (const cls of elem.classes) {
           const nodeId = `${pf.filePath}::elem.${cls}`;
           if (neededIds.has(nodeId)) {
-            fileMaxTier[langFileKey] = Math.max(fileMaxTier[langFileKey] || 0, webRefCount[nodeId] || 0);
+            fileMaxTier[langFileKey] = Math.max(
+              fileMaxTier[langFileKey] || 0,
+              webRefCount[nodeId] || 0,
+            );
           }
         }
         const tagNodeId = `${pf.filePath}::elem<${elem.tag}>`;
         if (neededIds.has(tagNodeId)) {
-          fileMaxTier[langFileKey] = Math.max(fileMaxTier[langFileKey] || 0, webRefCount[tagNodeId] || 0);
+          fileMaxTier[langFileKey] = Math.max(
+            fileMaxTier[langFileKey] || 0,
+            webRefCount[tagNodeId] || 0,
+          );
         }
       }
     } else if (pf.language === 'css') {
-      for (const sel of (pf.parsed.selectors || [])) {
+      for (const sel of pf.parsed.selectors || []) {
         const nodeId = `${pf.filePath}::${sel.raw}`;
         if (neededIds.has(nodeId)) {
-          fileMaxTier[langFileKey] = Math.max(fileMaxTier[langFileKey] || 0, webRefCount[nodeId] || 0);
+          fileMaxTier[langFileKey] = Math.max(
+            fileMaxTier[langFileKey] || 0,
+            webRefCount[nodeId] || 0,
+          );
         }
       }
-      for (const v of (pf.parsed.variables || [])) {
+      for (const v of pf.parsed.variables || []) {
         if (v.type === 'css-variable') {
           const varNodeId = `${v.filePath}::${v.name}`;
-          fileMaxTier[langFileKey] = Math.max(fileMaxTier[langFileKey] || 0, webRefCount[varNodeId] || 0);
+          fileMaxTier[langFileKey] = Math.max(
+            fileMaxTier[langFileKey] || 0,
+            webRefCount[varNodeId] || 0,
+          );
         }
       }
     }
@@ -580,7 +641,7 @@ function buildWebNodes(webParsedFiles, webEdges, jsFunctions, inboundCountMap, o
   const addedIds = new Set();
   for (const pf of webParsedFiles) {
     if (pf.language === 'html') {
-      for (const elem of (pf.parsed.elements || [])) {
+      for (const elem of pf.parsed.elements || []) {
         //ID 기반 노드
         if (elem.id) {
           const nodeId = `${pf.filePath}::elem#${elem.id}`;
@@ -651,7 +712,7 @@ function buildWebNodes(webParsedFiles, webEdges, jsFunctions, inboundCountMap, o
   //CSS 셀렉터 노드 생성
   for (const pf of webParsedFiles) {
     if (pf.language === 'css') {
-      for (const sel of (pf.parsed.selectors || [])) {
+      for (const sel of pf.parsed.selectors || []) {
         const nodeId = `${pf.filePath}::${sel.raw}`;
         if (neededIds.has(nodeId) && !addedIds.has(nodeId)) {
           addedIds.add(nodeId);
@@ -672,7 +733,7 @@ function buildWebNodes(webParsedFiles, webEdges, jsFunctions, inboundCountMap, o
       }
 
       //CSS 변수 노드 생성
-      for (const v of (pf.parsed.variables || [])) {
+      for (const v of pf.parsed.variables || []) {
         if (v.type === 'css-variable') {
           const varNodeId = `${v.filePath}::${v.name}`;
           if (!addedIds.has(varNodeId)) {
@@ -707,7 +768,8 @@ function buildWebNodes(webParsedFiles, webEdges, jsFunctions, inboundCountMap, o
     const refParts = [];
     if (inCount > 0) refParts.push(`${inCount}↓`);
     if (outCount > 0) refParts.push(`${outCount}↑`);
-    const label = refParts.length > 0 ? `${func.qualifiedName} (${refParts.join(' ')})` : func.qualifiedName;
+    const label =
+      refParts.length > 0 ? `${func.qualifiedName} (${refParts.join(' ')})` : func.qualifiedName;
     nodes.push({
       data: {
         id: nodeId,
@@ -765,7 +827,7 @@ function buildCycleEdgeIds(funcCycles, edges) {
       const source = cycle[i];
       const target = cycle[i + 1];
       const edgeId = `${source}->${target}`;
-      const exists = edges.some(e => e.source === source && e.target === target);
+      const exists = edges.some((e) => e.source === source && e.target === target);
       if (exists) cycleEdgeIds.add(edgeId);
     }
   }

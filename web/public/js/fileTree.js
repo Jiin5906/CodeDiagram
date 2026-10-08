@@ -64,7 +64,9 @@ function buildFileTree(data) {
   //DOM 생성
   function renderTree(obj, container, depth) {
     //디렉토리 먼저
-    const dirs = Object.keys(obj).filter(k => k !== '_files').sort();
+    const dirs = Object.keys(obj)
+      .filter((k) => k !== '_files')
+      .sort();
     for (const dir of dirs) {
       const dirEl = document.createElement('div');
       dirEl.className = 'tree-dir';
@@ -146,7 +148,9 @@ function buildFileTree(data) {
         });
         fileEl.addEventListener('dragend', () => {
           fileEl.classList.remove('dragging');
-          document.querySelectorAll('.tree-item.drop-target').forEach(el => el.classList.remove('drop-target'));
+          document
+            .querySelectorAll('.tree-item.drop-target')
+            .forEach((el) => el.classList.remove('drop-target'));
         });
         fileEl.addEventListener('dragover', (e) => {
           e.preventDefault();
@@ -174,7 +178,7 @@ function buildFileTree(data) {
 
 //활성 파일 항목 토글
 function setActiveTreeItem(fileEl) {
-  document.querySelectorAll('.tree-item.active').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.tree-item.active').forEach((el) => el.classList.remove('active'));
   fileEl.classList.add('active');
   activeFilePath = fileEl.dataset.filePath;
 }
@@ -182,8 +186,8 @@ function setActiveTreeItem(fileEl) {
 //드래그 앤 드롭으로 파일 순서 변경
 function reorderTreeItems(draggedPath, targetPath, container) {
   const items = Array.from(container.querySelectorAll('.tree-item'));
-  const draggedEl = items.find(el => el.dataset.filePath === draggedPath);
-  const targetEl = items.find(el => el.dataset.filePath === targetPath);
+  const draggedEl = items.find((el) => el.dataset.filePath === draggedPath);
+  const targetEl = items.find((el) => el.dataset.filePath === targetPath);
   if (!draggedEl || !targetEl || draggedEl.parentNode !== targetEl.parentNode) return;
 
   const parent = targetEl.parentNode;
@@ -195,7 +199,7 @@ function focusFileNode(filePath) {
 
   //뷰 모드에 따라 적절한 노드 타입으로 검색
   const selector = currentViewMode === 'file' ? '[type="file-node"]' : '[type="file"]';
-  const fileNodes = cy.nodes(selector).filter(n => n.data('fullPath') === filePath);
+  const fileNodes = cy.nodes(selector).filter((n) => n.data('fullPath') === filePath);
   if (fileNodes.length === 0) return;
 
   const target = fileNodes[0];
@@ -219,10 +223,13 @@ function focusFileNode(filePath) {
   }
 
   //카메라 이동
-  cy.animate({
-    center: { eles: target },
-    zoom: currentViewMode === 'file' ? 1.5 : 2,
-  }, { duration: 400, easing: 'ease-out-cubic' });
+  cy.animate(
+    {
+      center: { eles: target },
+      zoom: currentViewMode === 'file' ? 1.5 : 2,
+    },
+    { duration: 400, easing: 'ease-out-cubic' },
+  );
 }
 
 let fileTreeListenersBound = false;

@@ -4,33 +4,36 @@
 //- 호출 방향 입자: 강조된 선 위로 점들이 호출 방향(source → target)으로 흐른다
 //- 복잡도 글로우: 복잡도가 높은 파일은 원 뒤로 빛이 번지며 천천히 숨 쉬듯 밝아졌다 어두워진다 (복잡할수록 넓고 붉다)
 
-const DIAG_PULSE_INTERVAL = 1400;  //글로우가 한 번 밝아졌다 어두워지는 주기의 절반(ms)
-const FLOW_SPEED = 0.6;            //입자 이동 속도 (프레임당 px, 모델 좌표)
+const DIAG_PULSE_INTERVAL = 1400; //글로우가 한 번 밝아졌다 어두워지는 주기의 절반(ms)
+const FLOW_SPEED = 0.6; //입자 이동 속도 (프레임당 px, 모델 좌표)
 
 let _diagPulseTimer = null;
 let _flowRafId = null;
 let _flowEdges = null;
 
 //복잡도 글로우 설정
-const COMPLEX_TOP_RATIO = 0.12;    //복잡도 점수 상위 12% 파일만 표시
-const COMPLEX_MAX_FILES = 15;      //한 번에 표시하는 최대 파일 수 (그래프가 산만해지지 않도록)
-const COMPLEX_MIN_SCORE = 2;       //점수가 이보다 낮으면 상위권이어도 표시하지 않음 (작은 프로젝트 대비)
-const COMPLEX_LONG_FN_LINES = 50;  //긴 함수 기준 (진단의 God Function 기준과 같음)
+const COMPLEX_TOP_RATIO = 0.12; //복잡도 점수 상위 12% 파일만 표시
+const COMPLEX_MAX_FILES = 15; //한 번에 표시하는 최대 파일 수 (그래프가 산만해지지 않도록)
+const COMPLEX_MIN_SCORE = 2; //점수가 이보다 낮으면 상위권이어도 표시하지 않음 (작은 프로젝트 대비)
+const COMPLEX_LONG_FN_LINES = 50; //긴 함수 기준 (진단의 God Function 기준과 같음)
 const COMPLEX_LEVEL_SCORES = [5, 8]; //2단계, 3단계가 되는 점수 (예: 700줄·긴 함수 3개인 파일 ≈ 8.8)
 const COMPLEX_LEVELS = [
-  { color: '214, 165, 71', spread: 1.1, strength: 0.38 },  //1단계: 주황, 은은하게
-  { color: '230, 128, 70', spread: 1.5, strength: 0.5 },   //2단계: 진한 주황
-  { color: '239, 68, 68', spread: 1.9, strength: 0.62 },   //3단계: 빨강, 가장 넓고 밝게
+  { color: '214, 165, 71', spread: 1.1, strength: 0.38 }, //1단계: 주황, 은은하게
+  { color: '230, 128, 70', spread: 1.5, strength: 0.5 }, //2단계: 진한 주황
+  { color: '239, 68, 68', spread: 1.9, strength: 0.62 }, //3단계: 빨강, 가장 넓고 밝게
 ];
-const GLOW_BREATH_MS = 2800;        //한 번 밝아졌다 어두워지는 주기 (옛 버전의 1.4초 전환 × 2)
+const GLOW_BREATH_MS = 2800; //한 번 밝아졌다 어두워지는 주기 (옛 버전의 1.4초 전환 × 2)
 
 let _glowRafId = null;
 let _glowCanvas = null;
-let _glowNodes = null;   //[{ node, level, phase }]
+let _glowNodes = null; //[{ node, level, phase }]
 
 function _prefersReducedMotion() {
-  return typeof window !== 'undefined' && window.matchMedia &&
-    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  return (
+    typeof window !== 'undefined' &&
+    window.matchMedia &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  );
 }
 
 //renderGraph에서 레이아웃 직후 호출
@@ -54,7 +57,7 @@ function stopCodeEffects() {
   if (_flowRafId) cancelAnimationFrame(_flowRafId);
   _flowRafId = null;
   if (_flowEdges && cy) {
-    _flowEdges.forEach(edge => {
+    _flowEdges.forEach((edge) => {
       if (!edge.removed()) edge.removeClass('edge-flow').removeStyle('line-dash-offset');
     });
   }
@@ -66,7 +69,7 @@ function stopCodeEffects() {
 //진단의 파일 경로('app.js' 또는 'app.js::func')를 파일 노드 ID로 변환
 function _buildPathResolver() {
   const byPath = new Map();
-  cy.nodes('[type="file-node"]').forEach(node => {
+  cy.nodes('[type="file-node"]').forEach((node) => {
     const p = node.data('fullPath') || node.data('label');
     if (!byPath.has(p)) byPath.set(p, []);
     byPath.get(p).push(node);
@@ -76,7 +79,7 @@ function _buildPathResolver() {
     const candidates = byPath.get(p);
     if (!candidates) return null;
     const lang = EXT_TO_LANG[p.split('.').pop().toLowerCase()];
-    return (candidates.find(n => n.data('language') === lang) || candidates[0]).id();
+    return (candidates.find((n) => n.data('language') === lang) || candidates[0]).id();
   };
 }
 
@@ -93,7 +96,7 @@ function _applyDiagnosticGlow(diagnostics) {
   const fileCycles = (diagnostics.cycles && diagnostics.cycles.files) || [];
   for (const cycle of fileCycles) {
     const ids = cycle.map(resolve);
-    ids.forEach(id => id && errorIds.add(id));
+    ids.forEach((id) => id && errorIds.add(id));
     for (let i = 0; i < ids.length - 1; i++) {
       if (ids[i] && ids[i + 1]) cycleEdgeIds.add(`agg__${ids[i]}->${ids[i + 1]}`);
     }
@@ -108,9 +111,9 @@ function _applyDiagnosticGlow(diagnostics) {
   }
 
   cy.batch(() => {
-    errorIds.forEach(id => cy.getElementById(id).addClass('diag-error'));
-    warningIds.forEach(id => cy.getElementById(id).addClass('diag-warning'));
-    cycleEdgeIds.forEach(id => cy.getElementById(id).addClass('diag-cycle-edge'));
+    errorIds.forEach((id) => cy.getElementById(id).addClass('diag-error'));
+    warningIds.forEach((id) => cy.getElementById(id).addClass('diag-warning'));
+    cycleEdgeIds.forEach((id) => cy.getElementById(id).addClass('diag-cycle-edge'));
   });
 }
 
@@ -164,7 +167,9 @@ function _startEdgeFlow() {
 //파일 복잡도 점수: 함수 줄 수 합, 긴 함수 수, 함수 개수, 결합도, God Class 진단을 합친다.
 //진단 목록에는 info 등급이라 테두리로 표시되지 않는 "크고 복잡한 파일"을 원 뒤의 빛으로 드러낸다.
 function _fileComplexityScore(node, godClassCount) {
-  const fns = (node.data('functions') || []).filter(fn => fn.type !== 'variable' && fn.type !== 'class');
+  const fns = (node.data('functions') || []).filter(
+    (fn) => fn.type !== 'variable' && fn.type !== 'class',
+  );
   let lines = 0;
   let longFns = 0;
   for (const fn of fns) {
@@ -185,23 +190,28 @@ function _pickComplexFiles(diagnostics) {
   //God Class 진단을 파일별로 센다
   const godByFile = new Map();
   const resolve = _buildPathResolver();
-  for (const issue of ((diagnostics && diagnostics.antiPatterns) || [])) {
+  for (const issue of (diagnostics && diagnostics.antiPatterns) || []) {
     if (issue.type !== 'god_class' || !issue.nodeId) continue;
     const id = resolve(issue.nodeId);
     if (id) godByFile.set(id, (godByFile.get(id) || 0) + 1);
   }
 
-  const scored = fileNodes.map(node => ({ node, score: _fileComplexityScore(node, godByFile.get(node.id()) || 0) }))
-    .filter(e => e.score >= COMPLEX_MIN_SCORE)
+  const scored = fileNodes
+    .map((node) => ({ node, score: _fileComplexityScore(node, godByFile.get(node.id()) || 0) }))
+    .filter((e) => e.score >= COMPLEX_MIN_SCORE)
     .sort((a, b) => b.score - a.score);
 
-  const limit = Math.min(COMPLEX_MAX_FILES, Math.max(1, Math.ceil(fileNodes.length * COMPLEX_TOP_RATIO)));
+  const limit = Math.min(
+    COMPLEX_MAX_FILES,
+    Math.max(1, Math.ceil(fileNodes.length * COMPLEX_TOP_RATIO)),
+  );
   const picked = scored.slice(0, limit);
   if (!picked.length) return [];
 
   return picked.map((e, i) => {
     //단계는 상대 순위가 아닌 점수 자체로 정한다 (상위권이 모두 비슷하면 같은 단계)
-    const level = e.score >= COMPLEX_LEVEL_SCORES[1] ? 3 : e.score >= COMPLEX_LEVEL_SCORES[0] ? 2 : 1;
+    const level =
+      e.score >= COMPLEX_LEVEL_SCORES[1] ? 3 : e.score >= COMPLEX_LEVEL_SCORES[0] ? 2 : 1;
     e.node.data('complexityLevel', level);
     //파일마다 숨 쉬는 박자를 조금씩 어긋나게 해 한꺼번에 깜빡이지 않게 한다
     return { node: e.node, level, phase: i * 0.9 };
@@ -249,7 +259,10 @@ function _startComplexityGlow(diagnostics, still) {
     const cssW = _glowCanvas.clientWidth;
     const cssH = _glowCanvas.clientHeight;
     const dpr = window.devicePixelRatio || 1;
-    if (_glowCanvas.width !== Math.round(cssW * dpr) || _glowCanvas.height !== Math.round(cssH * dpr)) {
+    if (
+      _glowCanvas.width !== Math.round(cssW * dpr) ||
+      _glowCanvas.height !== Math.round(cssH * dpr)
+    ) {
       _glowCanvas.width = Math.round(cssW * dpr);
       _glowCanvas.height = Math.round(cssH * dpr);
     }
@@ -272,10 +285,13 @@ function _startComplexityGlow(diagnostics, still) {
       //빛 반경: 원 크기에 비례하되, 많이 축소했을 때도 보이도록 최소 폭을 둔다
       const reach = Math.max(r * style.spread, 10 + entry.level * 4);
       const outer = r + reach;
-      if (pos.x + outer < 0 || pos.y + outer < 0 || pos.x - outer > cssW || pos.y - outer > cssH) continue;
+      if (pos.x + outer < 0 || pos.y + outer < 0 || pos.x - outer > cssW || pos.y - outer > cssH)
+        continue;
 
       //숨 쉬기: 밝기와 번짐 폭을 사인 곡선으로 함께 키웠다 줄인다 (옛 버전의 ease-in-out-sine 전환과 같은 느낌)
-      const breath = still ? 0.5 : 0.5 - 0.5 * Math.cos((elapsed / GLOW_BREATH_MS) * Math.PI * 2 + entry.phase);
+      const breath = still
+        ? 0.5
+        : 0.5 - 0.5 * Math.cos((elapsed / GLOW_BREATH_MS) * Math.PI * 2 + entry.phase);
       const strength = style.strength * (0.6 + 0.4 * breath) * alpha;
       const radius = r + reach * (0.8 + 0.2 * breath);
 

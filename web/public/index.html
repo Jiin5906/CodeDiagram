@@ -1,227 +1,406 @@
 <!--메인 HTML페이지이다-->
 
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ko">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CodeDiagram</title>
-  <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/d2coding@1.3.2/d2coding-subset.css">
-  <link rel="stylesheet" href="css/style.css?v=14">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/python.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/typescript.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/cpp.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/csharp.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/css.min.js"></script>
-  <script src="https://unpkg.com/cytoscape@3.30.4/dist/cytoscape.min.js"></script>
-  <script src="https://unpkg.com/layout-base@2.0.1/layout-base.js"></script>
-  <script src="https://unpkg.com/cose-base@2.2.0/cose-base.js"></script>
-  <script src="https://unpkg.com/cytoscape-fcose@2.2.0/cytoscape-fcose.js"></script>
-  <script src="https://unpkg.com/dagre@0.8.5/dist/dagre.min.js"></script>
-  <script src="https://unpkg.com/cytoscape-dagre@2.5.0/cytoscape-dagre.js"></script>
-  <script src="https://unpkg.com/d3-dispatch@3/dist/d3-dispatch.min.js"></script>
-  <script src="https://unpkg.com/d3-quadtree@3/dist/d3-quadtree.min.js"></script>
-  <script src="https://unpkg.com/d3-timer@3/dist/d3-timer.min.js"></script>
-  <script src="https://unpkg.com/d3-force@3/dist/d3-force.min.js"></script>
-</head>
-<body>
-  <div id="top-bar">
-    <span class="logo">CodeDiagram</span>
-    <form id="analyze-form">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CodeDiagram</title>
+    <link
+      rel="stylesheet"
+      as="style"
+      crossorigin
+      href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"
+    />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/d2coding@1.3.2/d2coding-subset.css" />
+    <link rel="stylesheet" href="css/style.css?v=14" />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css"
+    />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/python.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/typescript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/cpp.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/csharp.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/css.min.js"></script>
+    <script src="https://unpkg.com/cytoscape@3.30.4/dist/cytoscape.min.js"></script>
+    <script src="https://unpkg.com/layout-base@2.0.1/layout-base.js"></script>
+    <script src="https://unpkg.com/cose-base@2.2.0/cose-base.js"></script>
+    <script src="https://unpkg.com/cytoscape-fcose@2.2.0/cytoscape-fcose.js"></script>
+    <script src="https://unpkg.com/dagre@0.8.5/dist/dagre.min.js"></script>
+    <script src="https://unpkg.com/cytoscape-dagre@2.5.0/cytoscape-dagre.js"></script>
+    <script src="https://unpkg.com/d3-dispatch@3/dist/d3-dispatch.min.js"></script>
+    <script src="https://unpkg.com/d3-quadtree@3/dist/d3-quadtree.min.js"></script>
+    <script src="https://unpkg.com/d3-timer@3/dist/d3-timer.min.js"></script>
+    <script src="https://unpkg.com/d3-force@3/dist/d3-force.min.js"></script>
+  </head>
+  <body>
+    <div id="top-bar">
+      <span class="logo">CodeDiagram</span>
+      <form id="analyze-form">
+        <input
+          type="text"
+          id="source-input"
+          placeholder="Git URL 또는 로컬 경로를 입력하세요"
+          autocomplete="off"
+        />
+        <button type="submit" id="analyze-btn">분석</button>
+      </form>
+      <div id="repo-chip" class="hidden"></div>
       <input
         type="text"
-        id="source-input"
-        placeholder="Git URL 또는 로컬 경로를 입력하세요"
+        id="search-input"
+        class="toolbar-search hidden"
+        placeholder="검색... (Ctrl+F)"
         autocomplete="off"
       />
-      <button type="submit" id="analyze-btn">분석</button>
-    </form>
-    <div id="repo-chip" class="hidden"></div>
-    <input
-      type="text"
-      id="search-input"
-      class="toolbar-search hidden"
-      placeholder="검색... (Ctrl+F)"
-      autocomplete="off"
-    />
-    <button id="back-to-package-btn" class="toolbar-btn hidden" title="패키지 뷰로 복귀">뒤로가기</button>
-  </div>
-
-  <!--이전 호환용 숨겨진 더미 요소들 (interactions.js 참조용)-->
-  <span id="divider-1" class="hidden"></span>
-  <span id="divider-2" class="hidden"></span>
-
-  <!--미리보기 배너-->
-  <div id="preview-banner" class="hidden">
-    <span id="preview-banner-text">미리보기 모드</span>
-    <button id="preview-restore-btn">원래대로</button>
-  </div>
-
-
-  <div id="main-content">
-    <!--좌측 리본 (아이콘 + 라벨 세로 바). data-tip은 마우스를 올리면 뜨는 설명-->
-    <div id="ribbon">
-      <button class="ribbon-btn" id="file-tree-toggle" data-tip="프로젝트 파일 목록을 열고 닫습니다" aria-label="파일">
-        <span class="ribbon-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg></span>
-        <span class="ribbon-label">파일</span>
+      <button id="back-to-package-btn" class="toolbar-btn hidden" title="패키지 뷰로 복귀">
+        뒤로가기
       </button>
-      <!--보기 단위 선택: 지금 어느 뷰인지 바로 보이도록 두 칸짜리 선택 버튼으로 둔다-->
-      <div class="ribbon-seg" role="group" aria-label="보기 단위">
-        <button class="ribbon-btn active" id="view-file-btn" aria-pressed="true" data-tip="파일 단위로 봅니다. 파일끼리 어떻게 연결되는지 보여줍니다" aria-label="파일 뷰">
-          <span class="ribbon-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/></svg></span>
+    </div>
+
+    <!--이전 호환용 숨겨진 더미 요소들 (interactions.js 참조용)-->
+    <span id="divider-1" class="hidden"></span>
+    <span id="divider-2" class="hidden"></span>
+
+    <!--미리보기 배너-->
+    <div id="preview-banner" class="hidden">
+      <span id="preview-banner-text">미리보기 모드</span>
+      <button id="preview-restore-btn">원래대로</button>
+    </div>
+
+    <div id="main-content">
+      <!--좌측 리본 (아이콘 + 라벨 세로 바). data-tip은 마우스를 올리면 뜨는 설명-->
+      <div id="ribbon">
+        <button
+          class="ribbon-btn"
+          id="file-tree-toggle"
+          data-tip="프로젝트 파일 목록을 열고 닫습니다"
+          aria-label="파일"
+        >
+          <span class="ribbon-icon" aria-hidden="true"
+            ><svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.75"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path
+                d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"
+              /></svg
+          ></span>
           <span class="ribbon-label">파일</span>
         </button>
-        <button class="ribbon-btn" id="view-function-btn" aria-pressed="false" data-tip="함수 단위로 봅니다. 함수끼리 어떻게 호출하는지 보여줍니다" aria-label="함수 뷰">
-          <span class="ribbon-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5a2 2 0 0 0 2 2h1"/><path d="M16 21h1a2 2 0 0 0 2-2v-5a2 2 0 0 1 2-2 2 2 0 0 1-2-2V5a2 2 0 0 0-2-2h-1"/></svg></span>
-          <span class="ribbon-label">함수</span>
+        <!--보기 단위 선택: 지금 어느 뷰인지 바로 보이도록 두 칸짜리 선택 버튼으로 둔다-->
+        <div class="ribbon-seg" role="group" aria-label="보기 단위">
+          <button
+            class="ribbon-btn active"
+            id="view-file-btn"
+            aria-pressed="true"
+            data-tip="파일 단위로 봅니다. 파일끼리 어떻게 연결되는지 보여줍니다"
+            aria-label="파일 뷰"
+          >
+            <span class="ribbon-icon" aria-hidden="true"
+              ><svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.75"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" />
+                <path d="M14 2v6h6" /></svg
+            ></span>
+            <span class="ribbon-label">파일</span>
+          </button>
+          <button
+            class="ribbon-btn"
+            id="view-function-btn"
+            aria-pressed="false"
+            data-tip="함수 단위로 봅니다. 함수끼리 어떻게 호출하는지 보여줍니다"
+            aria-label="함수 뷰"
+          >
+            <span class="ribbon-icon" aria-hidden="true"
+              ><svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.75"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5a2 2 0 0 0 2 2h1" />
+                <path
+                  d="M16 21h1a2 2 0 0 0 2-2v-5a2 2 0 0 1 2-2 2 2 0 0 1-2-2V5a2 2 0 0 0-2-2h-1"
+                /></svg
+            ></span>
+            <span class="ribbon-label">함수</span>
+          </button>
+        </div>
+        <button
+          class="ribbon-btn"
+          id="diagnostics-btn"
+          data-tip="순환 참조, 높은 결합도처럼 손볼 곳을 모아 보여줍니다"
+          aria-label="진단"
+        >
+          <span class="ribbon-icon" aria-hidden="true"
+            ><svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.75"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M22 12h-4l-3 9L9 3l-3 9H2" /></svg
+          ></span>
+          <span class="ribbon-label">진단</span>
+        </button>
+        <div class="ribbon-spacer"></div>
+        <button
+          class="ribbon-btn hidden"
+          id="toggle-edges-btn"
+          data-tip="함수끼리 호출하는 선을 보여줍니다"
+          aria-label="선 보기"
+        >
+          <span class="ribbon-icon" aria-hidden="true"
+            ><svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.75"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <circle cx="18" cy="5" r="3" />
+              <circle cx="6" cy="12" r="3" />
+              <circle cx="18" cy="19" r="3" />
+              <path d="m8.59 13.51 6.83 3.98" />
+              <path d="m15.41 6.51-6.82 3.98" /></svg
+          ></span>
+          <span class="ribbon-label">선 보기</span>
+        </button>
+        <button
+          class="ribbon-btn hidden"
+          id="collapse-all-btn"
+          data-tip="모든 파일 그룹을 접거나 펼칩니다"
+          aria-label="전체 접기"
+        >
+          <span class="ribbon-icon" aria-hidden="true"
+            ><svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.75"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="m7 20 5-5 5 5" />
+              <path d="m7 4 5 5 5-5" /></svg
+          ></span>
+          <span class="ribbon-label">전체 접기</span>
         </button>
       </div>
-      <button class="ribbon-btn" id="diagnostics-btn" data-tip="순환 참조, 높은 결합도처럼 손볼 곳을 모아 보여줍니다" aria-label="진단">
-        <span class="ribbon-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></span>
-        <span class="ribbon-label">진단</span>
-      </button>
-      <div class="ribbon-spacer"></div>
-      <button class="ribbon-btn hidden" id="toggle-edges-btn" data-tip="함수끼리 호출하는 선을 보여줍니다" aria-label="선 보기">
-        <span class="ribbon-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.59 13.51 6.83 3.98"/><path d="m15.41 6.51-6.82 3.98"/></svg></span>
-        <span class="ribbon-label">선 보기</span>
-      </button>
-      <button class="ribbon-btn hidden" id="collapse-all-btn" data-tip="모든 파일 그룹을 접거나 펼칩니다" aria-label="전체 접기">
-        <span class="ribbon-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m7 20 5-5 5 5"/><path d="m7 4 5 5 5-5"/></svg></span>
-        <span class="ribbon-label">전체 접기</span>
-      </button>
-    </div>
-    <div id="file-tree-panel" class="collapsed">
-      <div class="file-tree-header">
-        <span>파일 탐색기</span>
-        <button id="file-tree-close">&times;</button>
+      <div id="file-tree-panel" class="collapsed">
+        <div class="file-tree-header">
+          <span>파일 탐색기</span>
+          <button id="file-tree-close">&times;</button>
+        </div>
+        <div id="file-tree-content"></div>
       </div>
-      <div id="file-tree-content"></div>
-    </div>
-    <div id="graph-container">
-      <div id="empty-state">
-        <div class="empty-state-title">분석할 프로젝트를 입력하세요</div>
-        <div class="empty-state-desc">위 입력칸에 Git 저장소 주소나 내 컴퓨터의 폴더 경로를 넣고 분석을 누르면, 파일끼리 어떻게 연결되어 있는지 그래프로 보여줍니다.</div>
-        <div class="empty-state-example">예: https://github.com/pallets/flask</div>
-      </div>
-      <div id="cy"></div>
-      <!--계층형 배치 토글 (우측 상단): 켜면 계층형, 끄면 원래 배치로 돌아간다-->
-      <div id="graph-settings" class="hidden">
-        <button id="hierarchy-toggle" aria-pressed="false" title="호출 순서대로 층을 나눠 배치합니다 (화면에 맞게 위→아래 또는 왼→오른쪽)">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="5" rx="1"/><rect x="2" y="17" width="6" height="5" rx="1"/><rect x="16" y="17" width="6" height="5" rx="1"/><path d="M12 7v5M5 17v-2a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v2"/></svg>
-          계층형
-        </button>
-      </div>
-      <!--범례 패널 (접이식, 캔버스 좌상단)-->
-      <div id="legend-panel" class="hidden collapsed">
-        <button id="legend-toggle" aria-expanded="false">범례 ▸</button>
-        <div id="legend-content">
-          <div id="legend-file-view"></div>
-          <div id="legend-function-view" class="hidden"></div>
-          <button type="button" id="legend-shortcuts" class="legend-footer">단축키 보기 <kbd>?</kbd></button>
+      <div id="graph-container">
+        <div id="empty-state">
+          <div class="empty-state-title">분석할 프로젝트를 입력하세요</div>
+          <div class="empty-state-desc">
+            위 입력칸에 Git 저장소 주소나 내 컴퓨터의 폴더 경로를 넣고 분석을 누르면, 파일끼리
+            어떻게 연결되어 있는지 그래프로 보여줍니다.
+          </div>
+          <div class="empty-state-example">예: https://github.com/pallets/flask</div>
+        </div>
+        <div id="cy"></div>
+        <!--계층형 배치 토글 (우측 상단): 켜면 계층형, 끄면 원래 배치로 돌아간다-->
+        <div id="graph-settings" class="hidden">
+          <button
+            id="hierarchy-toggle"
+            aria-pressed="false"
+            title="호출 순서대로 층을 나눠 배치합니다 (화면에 맞게 위→아래 또는 왼→오른쪽)"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.75"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <rect x="9" y="2" width="6" height="5" rx="1" />
+              <rect x="2" y="17" width="6" height="5" rx="1" />
+              <rect x="16" y="17" width="6" height="5" rx="1" />
+              <path d="M12 7v5M5 17v-2a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v2" />
+            </svg>
+            계층형
+          </button>
+        </div>
+        <!--범례 패널 (접이식, 캔버스 좌상단)-->
+        <div id="legend-panel" class="hidden collapsed">
+          <button id="legend-toggle" aria-expanded="false">범례 ▸</button>
+          <div id="legend-content">
+            <div id="legend-file-view"></div>
+            <div id="legend-function-view" class="hidden"></div>
+            <button type="button" id="legend-shortcuts" class="legend-footer">
+              단축키 보기 <kbd>?</kbd>
+            </button>
+          </div>
+        </div>
+        <!--하단 상태바-->
+        <div id="status-bar" class="hidden">
+          <div id="status"></div>
+          <button id="warning-badge" class="hidden" title="진단 결과 보기"></button>
+        </div>
+        <!--캔버스 카드 레이어 (Phase 3)-->
+        <div id="canvas-cards-layer"></div>
+        <!--미니맵 (Phase 2)-->
+        <div id="minimap-container" class="hidden">
+          <canvas id="minimap-canvas" width="180" height="130"></canvas>
         </div>
       </div>
-      <!--하단 상태바-->
-      <div id="status-bar" class="hidden">
-        <div id="status"></div>
-        <button id="warning-badge" class="hidden" title="진단 결과 보기"></button>
-      </div>
-      <!--캔버스 카드 레이어 (Phase 3)-->
-      <div id="canvas-cards-layer"></div>
-      <!--미니맵 (Phase 2)-->
-      <div id="minimap-container" class="hidden">
-        <canvas id="minimap-canvas" width="180" height="130"></canvas>
-      </div>
-    </div>
-    <div id="code-viewer-panel" class="collapsed">
-      <!--왼쪽 가장자리를 끌어서 코드 뷰어 너비를 조절한다-->
-      <div id="code-viewer-resizer" title="끌어서 너비 조절 (더블클릭: 기본 크기)"></div>
-      <div class="code-viewer-header">
-        <span id="code-viewer-filename">소스코드</span>
-        <div class="code-viewer-actions">
-          <button id="code-viewer-close" aria-label="닫기">&times;</button>
+      <div id="code-viewer-panel" class="collapsed">
+        <!--왼쪽 가장자리를 끌어서 코드 뷰어 너비를 조절한다-->
+        <div id="code-viewer-resizer" title="끌어서 너비 조절 (더블클릭: 기본 크기)"></div>
+        <div class="code-viewer-header">
+          <span id="code-viewer-filename">소스코드</span>
+          <div class="code-viewer-actions">
+            <button id="code-viewer-close" aria-label="닫기">&times;</button>
+          </div>
+        </div>
+        <!--파일 클릭 시 함수 목록 (코드 영역 위에 표시)-->
+        <div id="code-viewer-fnlist" class="hidden"></div>
+        <div id="code-viewer-status" class="hidden"></div>
+        <!--함수 뷰에서 함수를 클릭하면 코드 위에 AI 해설을 함께 보여준다-->
+        <div id="code-viewer-explain" class="hidden">
+          <button id="cv-explain-toggle" class="cv-explain-head" aria-expanded="true">
+            <span class="cv-explain-title">AI 해설</span>
+            <span class="cv-explain-chevron" aria-hidden="true">▾</span>
+          </button>
+          <div id="cv-explain-body"></div>
+        </div>
+        <div id="code-viewer-content">
+          <pre><code id="code-viewer-code"></code></pre>
         </div>
       </div>
-      <!--파일 클릭 시 함수 목록 (코드 영역 위에 표시)-->
-      <div id="code-viewer-fnlist" class="hidden"></div>
-      <div id="code-viewer-status" class="hidden"></div>
-      <!--함수 뷰에서 함수를 클릭하면 코드 위에 AI 해설을 함께 보여준다-->
-      <div id="code-viewer-explain" class="hidden">
-        <button id="cv-explain-toggle" class="cv-explain-head" aria-expanded="true">
-          <span class="cv-explain-title">AI 해설</span>
-          <span class="cv-explain-chevron" aria-hidden="true">▾</span>
-        </button>
-        <div id="cv-explain-body"></div>
-      </div>
-      <div id="code-viewer-content">
-        <pre><code id="code-viewer-code"></code></pre>
+    </div>
+
+    <!--단축키 도움말 (? 키)-->
+    <div
+      id="shortcuts-overlay"
+      class="hidden"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="shortcuts-title"
+    >
+      <div class="shortcuts-box">
+        <div class="overlay-header">
+          <span id="shortcuts-title">단축키</span>
+          <button id="shortcuts-close" aria-label="닫기">&times;</button>
+        </div>
+        <dl class="shortcuts-list">
+          <div>
+            <dt><kbd>Ctrl</kbd> + <kbd>F</kbd></dt>
+            <dd>검색 (진단 창이 열려 있으면 진단 검색)</dd>
+          </div>
+          <div>
+            <dt><kbd>F</kbd></dt>
+            <dd>그래프 전체를 화면에 맞추기</dd>
+          </div>
+          <div>
+            <dt><kbd>Esc</kbd></dt>
+            <dd>열린 창 닫기 · 확대 보기에서 전체 보기로</dd>
+          </div>
+          <div>
+            <dt><kbd>?</kbd></dt>
+            <dd>이 도움말 열기/닫기</dd>
+          </div>
+          <div>
+            <dt>클릭</dt>
+            <dd>파일: 연결된 파일로 확대 · 함수: 코드와 연결선 보기 · 선: 참조 위치 목록</dd>
+          </div>
+          <div>
+            <dt>더블클릭</dt>
+            <dd>파일: 코드 카드 열기 · 함수 뷰의 파일 박스: 접기/펼치기</dd>
+          </div>
+          <div>
+            <dt>빈 곳 클릭</dt>
+            <dd>강조 해제 · 전체 보기로 돌아가기</dd>
+          </div>
+        </dl>
       </div>
     </div>
-  </div>
 
-  <!--단축키 도움말 (? 키)-->
-  <div id="shortcuts-overlay" class="hidden" role="dialog" aria-modal="true" aria-labelledby="shortcuts-title">
-    <div class="shortcuts-box">
+    <!--진단 패널-->
+    <div id="diagnostics-panel" class="overlay hidden">
       <div class="overlay-header">
-        <span id="shortcuts-title">단축키</span>
-        <button id="shortcuts-close" aria-label="닫기">&times;</button>
+        <span id="diagnostics-title">코드 진단 결과</span>
+        <button id="diagnostics-close">&times;</button>
       </div>
-      <dl class="shortcuts-list">
-        <div><dt><kbd>Ctrl</kbd> + <kbd>F</kbd></dt><dd>검색 (진단 창이 열려 있으면 진단 검색)</dd></div>
-        <div><dt><kbd>F</kbd></dt><dd>그래프 전체를 화면에 맞추기</dd></div>
-        <div><dt><kbd>Esc</kbd></dt><dd>열린 창 닫기 · 확대 보기에서 전체 보기로</dd></div>
-        <div><dt><kbd>?</kbd></dt><dd>이 도움말 열기/닫기</dd></div>
-        <div><dt>클릭</dt><dd>파일: 연결된 파일로 확대 · 함수: 코드와 연결선 보기 · 선: 참조 위치 목록</dd></div>
-        <div><dt>더블클릭</dt><dd>파일: 코드 카드 열기 · 함수 뷰의 파일 박스: 접기/펼치기</dd></div>
-        <div><dt>빈 곳 클릭</dt><dd>강조 해제 · 전체 보기로 돌아가기</dd></div>
-      </dl>
-    </div>
-  </div>
-
-  <!--진단 패널-->
-  <div id="diagnostics-panel" class="overlay hidden">
-    <div class="overlay-header">
-      <span id="diagnostics-title">코드 진단 결과</span>
-      <button id="diagnostics-close">&times;</button>
-    </div>
-    <!--진단 검색: 파일명·함수명·메시지로 필터링-->
-    <div class="diag-search">
-      <svg class="diag-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-      <input type="search" id="diag-search-input" placeholder="파일명·함수명으로 검색" autocomplete="off" aria-label="진단 결과 검색" />
-      <span id="diag-search-count" aria-live="polite"></span>
-    </div>
-    <div class="diag-scroll">
-      <div id="diagnostics-content"></div>
-      <div id="suggestions-section">
-        <div class="suggestions-header">리팩토링 제안</div>
-        <div id="suggestions-content"></div>
+      <!--진단 검색: 파일명·함수명·메시지로 필터링-->
+      <div class="diag-search">
+        <svg
+          class="diag-search-icon"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <circle cx="11" cy="11" r="7" />
+          <path d="m20 20-3.5-3.5" />
+        </svg>
+        <input
+          type="search"
+          id="diag-search-input"
+          placeholder="파일명·함수명으로 검색"
+          autocomplete="off"
+          aria-label="진단 결과 검색"
+        />
+        <span id="diag-search-count" aria-live="polite"></span>
+      </div>
+      <div class="diag-scroll">
+        <div id="diagnostics-content"></div>
+        <div id="suggestions-section">
+          <div class="suggestions-header">리팩토링 제안</div>
+          <div id="suggestions-content"></div>
+        </div>
       </div>
     </div>
-  </div>
 
-  <!--Diff 비교 오버레이-->
-  <div id="diff-overlay" class="hidden">
-    <div class="diff-overlay-inner">
-      <div class="overlay-header">
-        <span id="diff-title">구조 변경 Diff</span>
-        <button id="diff-close" onclick="hideDiffView()">&times;</button>
+    <!--Diff 비교 오버레이-->
+    <div id="diff-overlay" class="hidden">
+      <div class="diff-overlay-inner">
+        <div class="overlay-header">
+          <span id="diff-title">구조 변경 Diff</span>
+          <button id="diff-close" onclick="hideDiffView()">&times;</button>
+        </div>
+        <div id="diff-content"></div>
       </div>
-      <div id="diff-content"></div>
     </div>
-  </div>
 
-  <script src="js/graph.js?v=20"></script>
-  <script src="js/forceSim.js?v=4"></script>
-  <script src="js/codeEffects.js?v=4"></script>
-  <script src="js/codeViewer.js?v=8"></script>
-  <script src="js/canvasCard.js?v=3"></script>
-  <script src="js/localGraph.js?v=3"></script>
-  <script src="js/minimap.js?v=3"></script>
-  <script src="js/interactions.js?v=10"></script>
-  <script src="js/diffPreview.js"></script>
-  <script src="js/fileTree.js?v=2"></script>
-  <script src="js/app.js?v=13"></script>
-</body>
+    <script src="js/graph.js?v=20"></script>
+    <script src="js/forceSim.js?v=4"></script>
+    <script src="js/codeEffects.js?v=4"></script>
+    <script src="js/codeViewer.js?v=8"></script>
+    <script src="js/canvasCard.js?v=3"></script>
+    <script src="js/localGraph.js?v=3"></script>
+    <script src="js/minimap.js?v=3"></script>
+    <script src="js/interactions.js?v=10"></script>
+    <script src="js/diffPreview.js"></script>
+    <script src="js/fileTree.js?v=2"></script>
+    <script src="js/app.js?v=13"></script>
+  </body>
 </html>
