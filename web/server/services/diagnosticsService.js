@@ -117,7 +117,7 @@ function detectCouplingIssues(edges) {
 /* ── 안티패턴 탐지 ── */
 
 //God Function(50줄 이상)과 God Class(메서드 10개 이상)를 탐지한다.
-function detectAntiPatterns(functions, classes) {
+function detectAntiPatterns(functions, _classes) {
   const issues = [];
 
   //God Function 탐지
@@ -160,8 +160,7 @@ function detectAntiPatterns(functions, classes) {
 /* ── 웹 전용 안티패턴 탐지 ── */
 
 //웹 파일에서 안티패턴을 탐지한다.
-const INLINE_STYLE_THRESHOLD = 10;
-const LARGE_JS_LINES = 300;
+//TODO: 인라인 스타일 과다(요소 10개 이상)·대형 JS 파일(300줄 이상) 탐지는 아직 구현되지 않았다
 const EVENT_LISTENER_THRESHOLD = 10;
 
 function detectWebAntiPatterns(webParsedFiles) {
@@ -184,8 +183,7 @@ function detectWebAntiPatterns(webParsedFiles) {
   for (const pf of webParsedFiles) {
     if (pf.language === 'html') {
       //인라인 스타일 과다 탐지
-      let inlineStyleCount = 0;
-      for (const elem of (pf.parsed.elements || [])) {
+      for (const elem of pf.parsed.elements || []) {
         if (elem.id) htmlIds.add(elem.id);
         for (const cls of elem.classes) htmlClasses.add(cls);
         allHtmlElements.push(elem);
@@ -206,14 +204,14 @@ function detectWebAntiPatterns(webParsedFiles) {
     }
 
     if (pf.language === 'css') {
-      for (const sel of (pf.parsed.selectors || [])) {
+      for (const sel of pf.parsed.selectors || []) {
         allSelectors.push({ ...sel, sourceFile: pf.filePath });
       }
     }
 
     if (pf.language === 'javascript') {
       //거대 JS 파일 탐지
-      for (const func of (pf.parsed.functions || [])) {
+      for (const func of pf.parsed.functions || []) {
         jsDefinedFuncs.add(func.name);
         const lineCount = func.endLine - func.startLine + 1;
         if (lineCount >= GOD_FUNCTION_LINES) {
@@ -226,7 +224,7 @@ function detectWebAntiPatterns(webParsedFiles) {
         }
       }
 
-      for (const call of (pf.parsed.calls || [])) {
+      for (const call of pf.parsed.calls || []) {
         jsCalledFuncs.add(call.callee.split('.').pop());
       }
 
@@ -247,11 +245,17 @@ function detectWebAntiPatterns(webParsedFiles) {
   for (const sel of allSelectors) {
     let isUsed = false;
     for (const id of sel.ids) {
-      if (htmlIds.has(id)) { isUsed = true; break; }
+      if (htmlIds.has(id)) {
+        isUsed = true;
+        break;
+      }
     }
     if (!isUsed) {
       for (const cls of sel.classes) {
-        if (htmlClasses.has(cls)) { isUsed = true; break; }
+        if (htmlClasses.has(cls)) {
+          isUsed = true;
+          break;
+        }
       }
     }
     if (!isUsed && sel.tags.length > 0) {
@@ -274,9 +278,13 @@ function detectWebAntiPatterns(webParsedFiles) {
   //미사용 JS 함수 탐지
   for (const pf of webParsedFiles) {
     if (pf.language === 'javascript') {
-      for (const func of (pf.parsed.functions || [])) {
-        if (!jsCalledFuncs.has(func.name) && func.name !== 'anonymous' &&
-            !func.name.startsWith('_') && func.name !== 'constructor') {
+      for (const func of pf.parsed.functions || []) {
+        if (
+          !jsCalledFuncs.has(func.name) &&
+          func.name !== 'anonymous' &&
+          !func.name.startsWith('_') &&
+          func.name !== 'constructor'
+        ) {
           issues.push({
             type: 'unused_js_function',
             nodeId: `${pf.filePath}::${func.qualifiedName}`,
@@ -312,4 +320,10 @@ function runDiagnostics(edges, functions, classes, webParsedFiles) {
   };
 }
 
-module.exports = { runDiagnostics, detectCycles, detectFileCycles, detectCouplingIssues, detectAntiPatterns };
+module.exports = {
+  runDiagnostics,
+  detectCycles,
+  detectFileCycles,
+  detectCouplingIssues,
+  detectAntiPatterns,
+};

@@ -1,0 +1,35 @@
+# Android 앱(app/) CI — 현재 보류 중
+# 앱 출시 계획이 없어서 자동 실행(PR·push)을 끄고 수동 실행만 남겨 둔다.
+# 다시 쓰려면:
+#  1) 아래 on:에 pull_request / push 트리거를 되살린다 (app/**, gradle/**, *.gradle.kts, gradle.properties, gradlew 경로 조건)
+#  2) gradle/libs.versions.toml의 라이브러리와 AGP·compileSdk 버전을 맞춘다
+#     (2026-10 기준 core-ktx 1.19.0, lifecycle 2.11.0이 AGP 9.1+ · compileSdk 37을 요구해 빌드 실패)
+#  3) release.yml에 APK 빌드 job, dependabot.yml에 gradle 항목을 되살린다
+# 계측 테스트(androidTest)는 에뮬레이터가 필요해서 제외한다.
+name: Android (보류)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  android:
+    name: 단위 테스트 · lint · debug 빌드
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '21'
+      # Gradle wrapper 체크섬 검증은 기본으로 켜져 있다
+      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+        with:
+          # 오픈소스 캐시(actions/cache)만 쓴다. 기본값 enhanced는 독점 컴포넌트다
+          cache-provider: basic
+      - run: ./gradlew testDebugUnitTest lintDebug assembleDebug

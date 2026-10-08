@@ -17,10 +17,9 @@ local.properties
 # Claude Code
 .claude/
 # 스크린샷 / 문서
-# 개인 보고서·작업 문서는 루트의 docs/ 폴더에 두면 통째로 제외된다.
-# README 등 저장소 문서는 추적해야 하므로 *.md 전역 제외는 쓰지 않는다.
-# 하위 폴더의 문서(web/docs 등)는 저장소 문서이므로 제외하지 않는다.
-/docs/
+# 개인 보고서·작업 문서는 docs/ 폴더에 둔다. 위치와 관계없이(루트, web/docs 등) 모든 docs 폴더를 제외한다.
+# 파서 스키마처럼 저장소에 필요한 파일은 docs/가 아닌 곳(web/schemas/ 등)에 둔다.
+docs/
 *.png
 *.jpg
 *.jpeg
@@ -28,6 +27,11 @@ local.properties
 *.bmp
 *.svg
 *.pdf
+# 문서(*.md)는 기본으로 제외하고, 팀이 함께 보는 문서만 예외로 추적한다
+*.md
+!README.md
+!.github/**/*.md
+!CLAUDE.md
 *.pptx
 *.ppt
 *.docx
@@ -49,6 +53,3 @@ Thumbs.db
 
 # 환경변수
 .env
-
-# 클로드
-CLAUDE.md

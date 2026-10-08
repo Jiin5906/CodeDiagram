@@ -6,7 +6,8 @@ const TypeScriptLanguage = require('tree-sitter-typescript').typescript;
 
 function createParser() {
   const p = new Parser();
-  p.setLanguage(TypeScriptLanguage);
+  //문법 패키지의 타입 정의가 tree-sitter 0.22 타입과 맞지 않아 캐스팅한다 (런타임 동작은 같다)
+  p.setLanguage(/** @type {any} */ (TypeScriptLanguage));
   return p;
 }
 
@@ -26,7 +27,18 @@ function parseTs(code, filePath) {
   const enums = [];
 
   collectImports(root, filePath, imports);
-  collectDefinitions(root, code, filePath, functions, calls, classes, interfaces, typeAliases, enums, null);
+  collectDefinitions(
+    root,
+    code,
+    filePath,
+    functions,
+    calls,
+    classes,
+    interfaces,
+    typeAliases,
+    enums,
+    null,
+  );
   collectVariables(root, filePath, variables);
 
   //함수 body에서 변수 참조 수집
@@ -137,7 +149,18 @@ function extractRequireCalls(node, filePath, imports) {
 
 /* ── 함수/클래스/인터페이스/타입/열거형 정의 수집 ── */
 
-function collectDefinitions(node, code, filePath, functions, calls, classes, interfaces, typeAliases, enums, className) {
+function collectDefinitions(
+  node,
+  code,
+  filePath,
+  functions,
+  calls,
+  classes,
+  interfaces,
+  typeAliases,
+  enums,
+  className,
+) {
   for (let i = 0; i < node.childCount; i++) {
     const child = node.child(i);
 
@@ -156,8 +179,13 @@ function collectDefinitions(node, code, filePath, functions, calls, classes, int
         if (declarator.type === 'variable_declarator') {
           const nameNode = declarator.childForFieldName('name');
           const valueNode = declarator.childForFieldName('value');
-          if (nameNode && valueNode &&
-              (valueNode.type === 'arrow_function' || valueNode.type === 'function_expression' || valueNode.type === 'function')) {
+          if (
+            nameNode &&
+            valueNode &&
+            (valueNode.type === 'arrow_function' ||
+              valueNode.type === 'function_expression' ||
+              valueNode.type === 'function')
+          ) {
             const func = {
               name: nameNode.text,
               qualifiedName: className ? `${className}.${nameNode.text}` : nameNode.text,
@@ -179,25 +207,50 @@ function collectDefinitions(node, code, filePath, functions, calls, classes, int
 
     //export된 선언
     if (child.type === 'export_statement') {
-      collectDefinitions(child, code, filePath, functions, calls, classes, interfaces, typeAliases, enums, className);
+      collectDefinitions(
+        child,
+        code,
+        filePath,
+        functions,
+        calls,
+        classes,
+        interfaces,
+        typeAliases,
+        enums,
+        className,
+      );
     }
 
     //클래스 정의
-    if (child.type === 'class_declaration' || child.type === 'class' || child.type === 'abstract_class_declaration') {
+    if (
+      child.type === 'class_declaration' ||
+      child.type === 'class' ||
+      child.type === 'abstract_class_declaration'
+    ) {
       const nameNode = child.childForFieldName('name');
       const clsName = nameNode ? nameNode.text : 'AnonymousClass';
 
       const superclasses = [];
       //extends
-      const heritage = child.childForFieldName('heritage') || findChildByType(child, 'class_heritage');
+      const heritage =
+        child.childForFieldName('heritage') || findChildByType(child, 'class_heritage');
       if (heritage) {
         for (let j = 0; j < heritage.childCount; j++) {
           const h = heritage.child(j);
           if (h.type === 'extends_clause') {
             for (let k = 0; k < h.childCount; k++) {
               const ext = h.child(k);
-              if (ext.type === 'identifier' || ext.type === 'member_expression' || ext.type === 'generic_type') {
-                const typeName = ext.type === 'generic_type' ? (ext.child(0) ? ext.child(0).text : ext.text) : ext.text;
+              if (
+                ext.type === 'identifier' ||
+                ext.type === 'member_expression' ||
+                ext.type === 'generic_type'
+              ) {
+                const typeName =
+                  ext.type === 'generic_type'
+                    ? ext.child(0)
+                      ? ext.child(0).text
+                      : ext.text
+                    : ext.text;
                 superclasses.push(typeName);
               }
             }
@@ -205,8 +258,17 @@ function collectDefinitions(node, code, filePath, functions, calls, classes, int
           if (h.type === 'implements_clause') {
             for (let k = 0; k < h.childCount; k++) {
               const impl = h.child(k);
-              if (impl.type === 'identifier' || impl.type === 'generic_type' || impl.type === 'type_identifier') {
-                const typeName = impl.type === 'generic_type' ? (impl.child(0) ? impl.child(0).text : impl.text) : impl.text;
+              if (
+                impl.type === 'identifier' ||
+                impl.type === 'generic_type' ||
+                impl.type === 'type_identifier'
+              ) {
+                const typeName =
+                  impl.type === 'generic_type'
+                    ? impl.child(0)
+                      ? impl.child(0).text
+                      : impl.text
+                    : impl.text;
                 superclasses.push(typeName);
               }
             }
@@ -237,8 +299,11 @@ function collectDefinitions(node, code, filePath, functions, calls, classes, int
             if (member.type === 'public_field_definition') {
               const fieldName = member.childForFieldName('name');
               const fieldValue = member.childForFieldName('value');
-              if (fieldName && fieldValue &&
-                  (fieldValue.type === 'arrow_function' || fieldValue.type === 'function_expression')) {
+              if (
+                fieldName &&
+                fieldValue &&
+                (fieldValue.type === 'arrow_function' || fieldValue.type === 'function_expression')
+              ) {
                 const func = {
                   name: fieldName.text,
                   qualifiedName: `${clsName}.${fieldName.text}`,
@@ -271,8 +336,17 @@ function collectDefinitions(node, code, filePath, functions, calls, classes, int
       if (extendsClause) {
         for (let j = 0; j < extendsClause.childCount; j++) {
           const ext = extendsClause.child(j);
-          if (ext.type === 'identifier' || ext.type === 'type_identifier' || ext.type === 'generic_type') {
-            const typeName = ext.type === 'generic_type' ? (ext.child(0) ? ext.child(0).text : ext.text) : ext.text;
+          if (
+            ext.type === 'identifier' ||
+            ext.type === 'type_identifier' ||
+            ext.type === 'generic_type'
+          ) {
+            const typeName =
+              ext.type === 'generic_type'
+                ? ext.child(0)
+                  ? ext.child(0).text
+                  : ext.text
+                : ext.text;
             superInterfaces.push(typeName);
           }
         }
@@ -402,20 +476,71 @@ function collectCalls(node, callerName, filePath, calls) {
 /* ── 변수 수집 ── */
 
 const TS_BUILTINS = new Set([
-  'undefined', 'null', 'true', 'false', 'NaN', 'Infinity',
-  'console', 'window', 'document', 'Math', 'JSON', 'Date',
-  'Array', 'Object', 'String', 'Number', 'Boolean', 'RegExp',
-  'Promise', 'Map', 'Set', 'WeakMap', 'WeakSet', 'Symbol',
-  'Error', 'TypeError', 'RangeError', 'SyntaxError',
-  'parseInt', 'parseFloat', 'isNaN', 'isFinite',
-  'setTimeout', 'setInterval', 'clearTimeout', 'clearInterval',
-  'fetch', 'XMLHttpRequest', 'FormData', 'URLSearchParams',
-  'require', 'module', 'exports', '__dirname', '__filename',
-  'process', 'global', 'Buffer',
-  'Partial', 'Required', 'Readonly', 'Record', 'Pick', 'Omit',
-  'Exclude', 'Extract', 'NonNullable', 'ReturnType', 'InstanceType',
-  'Parameters', 'ConstructorParameters',
-  'void', 'never', 'unknown', 'any',
+  'undefined',
+  'null',
+  'true',
+  'false',
+  'NaN',
+  'Infinity',
+  'console',
+  'window',
+  'document',
+  'Math',
+  'JSON',
+  'Date',
+  'Array',
+  'Object',
+  'String',
+  'Number',
+  'Boolean',
+  'RegExp',
+  'Promise',
+  'Map',
+  'Set',
+  'WeakMap',
+  'WeakSet',
+  'Symbol',
+  'Error',
+  'TypeError',
+  'RangeError',
+  'SyntaxError',
+  'parseInt',
+  'parseFloat',
+  'isNaN',
+  'isFinite',
+  'setTimeout',
+  'setInterval',
+  'clearTimeout',
+  'clearInterval',
+  'fetch',
+  'XMLHttpRequest',
+  'FormData',
+  'URLSearchParams',
+  'require',
+  'module',
+  'exports',
+  '__dirname',
+  '__filename',
+  'process',
+  'global',
+  'Buffer',
+  'Partial',
+  'Required',
+  'Readonly',
+  'Record',
+  'Pick',
+  'Omit',
+  'Exclude',
+  'Extract',
+  'NonNullable',
+  'ReturnType',
+  'InstanceType',
+  'Parameters',
+  'ConstructorParameters',
+  'void',
+  'never',
+  'unknown',
+  'any',
 ]);
 
 function collectVariables(node, filePath, variables) {
@@ -429,7 +554,12 @@ function collectVariables(node, filePath, variables) {
           const nameNode = declarator.childForFieldName('name');
           const valueNode = declarator.childForFieldName('value');
           //함수/화살표 함수는 함수로 처리되므로 건너뜀
-          if (valueNode && (valueNode.type === 'arrow_function' || valueNode.type === 'function_expression' || valueNode.type === 'function')) {
+          if (
+            valueNode &&
+            (valueNode.type === 'arrow_function' ||
+              valueNode.type === 'function_expression' ||
+              valueNode.type === 'function')
+          ) {
             continue;
           }
           if (nameNode && nameNode.type === 'identifier' && !TS_BUILTINS.has(nameNode.text)) {
@@ -486,18 +616,28 @@ function getFunctionBody(node) {
 
 function findFunctionNode(root, func, startLine) {
   function search(node) {
-    if ((node.type === 'function_declaration' || node.type === 'method_definition') &&
-        node.startPosition.row + 1 === startLine) {
+    if (
+      (node.type === 'function_declaration' || node.type === 'method_definition') &&
+      node.startPosition.row + 1 === startLine
+    ) {
       return node;
     }
-    if ((node.type === 'arrow_function' || node.type === 'function_expression' || node.type === 'function') &&
-        node.startPosition.row + 1 === startLine) {
+    if (
+      (node.type === 'arrow_function' ||
+        node.type === 'function_expression' ||
+        node.type === 'function') &&
+      node.startPosition.row + 1 === startLine
+    ) {
       return node;
     }
     if (node.type === 'variable_declarator') {
       const value = node.childForFieldName('value');
-      if (value && (value.type === 'arrow_function' || value.type === 'function_expression') &&
-          node.parent && node.parent.startPosition.row + 1 === startLine) {
+      if (
+        value &&
+        (value.type === 'arrow_function' || value.type === 'function_expression') &&
+        node.parent &&
+        node.parent.startPosition.row + 1 === startLine
+      ) {
         return value;
       }
     }

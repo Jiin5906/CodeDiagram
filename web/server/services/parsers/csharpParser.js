@@ -5,7 +5,8 @@ const CSharp = require('tree-sitter-c-sharp');
 
 function createParser() {
   const p = new Parser();
-  p.setLanguage(CSharp);
+  //문법 패키지의 타입 정의가 tree-sitter 0.22 타입과 맞지 않아 캐스팅한다 (런타임 동작은 같다)
+  p.setLanguage(/** @type {any} */ (CSharp));
   return p;
 }
 
@@ -92,8 +93,11 @@ function collectDefinitions(node, code, filePath, functions, calls, classes, cla
     }
 
     //클래스, 구조체, 인터페이스
-    if (child.type === 'class_declaration' || child.type === 'struct_declaration' ||
-        child.type === 'interface_declaration') {
+    if (
+      child.type === 'class_declaration' ||
+      child.type === 'struct_declaration' ||
+      child.type === 'interface_declaration'
+    ) {
       const nameNode = child.childForFieldName('name');
       const clsName = nameNode ? nameNode.text : null;
       if (!clsName) continue;
@@ -285,15 +289,47 @@ function collectCalls(node, callerName, filePath, calls) {
 /* ── 변수 수집 ── */
 
 const CSHARP_BUILTINS = new Set([
-  'this', 'base', 'true', 'false', 'null',
-  'int', 'float', 'double', 'decimal', 'char', 'bool', 'void',
-  'string', 'object', 'byte', 'sbyte', 'short', 'ushort',
-  'uint', 'long', 'ulong', 'var', 'dynamic',
-  'Console', 'Math', 'String', 'Object', 'Array',
-  'List', 'Dictionary', 'HashSet', 'Queue', 'Stack',
-  'Task', 'Tuple', 'Nullable',
-  'Exception', 'ArgumentException', 'InvalidOperationException',
-  'NullReferenceException', 'IndexOutOfRangeException',
+  'this',
+  'base',
+  'true',
+  'false',
+  'null',
+  'int',
+  'float',
+  'double',
+  'decimal',
+  'char',
+  'bool',
+  'void',
+  'string',
+  'object',
+  'byte',
+  'sbyte',
+  'short',
+  'ushort',
+  'uint',
+  'long',
+  'ulong',
+  'var',
+  'dynamic',
+  'Console',
+  'Math',
+  'String',
+  'Object',
+  'Array',
+  'List',
+  'Dictionary',
+  'HashSet',
+  'Queue',
+  'Stack',
+  'Task',
+  'Tuple',
+  'Nullable',
+  'Exception',
+  'ArgumentException',
+  'InvalidOperationException',
+  'NullReferenceException',
+  'IndexOutOfRangeException',
 ]);
 
 function collectVariables(node, filePath, variables, className) {
@@ -325,7 +361,8 @@ function collectVariables(node, filePath, variables, className) {
 
     //필드 선언
     if (child.type === 'field_declaration') {
-      const varDecl = child.childForFieldName('declaration') || findChildByType(child, 'variable_declaration');
+      const varDecl =
+        child.childForFieldName('declaration') || findChildByType(child, 'variable_declaration');
       if (varDecl) {
         extractVariableNames(varDecl, className, filePath, child.startPosition.row + 1, variables);
       } else {
@@ -419,9 +456,12 @@ function collectVariableRefs(node, callerName, filePath, refs) {
 
 function findFunctionNode(root, startLine) {
   function search(node) {
-    if ((node.type === 'method_declaration' || node.type === 'constructor_declaration' ||
-         node.type === 'local_function_statement') &&
-        node.startPosition.row + 1 === startLine) {
+    if (
+      (node.type === 'method_declaration' ||
+        node.type === 'constructor_declaration' ||
+        node.type === 'local_function_statement') &&
+      node.startPosition.row + 1 === startLine
+    ) {
       return node;
     }
     for (let i = 0; i < node.childCount; i++) {

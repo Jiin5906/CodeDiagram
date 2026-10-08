@@ -18,7 +18,7 @@ function generateSuggestions(diagnostics) {
     });
   }
   for (const cycle of funcCycles) {
-    const cycleStr = cycle.map(n => n.split('::').pop()).join(' → ');
+    const cycleStr = cycle.map((n) => n.split('::').pop()).join(' → ');
     suggestions.push({
       type: 'cycle',
       severity: 'warning',
@@ -38,7 +38,8 @@ function generateSuggestions(diagnostics) {
         severity: 'warning',
         title: `${funcName}: 인바운드 결합도 과다`,
         description: issue.message,
-        suggestion: '파사드(Facade) 패턴을 도입하거나 중재자(Mediator)를 통해 간접 호출로 전환하세요.',
+        suggestion:
+          '파사드(Facade) 패턴을 도입하거나 중재자(Mediator)를 통해 간접 호출로 전환하세요.',
         relatedNodes: [issue.nodeId],
       });
     } else {
@@ -62,7 +63,8 @@ function generateSuggestions(diagnostics) {
         severity: 'info',
         title: `${name}: God Function`,
         description: issue.message,
-        suggestion: '논리적 단위별로 헬퍼 함수를 추출하고, 주 함수는 조율(orchestration) 역할만 하도록 하세요.',
+        suggestion:
+          '논리적 단위별로 헬퍼 함수를 추출하고, 주 함수는 조율(orchestration) 역할만 하도록 하세요.',
         relatedNodes: [issue.nodeId],
       });
     } else if (issue.type === 'god_class') {

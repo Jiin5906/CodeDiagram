@@ -1,0 +1,87 @@
+# CI: 웹 서버(web/)의 린트·테스트·보안 검사를 병렬로 실행한다.
+# Android(app/)는 android.yml이 경로가 바뀔 때만 따로 실행한다.
+# 외부 액션은 전체 커밋 SHA로 고정한다 (태그는 바꿔치기될 수 있음). 갱신은 Dependabot이 맡는다.
+name: CI
+
+on:
+  # 모든 PR에서 실행한다 (대상 브랜치와 관계없이)
+  pull_request:
+  # PR 없이 바로 push해도 검사되도록 주요 브랜치는 push에서도 실행한다
+  push:
+    branches: [master, feature/web-update]
+  # release.yml이 태그 배포 전에 같은 검사를 재사용한다
+  workflow_call:
+
+# 기본은 읽기 권한만. 추가 권한이 필요한 job에서만 따로 준다.
+permissions:
+  contents: read
+
+# 같은 브랜치에 새 커밋이 올라오면 이전 실행은 취소한다
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # CI에서는 git 훅을 설치하지 않는다
+  HUSKY: '0'
+
+defaults:
+  run:
+    working-directory: web
+
+jobs:
+  lint:
+    name: 린트 · 포맷 · 타입 검사
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: web/.nvmrc
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run format:check
+      - run: npm run typecheck
+
+  test:
+    name: 테스트 + 커버리지 (Docker test 스테이지)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: test 이미지 빌드
+        run: docker build --target test -t code-diagram:test .
+      # 커버리지가 jest.config.js의 최소 기준보다 낮으면 실패한다
+      - name: 테스트 실행
+        run: docker run --rm code-diagram:test npm run test:coverage
+
+  security:
+    name: 보안 검사 (gitleaks · npm audit · Trivy)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # gitleaks가 커밋 기록 전체를 검사하도록 전부 가져온다
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: web/.nvmrc
+      # 로컬과 같은 Docker 이미지(digest 고정)로 실행한다: scripts/scan.js
+      - name: 비밀값 검사 (gitleaks, 전체 기록)
+        run: npm run scan:secrets
+      # package-lock.json만으로 검사하므로 npm ci가 필요 없다. 운영 의존성 high 이상이면 실패
+      - name: 의존성 취약점 (npm audit)
+        run: npm run audit
+      - name: prod 이미지 빌드
+        run: npm run docker:build
+      - name: 이미지 취약점 (Trivy)
+        run: npm run scan:image

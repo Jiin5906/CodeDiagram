@@ -130,8 +130,11 @@ function renderMinimap() {
   const edges = cy.edges(':visible');
   if (edges.length <= 4000) {
     ctx.lineWidth = 0.6;
-    edges.forEach(edge => {
-      const alpha = Math.min(1, edge.effectiveOpacity() * (parseFloat(edge.style('line-opacity')) || 0));
+    edges.forEach((edge) => {
+      const alpha = Math.min(
+        1,
+        edge.effectiveOpacity() * (parseFloat(edge.style('line-opacity')) || 0),
+      );
       if (alpha < 0.05) return;
       const s = toMinimap(edge.source().position('x'), edge.source().position('y'));
       const t = toMinimap(edge.target().position('x'), edge.target().position('y'));
@@ -146,7 +149,7 @@ function renderMinimap() {
 
   //노드: 바깥 박스(compound)부터 그려야 안쪽 노드가 가려지지 않는다
   const sorted = nodes.sort((a, b) => a.ancestors().length - b.ancestors().length);
-  sorted.forEach(node => {
+  sorted.forEach((node) => {
     const nb = node.boundingBox({ includeLabels: false, includeOverlays: false });
     const tl = toMinimap(nb.x1, nb.y1);
     const nw = Math.max(1.5, nb.w * scale);
@@ -185,19 +188,9 @@ function renderMinimap() {
 
   ctx.strokeStyle = '#548AF7';
   ctx.lineWidth = 1.5;
-  ctx.strokeRect(
-    topLeft.x,
-    topLeft.y,
-    bottomRight.x - topLeft.x,
-    bottomRight.y - topLeft.y,
-  );
+  ctx.strokeRect(topLeft.x, topLeft.y, bottomRight.x - topLeft.x, bottomRight.y - topLeft.y);
   ctx.fillStyle = 'rgba(96, 165, 250, 0.06)';
-  ctx.fillRect(
-    topLeft.x,
-    topLeft.y,
-    bottomRight.x - topLeft.x,
-    bottomRight.y - topLeft.y,
-  );
+  ctx.fillRect(topLeft.x, topLeft.y, bottomRight.x - topLeft.x, bottomRight.y - topLeft.y);
 
   //좌표 변환 함수를 캔버스에 저장 (클릭 시 사용, CSS px 기준)
   _minimapCanvas._toGraph = function (mx, my) {

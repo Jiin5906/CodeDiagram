@@ -43,7 +43,8 @@ function setupInteractions() {
   //계층형은 파일 뷰 전용 — 함수 뷰는 박스가 겹겹이라 계층형으로 펼치면 읽을 수 없다.
   //켜 둔 상태는 기억했다가 파일 뷰로 돌아오면 다시 적용한다.
   const hierarchyBox = document.getElementById('graph-settings');
-  if (hierarchyBox && graphData) hierarchyBox.classList.toggle('hidden', currentViewMode !== 'file');
+  if (hierarchyBox && graphData)
+    hierarchyBox.classList.toggle('hidden', currentViewMode !== 'file');
   if (hierarchicalLayout && currentViewMode === 'file') applyHierarchicalLayout();
   syncViewButtons();
 }
@@ -165,7 +166,6 @@ function setupFileViewInteractions() {
   cy.on('tap', 'edge[type="aggregated"]', function (evt) {
     const edge = evt.target;
     const functionEdges = edge.data('functionEdges') || [];
-    const typeBreakdown = edge.data('typeBreakdown') || {};
 
     if (functionEdges.length === 0) return;
 
@@ -213,17 +213,21 @@ function setupFunctionViewInteractions() {
   });
 
   //웹/TS/C++/C# 노드 클릭
-  cy.on('tap', 'node[type="js-function"], node[type="ts-function"], node[type="cpp-function"], node[type="csharp-function"], node[type="html-element"], node[type="css-selector"], node[type="css-variable"]', function (evt) {
-    const node = evt.target;
-    highlightNode(node.id());
-    const funcTypes = ['js-function', 'ts-function', 'cpp-function', 'csharp-function'];
-    if (funcTypes.includes(node.data('type')) && node.data('code')) {
-      showFunctionDetail(node.data());
-    } else if (node.data('code') && typeof showCodeViewer === 'function') {
-      showCodeViewer(node.data());
-    }
-    evt.stopPropagation();
-  });
+  cy.on(
+    'tap',
+    'node[type="js-function"], node[type="ts-function"], node[type="cpp-function"], node[type="csharp-function"], node[type="html-element"], node[type="css-selector"], node[type="css-variable"]',
+    function (evt) {
+      const node = evt.target;
+      highlightNode(node.id());
+      const funcTypes = ['js-function', 'ts-function', 'cpp-function', 'csharp-function'];
+      if (funcTypes.includes(node.data('type')) && node.data('code')) {
+        showFunctionDetail(node.data());
+      } else if (node.data('code') && typeof showCodeViewer === 'function') {
+        showCodeViewer(node.data());
+      }
+      evt.stopPropagation();
+    },
+  );
 
   //파일/티어 노드 더블클릭 → 접기/펼치기
   cy.on('dbltap', 'node[type="file"], node[type="tier"]', function (evt) {
@@ -318,7 +322,6 @@ function setupDomListeners() {
     }
   });
 
-
   //진단 패널 닫기
   document.getElementById('diagnostics-close').addEventListener('click', () => {
     document.getElementById('diagnostics-panel').classList.add('hidden');
@@ -337,11 +340,11 @@ function setupDomListeners() {
     if (!cy) return;
     const fileNodes = cy.nodes('[type="file"]');
     if (allCollapsed) {
-      fileNodes.forEach(node => expandNode(node));
+      fileNodes.forEach((node) => expandNode(node));
       allCollapsed = false;
       setRibbonLabel('collapse-all-btn', '전체 접기', RIBBON_TIPS.collapse);
     } else {
-      fileNodes.forEach(node => collapseNode(node));
+      fileNodes.forEach((node) => collapseNode(node));
       allCollapsed = true;
       setRibbonLabel('collapse-all-btn', '전체 펼치기', RIBBON_TIPS.expand);
     }
@@ -372,7 +375,7 @@ function collapseNode(node) {
   collapsedNodes.add(nodeId);
 
   const children = node.children();
-  children.forEach(child => {
+  children.forEach((child) => {
     child.style('display', 'none');
     child.connectedEdges().style('display', 'none');
   });
@@ -385,9 +388,9 @@ function expandNode(node) {
   collapsedNodes.delete(nodeId);
 
   const children = node.children();
-  children.forEach(child => {
+  children.forEach((child) => {
     child.style('display', 'element');
-    child.connectedEdges().forEach(edge => {
+    child.connectedEdges().forEach((edge) => {
       const other = edge.source().id() === child.id() ? edge.target() : edge.source();
       if (other.style('display') !== 'none') {
         edge.style('display', 'element');
@@ -401,7 +404,9 @@ function expandNode(node) {
 
 //nodeId('경로::함수명' 또는 '경로')에서 파일 경로만 뽑는다
 function _diagFilePath(nodeId) {
-  return String(nodeId || '').replace(/^file__/, '').split('::')[0];
+  return String(nodeId || '')
+    .replace(/^file__/, '')
+    .split('::')[0];
 }
 
 //진단 항목 클릭 → 그래프에서 해당 노드(파일 뷰면 파일 노드)로 이동
@@ -411,7 +416,10 @@ function _focusDiagTarget(nodeId) {
   if (!target.length) {
     //노드가 없으면(파일 뷰 등) 같은 경로의 파일 노드로 이동
     const filePath = _diagFilePath(nodeId);
-    target = cy.nodes().filter(n => n.data('fullPath') === filePath).first();
+    target = cy
+      .nodes()
+      .filter((n) => n.data('fullPath') === filePath)
+      .first();
   }
   if (!target.length) return;
   highlightNode(target.id());
@@ -428,7 +436,7 @@ function _diagLocation(nodeId, message) {
   const data = (typeof lastAnalysisData !== 'undefined' && lastAnalysisData) || graphData;
   const nodes = (data && data.nodes) || [];
 
-  const node = nodes.find(n => n.data.id === nodeId);
+  const node = nodes.find((n) => n.data.id === nodeId);
   if (node && node.data.startLine) {
     return {
       filePath,
@@ -441,12 +449,14 @@ function _diagLocation(nodeId, message) {
 
   const memberName = String(nodeId || '').split('::')[1];
   if (memberName) {
-    const methods = nodes.filter(n => n.data.filePath === filePath && n.data.className === memberName && n.data.startLine);
+    const methods = nodes.filter(
+      (n) => n.data.filePath === filePath && n.data.className === memberName && n.data.startLine,
+    );
     if (methods.length) {
       return {
         filePath,
-        startLine: Math.min(...methods.map(n => n.data.startLine)),
-        endLine: Math.max(...methods.map(n => n.data.endLine || n.data.startLine)),
+        startLine: Math.min(...methods.map((n) => n.data.startLine)),
+        endLine: Math.max(...methods.map((n) => n.data.endLine || n.data.startLine)),
         name: memberName,
       };
     }
@@ -476,7 +486,9 @@ function _openDiagLocation(nodeId, message, itemEl) {
     _focusDiagTarget(nodeId);
   }
   //어떤 항목을 보고 있는지 표시
-  document.querySelectorAll('#diagnostics-panel .diag-item.active').forEach(el => el.classList.remove('active'));
+  document
+    .querySelectorAll('#diagnostics-panel .diag-item.active')
+    .forEach((el) => el.classList.remove('active'));
   if (itemEl) itemEl.classList.add('active');
 }
 
@@ -494,7 +506,7 @@ function _makeDiagItem(severity, message, nodeIds) {
 
   //파일마다 칩 하나 — 순환처럼 여러 파일이 얽힌 경우 칩을 눌러 각 파일로 갈 수 있다
   const firstIdByFile = new Map();
-  for (const id of (nodeIds || [])) {
+  for (const id of nodeIds || []) {
     const f = _diagFilePath(id);
     if (f && !firstIdByFile.has(f)) firstIdByFile.set(f, id);
   }
@@ -552,7 +564,7 @@ function _makeDiagSection(title, items, emptyText) {
     empty.textContent = emptyText;
     section.appendChild(empty);
   } else {
-    items.forEach(item => section.appendChild(item));
+    items.forEach((item) => section.appendChild(item));
     //검색 결과가 없을 때 보여줄 안내
     const noMatch = document.createElement('div');
     noMatch.className = 'diag-empty diag-no-match hidden';
@@ -566,24 +578,28 @@ function _makeDiagSection(title, items, emptyText) {
 function filterDiagnostics(query) {
   const panel = document.getElementById('diagnostics-panel');
   if (!panel) return;
-  const terms = String(query || '').toLowerCase().split(/\s+/).filter(Boolean);
+  const terms = String(query || '')
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean);
   let shown = 0;
   let total = 0;
 
-  panel.querySelectorAll('.diag-item, .suggestion-item').forEach(item => {
+  panel.querySelectorAll('.diag-item, .suggestion-item').forEach((item) => {
     const text = item.dataset.search || item.textContent.toLowerCase();
-    const match = terms.every(t => text.includes(t));
+    const match = terms.every((t) => text.includes(t));
     item.classList.toggle('hidden', !match);
     total++;
     if (match) shown++;
   });
 
-  panel.querySelectorAll('.diag-section').forEach(section => {
+  panel.querySelectorAll('.diag-section').forEach((section) => {
     const items = section.querySelectorAll('.diag-item');
     const visible = section.querySelectorAll('.diag-item:not(.hidden)').length;
     const count = section.querySelector('.diag-section-count');
     const total = count ? Number(count.dataset.total) : 0;
-    if (count) count.textContent = terms.length && total > 0 ? `${visible}/${total}` : String(total);
+    if (count)
+      count.textContent = terms.length && total > 0 ? `${visible}/${total}` : String(total);
     const noMatch = section.querySelector('.diag-no-match');
     if (noMatch) noMatch.classList.toggle('hidden', !(items.length && visible === 0));
   });
@@ -619,21 +635,33 @@ function showDiagnosticsPanel(diagnostics, suggestions) {
   const fileCycles = diagnostics.cycles.files || [];
   const funcCycles = diagnostics.cycles.functions || [];
   const cycleItems = [
-    ...fileCycles.map(cycle => _makeDiagItem('error',
-      `파일 순환: ${cycle.map(f => f.split('/').pop()).join(' → ')}`, cycle)),
-    ...funcCycles.map(cycle => _makeDiagItem('warning',
-      `함수 순환: ${cycle.map(n => n.split('::').pop()).join(' → ')}`, cycle)),
+    ...fileCycles.map((cycle) =>
+      _makeDiagItem(
+        'error',
+        `파일 순환: ${cycle.map((f) => f.split('/').pop()).join(' → ')}`,
+        cycle,
+      ),
+    ),
+    ...funcCycles.map((cycle) =>
+      _makeDiagItem(
+        'warning',
+        `함수 순환: ${cycle.map((n) => n.split('::').pop()).join(' → ')}`,
+        cycle,
+      ),
+    ),
   ];
   content.appendChild(_makeDiagSection('순환 참조', cycleItems, '순환 참조가 없습니다'));
 
   //결합도 과다 섹션
-  const couplingItems = (diagnostics.couplingIssues || []).map(issue =>
-    _makeDiagItem('warning', `${issue.nodeId.split('::').pop()}: ${issue.message}`, [issue.nodeId]));
+  const couplingItems = (diagnostics.couplingIssues || []).map((issue) =>
+    _makeDiagItem('warning', `${issue.nodeId.split('::').pop()}: ${issue.message}`, [issue.nodeId]),
+  );
   content.appendChild(_makeDiagSection('결합도 과다', couplingItems, '결합도 문제가 없습니다'));
 
   //안티패턴 섹션
-  const antiItems = (diagnostics.antiPatterns || []).map(issue =>
-    _makeDiagItem('info', issue.message, [issue.nodeId]));
+  const antiItems = (diagnostics.antiPatterns || []).map((issue) =>
+    _makeDiagItem('info', issue.message, [issue.nodeId]),
+  );
   content.appendChild(_makeDiagSection('안티패턴', antiItems, '안티패턴이 없습니다'));
 
   //리팩토링 제안 표시
@@ -641,8 +669,14 @@ function showDiagnosticsPanel(diagnostics, suggestions) {
     for (const sug of suggestions) {
       const item = document.createElement('div');
       item.className = 'suggestion-item';
-      item.dataset.search = [sug.title, sug.description, sug.suggestion, ...(sug.relatedNodes || [])]
-        .join(' ').toLowerCase();
+      item.dataset.search = [
+        sug.title,
+        sug.description,
+        sug.suggestion,
+        ...(sug.relatedNodes || []),
+      ]
+        .join(' ')
+        .toLowerCase();
 
       const title = document.createElement('div');
       title.className = 'suggestion-title';
@@ -741,14 +775,16 @@ function showRefsInViewer(references, sourceId, targetId) {
   list.className = 'fn-list';
 
   const openRef = (ref, item) => {
-    list.querySelectorAll('.fn-list-item.active').forEach(el => el.classList.remove('active'));
+    list.querySelectorAll('.fn-list-item.active').forEach((el) => el.classList.remove('active'));
     item.classList.add('active');
     if (ref.file && typeof showCodeAtLocation === 'function') {
       showCodeAtLocation(ref.file, ref.line || 0, ref.line || 0, ref.caller, { keepList: true });
     }
     //함수 뷰: 호출한 함수 노드를 강조하고 화면 가운데로
     if (!cy || currentViewMode === 'file') return;
-    const callerNode = cy.nodes().filter(n => n.data('qualifiedName') === ref.caller || n.data('label') === ref.caller);
+    const callerNode = cy
+      .nodes()
+      .filter((n) => n.data('qualifiedName') === ref.caller || n.data('label') === ref.caller);
     if (callerNode.length > 0) {
       highlightNode(callerNode[0].id());
       cy.animate({ center: { eles: callerNode[0] } }, { duration: 400, easing: 'ease-out-cubic' });
@@ -761,7 +797,9 @@ function showRefsInViewer(references, sourceId, targetId) {
 
     const nameSpan = document.createElement('span');
     nameSpan.className = 'fn-list-name';
-    const fileName = String(ref.file || '').split('/').pop();
+    const fileName = String(ref.file || '')
+      .split('/')
+      .pop();
     nameSpan.textContent = fileName + (ref.line ? ':' + ref.line : '');
     nameSpan.title = (ref.file || '') + (ref.line ? ':' + ref.line : '');
     item.appendChild(nameSpan);
@@ -841,7 +879,8 @@ async function showExplanation(funcData) {
       const err = await response.json().catch(() => ({}));
       if (seq !== explainSeq) return;
       if (response.status === 503) {
-        explainUnavailableMsg = 'API 키가 설정되지 않아 AI 해설을 쓸 수 없습니다. (web/.env의 ANTHROPIC_API_KEY)';
+        explainUnavailableMsg =
+          'API 키가 설정되지 않아 AI 해설을 쓸 수 없습니다. (web/.env의 ANTHROPIC_API_KEY)';
         _explainNote(body, explainUnavailableMsg);
       } else {
         _explainNote(body, `해설을 가져올 수 없습니다: ${err.error || '서버 오류'}`);
@@ -864,7 +903,7 @@ async function showExplanation(funcData) {
 function formatExplanation(text) {
   const fragment = document.createDocumentFragment();
   const paragraphs = text.split('\n\n');
-  paragraphs.forEach(para => {
+  paragraphs.forEach((para) => {
     const p = document.createElement('p');
     const lines = para.split('\n');
     lines.forEach((line, i) => {
@@ -889,11 +928,12 @@ function setupSearch() {
     }
 
     //파일 뷰에서는 file-node도 검색 대상
-    const searchSelector = currentViewMode === 'file'
-      ? 'node[type="file-node"]'
-      : 'node[type="function"], node[type="file"], node[type="js-function"], node[type="ts-function"], node[type="cpp-function"], node[type="csharp-function"]';
+    const searchSelector =
+      currentViewMode === 'file'
+        ? 'node[type="file-node"]'
+        : 'node[type="function"], node[type="file"], node[type="js-function"], node[type="ts-function"], node[type="cpp-function"], node[type="csharp-function"]';
 
-    const matched = cy.nodes(searchSelector).filter(node => {
+    const matched = cy.nodes(searchSelector).filter((node) => {
       const label = (node.data('label') || '').toLowerCase();
       return label.includes(query);
     });
@@ -905,7 +945,9 @@ function setupSearch() {
 
     let keepVisible = matched;
     if (currentViewMode !== 'file') {
-      matched.forEach(n => { keepVisible = keepVisible.union(n.ancestors()); });
+      matched.forEach((n) => {
+        keepVisible = keepVisible.union(n.ancestors());
+      });
     }
 
     cy.nodes().removeClass('highlighted dimmed');
@@ -919,21 +961,25 @@ function setupSearch() {
       const query = input.value.trim().toLowerCase();
       if (!cy || !query) return;
 
-      const searchSelector = currentViewMode === 'file'
-        ? 'node[type="file-node"]'
-        : 'node[type="function"], node[type="file"]';
+      const searchSelector =
+        currentViewMode === 'file'
+          ? 'node[type="file-node"]'
+          : 'node[type="function"], node[type="file"]';
 
-      const matched = cy.nodes(searchSelector).filter(node => {
+      const matched = cy.nodes(searchSelector).filter((node) => {
         const label = (node.data('label') || '').toLowerCase();
         return label.includes(query);
       });
 
       if (matched.length > 0) {
         const first = matched[0];
-        cy.animate({
-          center: { eles: first },
-          zoom: currentViewMode === 'file' ? 1.5 : 2,
-        }, { duration: 400, easing: 'ease-out-cubic' });
+        cy.animate(
+          {
+            center: { eles: first },
+            zoom: currentViewMode === 'file' ? 1.5 : 2,
+          },
+          { duration: 400, easing: 'ease-out-cubic' },
+        );
       }
     }
 
@@ -1049,7 +1095,10 @@ function setupShortcutsHelp() {
   if (closeBtn) closeBtn.addEventListener('click', () => toggleShortcutsHelp(false));
   if (legendBtn) legendBtn.addEventListener('click', () => toggleShortcutsHelp(true));
   //바깥 어두운 영역을 누르면 닫는다
-  if (el) el.addEventListener('click', (e) => { if (e.target === el) toggleShortcutsHelp(false); });
+  if (el)
+    el.addEventListener('click', (e) => {
+      if (e.target === el) toggleShortcutsHelp(false);
+    });
 }
 
 /* ── 롱 프레스 (모바일 우클릭 대체) ── */
@@ -1065,7 +1114,13 @@ function setupLongPress() {
       if (!longPressTarget) return;
       const node = longPressTarget;
       const nodeType = node.data('type');
-      const funcTypes = ['function', 'js-function', 'ts-function', 'cpp-function', 'csharp-function'];
+      const funcTypes = [
+        'function',
+        'js-function',
+        'ts-function',
+        'cpp-function',
+        'csharp-function',
+      ];
 
       if (funcTypes.includes(nodeType)) {
         highlightNode(node.id());
@@ -1100,11 +1155,19 @@ let hierarchicalLayout = false;
 const HIERARCHY_COMPARE_LIMIT = 1500; // 이보다 크면 두 번 계산하지 않고 모양으로만 판단
 
 function _runDagre(eles, rankDir) {
-  eles.layout({
-    name: 'dagre', animate: false, fit: false, padding: 40,
-    nodeDimensionsIncludeLabels: true, rankDir,
-    rankSep: 80, nodeSep: 40, edgeSep: 20,
-  }).run();
+  eles
+    .layout({
+      name: 'dagre',
+      animate: false,
+      fit: false,
+      padding: 40,
+      nodeDimensionsIncludeLabels: true,
+      rankDir,
+      rankSep: 80,
+      nodeSep: 40,
+      edgeSep: 20,
+    })
+    .run();
   const bb = eles.boundingBox({ includeLabels: true });
   return Math.min(cy.width() / Math.max(1, bb.w), cy.height() / Math.max(1, bb.h));
 }
@@ -1125,7 +1188,8 @@ function applyHierarchicalLayout() {
   } else {
     //노드가 아주 많으면 TB 결과가 화면보다 3배 이상 가로로 길 때만 LR로 다시 배치
     const bb = eles.boundingBox();
-    if (bb.w / Math.max(1, bb.h) > (cy.width() / Math.max(1, cy.height())) * 3) _runDagre(eles, 'LR');
+    if (bb.w / Math.max(1, bb.h) > (cy.width() / Math.max(1, cy.height())) * 3)
+      _runDagre(eles, 'LR');
   }
   cy.fit(eles, 40);
 }
@@ -1147,7 +1211,9 @@ function setupHierarchyToggle() {
     hierarchicalLayout = !hierarchicalLayout;
     btn.classList.toggle('active', hierarchicalLayout);
     btn.setAttribute('aria-pressed', String(hierarchicalLayout));
-    btn.title = hierarchicalLayout ? '원래 배치로 되돌립니다' : '호출 순서대로 층을 나눠 배치합니다 (화면에 맞게 위→아래 또는 왼→오른쪽)';
+    btn.title = hierarchicalLayout
+      ? '원래 배치로 되돌립니다'
+      : '호출 순서대로 층을 나눠 배치합니다 (화면에 맞게 위→아래 또는 왼→오른쪽)';
     if (hierarchicalLayout) {
       applyHierarchicalLayout();
     } else {
@@ -1271,11 +1337,14 @@ function showFunctionList(node) {
 
   const openFn = (fn, index) => {
     if (fn.code && typeof showCodeViewer === 'function') {
-      showCodeViewer({
-        ...fn,
-        filePath: filePath,
-        label: fn.name,
-      }, { keepFnList: true, fnIndex: index });
+      showCodeViewer(
+        {
+          ...fn,
+          filePath: filePath,
+          label: fn.name,
+        },
+        { keepFnList: true, fnIndex: index },
+      );
     }
   };
 
@@ -1283,7 +1352,7 @@ function showFunctionList(node) {
     const item = document.createElement('div');
     item.className = 'fn-list-item';
 
-    const icon = fn.type === 'variable' ? '◆' : ((fn.type || '').includes('function') ? 'ƒ' : '○');
+    const icon = fn.type === 'variable' ? '◆' : (fn.type || '').includes('function') ? 'ƒ' : '○';
     const iconSpan = document.createElement('span');
     iconSpan.className = 'fn-list-icon';
     iconSpan.textContent = icon;
@@ -1304,7 +1373,7 @@ function showFunctionList(node) {
   fnListEl.appendChild(list);
 
   //첫 번째 함수(참조가 가장 많은 함수) 코드를 먼저 보여준다
-  const firstIndex = functions.findIndex(fn => fn.code);
+  const firstIndex = functions.findIndex((fn) => fn.code);
   if (firstIndex >= 0) {
     openFn(functions[firstIndex], firstIndex);
   } else {
@@ -1407,11 +1476,11 @@ function setupEdgeToggle() {
     edgesVisible = !edgesVisible;
 
     if (edgesVisible) {
-      cy.edges().style({ 'display': 'element', 'line-opacity': 0.3 });
+      cy.edges().style({ display: 'element', 'line-opacity': 0.3 });
       setRibbonLabel('toggle-edges-btn', '선 숨기기', RIBBON_TIPS.edgesShown);
       btn.classList.add('active');
     } else {
-      cy.edges().style({ 'display': 'none' });
+      cy.edges().style({ display: 'none' });
       setRibbonLabel('toggle-edges-btn', '선 보기', RIBBON_TIPS.edgesHidden);
       btn.classList.remove('active');
     }
