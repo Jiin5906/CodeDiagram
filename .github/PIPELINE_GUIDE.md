@@ -8,8 +8,8 @@ CodeDiagram의 품질 검사와 배포가 어떻게 연결되어 있는지, 매�
 커밋 ──▶ pre-commit (내 PC)          PR / push ──▶ CI (GitHub Actions)         v* 태그 ──▶ Release
          ├ lint-staged                              ├ lint      린트·포맷·타입             ├ CI 재실행
          │  (ESLint --fix, Prettier)                ├ test      Docker 안에서 커버리지     ├ 이미지 → GHCR
-         ├ gitleaks (스테이징분)                     ├ security  gitleaks·audit·Trivy      ├ APK → Release
-         └ test:unit                                └ android   app/ 바뀔 때만             └ deploy(자리만)
+         ├ gitleaks (스테이징분)                     ├ security  gitleaks·audit·Trivy      ├ Release 생성
+         └ test:unit                                                                       └ deploy(자리만)
 ```
 
 | 단계 | 어디서 | 파일 |
@@ -18,7 +18,7 @@ CodeDiagram의 품질 검사와 배포가 어떻게 연결되어 있는지, 매�
 | 정적 분석 | 로컬·CI | `web/eslint.config.js`, `web/.prettierrc.json`, `web/tsconfig.json`, `web/scripts/scan.js` |
 | 테스트 | 로컬·CI | `web/jest.config.js`, `web/jest.live.config.js`, `web/test/**` |
 | pre-commit | 로컬 | `.husky/pre-commit`, `web/package.json`의 `lint-staged`·`prepare` |
-| CI | GitHub | `.github/workflows/ci.yml`, `.github/workflows/android.yml` |
+| CI | GitHub | `.github/workflows/ci.yml` (`android.yml`은 보류, 수동 실행만) |
 | CD | GitHub | `.github/workflows/release.yml` |
 | 저장소 운영 | GitHub | `.github/dependabot.yml`, `.github/pull_request_template.md`, `.github/CONTRIBUTING.md` |
 
@@ -52,7 +52,7 @@ copy .env.example .env                        # AI 해설을 쓰려면 ANTHROPIC
 | `npm run scan:image` | Trivy로 `code-diagram:local` 이미지 취약점 검사 (Docker) |
 | `npm run docker:build` / `docker:test` / `docker:run` | prod 이미지 빌드 / test 스테이지에서 테스트 / 서버 실행 |
 
-Android(루트에서): `./gradlew testDebugUnitTest lintDebug assembleDebug`
+Android(루트에서, 현재 보류): `./gradlew testDebugUnitTest lintDebug assembleDebug`
 
 ## 작업 흐름
 
@@ -83,7 +83,7 @@ Android(루트에서): `./gradlew testDebugUnitTest lintDebug assembleDebug`
 | `lint` | `npm ci` → lint → format:check → typecheck |
 | `test` | `docker build --target test` → 컨테이너에서 `npm run test:coverage` |
 | `security` | gitleaks(전체 기록, `fetch-depth: 0`) → npm audit → prod 이미지 빌드 → Trivy |
-| `android` (`android.yml`) | `app/`, `gradle/`, `*.gradle.kts`, `gradlew` 등이 바뀔 때만. JDK 21 + `testDebugUnitTest lintDebug assembleDebug` |
+| `android` (`android.yml`) | **보류**: 앱 출시 계획이 없어 자동 실행을 껐고, Actions 탭에서 수동 실행만 됩니다. 다시 켜는 방법은 파일 맨 위 주석에 있습니다 |
 
 보안 규칙:
 - 모든 외부 액션은 전체 커밋 SHA로 고정하고 `# vX.Y.Z` 주석을 답니다.
@@ -97,20 +97,19 @@ Android(루트에서): `./gradlew testDebugUnitTest lintDebug assembleDebug`
 
 ## CD 구성 (`.github/workflows/release.yml`)
 
-`v*` 태그 푸시 → `verify`(CI 재실행) → 아래 두 job이 병렬로 실행 → `release` → `deploy`
+`v*` 태그 푸시 → `verify`(CI 재실행) → `image` → `release` → `deploy`
 
 | job | 권한 | 하는 일 |
 |---|---|---|
 | `image` | `packages: write` | prod 이미지 빌드 → Trivy → `ghcr.io/<owner>/code-diagram:<태그>`와 `:latest` 푸시 |
-| `apk` | 읽기 | `testDebugUnitTest assembleDebug` → APK를 artifact로 업로드 |
-| `release` | `contents: write` | APK를 받아 GitHub Release 생성 (`--generate-notes`) |
+| `release` | `contents: write` | GitHub Release 생성 (`--generate-notes`). Android APK 첨부는 보류 |
 | `deploy` | 읽기 | `environment: production`. 배포 대상이 생기면 이 job에 명령을 넣습니다 |
 
-- 쓰기 권한이 필요한 job(`release`)은 빌드를 하지 않고, 빌드하는 job(`apk`)은 쓰기 권한이 없습니다.
+- 쓰기 권한이 필요한 job(`release`)은 빌드를 하지 않습니다.
 
 ## 저장소 운영
 
-- **Dependabot** (`.github/dependabot.yml`): npm(`web/`), github-actions, docker(`web/Dockerfile`), gradle 모두 주 1회(월요일 09:00 KST)입니다.
+- **Dependabot** (`.github/dependabot.yml`): npm(`web/`), github-actions, docker(`web/Dockerfile`) 모두 주 1회 (gradle은 Android 보류로 제외)(월요일 09:00 KST)입니다.
   - PR은 `ci/pipeline`으로 갑니다. `master`로 병합한 뒤에는 `target-branch`를 `master`로 바꾸거나 지웁니다.
   - Dependabot 설정은 **기본 브랜치(`master`)에 있어야** 동작합니다. 그 전까지는 적용되지 않습니다.
   - tree-sitter 계열과 Node 이미지의 메이저 업그레이드는 직접 합니다.

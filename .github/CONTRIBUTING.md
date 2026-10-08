@@ -52,7 +52,7 @@ CodeDiagram 저장소에서 함께 작업할 때 지키는 규칙입니다. 파�
 ```
 feat(parser): C# 제네릭 메서드 호출 추출
 fix(resolver): 점 없는 호출은 같은 이름의 메서드보다 모듈 함수를 우선
-ci: 태그 푸시 시 GHCR 이미지와 APK 릴리스
+ci: 태그 푸시 시 GHCR 이미지 릴리스
 chore(deps): express 4.22.3으로 갱신
 ```
 
