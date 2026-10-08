@@ -42,7 +42,7 @@
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.0",
-    "simple-git": "^3.27.0",
+    "simple-git": "^4.0.2",
     "tree-sitter": "^0.22.4",
     "tree-sitter-c-sharp": "^0.21.3",
     "tree-sitter-cpp": "^0.23.4",
