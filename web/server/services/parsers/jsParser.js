@@ -5,7 +5,8 @@ const JavaScript = require('tree-sitter-javascript');
 
 function createParser() {
   const p = new Parser();
-  p.setLanguage(JavaScript);
+  //문법 패키지의 타입 정의가 tree-sitter 0.22 타입과 맞지 않아 캐스팅한다 (런타임 동작은 같다)
+  p.setLanguage(/** @type {any} */ (JavaScript));
   return p;
 }
 
@@ -147,8 +148,13 @@ function collectDefinitions(node, code, filePath, functions, calls, classes, cla
         if (declarator.type === 'variable_declarator') {
           const nameNode = declarator.childForFieldName('name');
           const valueNode = declarator.childForFieldName('value');
-          if (nameNode && valueNode &&
-              (valueNode.type === 'arrow_function' || valueNode.type === 'function_expression' || valueNode.type === 'function')) {
+          if (
+            nameNode &&
+            valueNode &&
+            (valueNode.type === 'arrow_function' ||
+              valueNode.type === 'function_expression' ||
+              valueNode.type === 'function')
+          ) {
             const func = {
               name: nameNode.text,
               qualifiedName: className ? `${className}.${nameNode.text}` : nameNode.text,
@@ -182,7 +188,8 @@ function collectDefinitions(node, code, filePath, functions, calls, classes, cla
       const clsName = nameNode ? nameNode.text : 'AnonymousClass';
 
       const superclasses = [];
-      const heritage = child.childForFieldName('heritage') || findChildByType(child, 'class_heritage');
+      const heritage =
+        child.childForFieldName('heritage') || findChildByType(child, 'class_heritage');
       if (heritage) {
         for (let j = 0; j < heritage.childCount; j++) {
           const h = heritage.child(j);
@@ -214,8 +221,11 @@ function collectDefinitions(node, code, filePath, functions, calls, classes, cla
           if (member.type === 'field_definition') {
             const fieldName = member.childForFieldName('property');
             const fieldValue = member.childForFieldName('value');
-            if (fieldName && fieldValue &&
-                (fieldValue.type === 'arrow_function' || fieldValue.type === 'function_expression')) {
+            if (
+              fieldName &&
+              fieldValue &&
+              (fieldValue.type === 'arrow_function' || fieldValue.type === 'function_expression')
+            ) {
               const func = {
                 name: fieldName.text,
                 qualifiedName: `${clsName}.${fieldName.text}`,
@@ -298,16 +308,54 @@ function collectCalls(node, callerName, filePath, calls) {
 /* ── 변수 수집 ── */
 
 const JS_BUILTINS = new Set([
-  'undefined', 'null', 'true', 'false', 'NaN', 'Infinity',
-  'console', 'window', 'document', 'Math', 'JSON', 'Date',
-  'Array', 'Object', 'String', 'Number', 'Boolean', 'RegExp',
-  'Promise', 'Map', 'Set', 'WeakMap', 'WeakSet', 'Symbol',
-  'Error', 'TypeError', 'RangeError', 'SyntaxError',
-  'parseInt', 'parseFloat', 'isNaN', 'isFinite',
-  'setTimeout', 'setInterval', 'clearTimeout', 'clearInterval',
-  'fetch', 'XMLHttpRequest', 'FormData', 'URLSearchParams',
-  'require', 'module', 'exports', '__dirname', '__filename',
-  'process', 'global', 'Buffer',
+  'undefined',
+  'null',
+  'true',
+  'false',
+  'NaN',
+  'Infinity',
+  'console',
+  'window',
+  'document',
+  'Math',
+  'JSON',
+  'Date',
+  'Array',
+  'Object',
+  'String',
+  'Number',
+  'Boolean',
+  'RegExp',
+  'Promise',
+  'Map',
+  'Set',
+  'WeakMap',
+  'WeakSet',
+  'Symbol',
+  'Error',
+  'TypeError',
+  'RangeError',
+  'SyntaxError',
+  'parseInt',
+  'parseFloat',
+  'isNaN',
+  'isFinite',
+  'setTimeout',
+  'setInterval',
+  'clearTimeout',
+  'clearInterval',
+  'fetch',
+  'XMLHttpRequest',
+  'FormData',
+  'URLSearchParams',
+  'require',
+  'module',
+  'exports',
+  '__dirname',
+  '__filename',
+  'process',
+  'global',
+  'Buffer',
 ]);
 
 function collectVariables(node, filePath, variables) {
@@ -321,7 +369,12 @@ function collectVariables(node, filePath, variables) {
           const nameNode = declarator.childForFieldName('name');
           const valueNode = declarator.childForFieldName('value');
           //함수/화살표 함수는 함수로 처리되므로 건너뜀
-          if (valueNode && (valueNode.type === 'arrow_function' || valueNode.type === 'function_expression' || valueNode.type === 'function')) {
+          if (
+            valueNode &&
+            (valueNode.type === 'arrow_function' ||
+              valueNode.type === 'function_expression' ||
+              valueNode.type === 'function')
+          ) {
             continue;
           }
           if (nameNode && nameNode.type === 'identifier' && !JS_BUILTINS.has(nameNode.text)) {
@@ -378,11 +431,11 @@ function collectDomAndEvents(node, filePath, functions, domAccesses, eventBindin
 
         //DOM 접근 메서드 감지
         const domMethods = {
-          'getElementById': 'id',
-          'getElementsByClassName': 'class',
-          'getElementsByTagName': 'tag',
-          'querySelector': 'selector',
-          'querySelectorAll': 'selector',
+          getElementById: 'id',
+          getElementsByClassName: 'class',
+          getElementsByTagName: 'tag',
+          querySelector: 'selector',
+          querySelectorAll: 'selector',
         };
 
         if (domMethods[method] && args) {
@@ -512,10 +565,11 @@ function getHandlerArg(argsNode) {
 function findEnclosingFunction(node, functions, filePath) {
   //노드의 줄 번호로 가장 가까운 함수 찾기
   const line = node.startPosition.row + 1;
+  /** @type {{ startLine: number, endLine: number, qualifiedName: string } | null} */
   let best = null;
   for (const func of functions) {
     if (func.filePath === filePath && func.startLine <= line && func.endLine >= line) {
-      if (!best || (func.endLine - func.startLine) < (best.endLine - best.startLine)) {
+      if (!best || func.endLine - func.startLine < best.endLine - best.startLine) {
         best = func;
       }
     }
@@ -529,20 +583,30 @@ function getFunctionBody(node) {
 
 function findFunctionNode(root, func, startLine) {
   function search(node) {
-    if ((node.type === 'function_declaration' || node.type === 'method_definition') &&
-        node.startPosition.row + 1 === startLine) {
+    if (
+      (node.type === 'function_declaration' || node.type === 'method_definition') &&
+      node.startPosition.row + 1 === startLine
+    ) {
       return node;
     }
     //화살표 함수/함수 표현식
-    if ((node.type === 'arrow_function' || node.type === 'function_expression' || node.type === 'function') &&
-        node.startPosition.row + 1 === startLine) {
+    if (
+      (node.type === 'arrow_function' ||
+        node.type === 'function_expression' ||
+        node.type === 'function') &&
+      node.startPosition.row + 1 === startLine
+    ) {
       return node;
     }
     //변수 선언에 할당된 함수
     if (node.type === 'variable_declarator') {
       const value = node.childForFieldName('value');
-      if (value && (value.type === 'arrow_function' || value.type === 'function_expression') &&
-          node.parent && node.parent.startPosition.row + 1 === startLine) {
+      if (
+        value &&
+        (value.type === 'arrow_function' || value.type === 'function_expression') &&
+        node.parent &&
+        node.parent.startPosition.row + 1 === startLine
+      ) {
         return value;
       }
     }

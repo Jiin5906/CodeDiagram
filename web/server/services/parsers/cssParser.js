@@ -5,7 +5,8 @@ const CSS = require('tree-sitter-css');
 
 function createParser() {
   const p = new Parser();
-  p.setLanguage(CSS);
+  //문법 패키지의 타입 정의가 tree-sitter 0.22 타입과 맞지 않아 캐스팅한다 (런타임 동작은 같다)
+  p.setLanguage(/** @type {any} */ (CSS));
   return p;
 }
 
@@ -99,7 +100,10 @@ function extractSelectors(node, filePath, line, results) {
   if (!text) return;
 
   //각 셀렉터를 쉼표로 분할
-  const parts = text.split(',').map(s => s.trim()).filter(Boolean);
+  const parts = text
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
   for (const part of parts) {
     const parsed = parseSelectorString(part);
     results.push({
@@ -147,7 +151,20 @@ function parseSelectorString(selector) {
   if (tagMatches) {
     for (const m of tagMatches) {
       const tag = m.trim().replace(/^[>+~]\s*/, '');
-      if (tag && !['not', 'nth-child', 'hover', 'focus', 'active', 'first-child', 'last-child', 'before', 'after'].includes(tag)) {
+      if (
+        tag &&
+        ![
+          'not',
+          'nth-child',
+          'hover',
+          'focus',
+          'active',
+          'first-child',
+          'last-child',
+          'before',
+          'after',
+        ].includes(tag)
+      ) {
         tags.push(tag.toLowerCase());
       }
     }
@@ -203,7 +220,8 @@ function collectVarRefs(node, filePath, variableRefs) {
 function processImport(node, filePath, imports) {
   const text = node.text;
   //@import url("...") 또는 @import "..." 패턴
-  const urlMatch = text.match(/url\(\s*["']?([^"')]+)["']?\s*\)/) || text.match(/@import\s+["']([^"']+)["']/);
+  const urlMatch =
+    text.match(/url\(\s*["']?([^"')]+)["']?\s*\)/) || text.match(/@import\s+["']([^"']+)["']/);
   if (urlMatch) {
     imports.push({
       type: 'css-import',

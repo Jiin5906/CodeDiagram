@@ -9,25 +9,25 @@
 /* 화면 크기에 맞춰 변하는 크기 토큰 — 패널 너비·글자 크기는 여기서 조절한다 */
 :root {
   /* 에디터 톤 팔레트 — 중립 회색 + 강조색 하나 */
-  --bg-editor: #1E1F22;
-  --bg-panel: #2B2D30;
-  --bg-field: #1E1F22;
-  --bg-hover: #35373B;
-  --bg-hover-strong: #43454A;
-  --bg-selected: #2E436E;
-  --border: #393B40;
-  --border-strong: #4E5157;
-  --text: #DFE1E5;
-  --text-2: #A8ABB2;
-  --text-3: #6F737A;
-  --accent: #3574F0;
-  --accent-hover: #2F66D6;
-  --accent-text: #548AF7;
+  --bg-editor: #1e1f22;
+  --bg-panel: #2b2d30;
+  --bg-field: #1e1f22;
+  --bg-hover: #35373b;
+  --bg-hover-strong: #43454a;
+  --bg-selected: #2e436e;
+  --border: #393b40;
+  --border-strong: #4e5157;
+  --text: #dfe1e5;
+  --text-2: #a8abb2;
+  --text-3: #6f737a;
+  --accent: #3574f0;
+  --accent-hover: #2f66d6;
+  --accent-text: #548af7;
   --accent-tint: rgba(53, 116, 240, 0.16);
-  --warn: #D6A547;
-  --warn-bg: #3D3322;
-  --error: #E06666;
-  --ok: #5FB865;
+  --warn: #d6a547;
+  --warn-bg: #3d3322;
+  --error: #e06666;
+  --ok: #5fb865;
   --shadow-float: 0 4px 14px rgba(0, 0, 0, 0.35);
   --font-ui: 'Pretendard Variable', 'Pretendard', -apple-system, 'Segoe UI', sans-serif;
   --font-code: 'D2Coding', 'JetBrains Mono', Consolas, monospace;
@@ -103,7 +103,9 @@ body {
   color: var(--text);
   font-size: 13px;
   outline: none;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
 }
 
 #source-input::placeholder {
@@ -119,7 +121,7 @@ body {
   height: 28px;
   padding: 0 14px;
   background: var(--accent);
-  color: #FFFFFF;
+  color: #ffffff;
   border: none;
   border-radius: 4px;
   font-size: 13px;
@@ -159,7 +161,6 @@ body {
   margin: 0 4px;
 }
 
-
 .toolbar-btn {
   padding: 5px 12px;
   background: var(--bg-hover);
@@ -168,7 +169,10 @@ body {
   border-radius: 4px;
   font-size: 14px;
   cursor: pointer;
-  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  transition:
+    color 0.15s,
+    border-color 0.15s,
+    background 0.15s;
   white-space: nowrap;
 }
 
@@ -183,7 +187,6 @@ body {
   border-color: var(--accent);
   background: var(--bg-field);
 }
-
 
 .toolbar-select {
   padding: 4px 8px;
@@ -201,7 +204,6 @@ body {
   color: var(--text);
 }
 
-
 /* ── 검색 입력 필드 ── */
 .toolbar-search {
   padding: 5px 12px;
@@ -212,7 +214,9 @@ body {
   font-size: 14px;
   outline: none;
   width: clamp(140px, 16vw, 260px);
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
 }
 
 .toolbar-search::placeholder {
@@ -224,8 +228,6 @@ body {
   box-shadow: 0 0 0 1px var(--accent);
 }
 
-
-
 /* ── 미리보기 배너 ── */
 #preview-banner {
   display: flex;
@@ -234,16 +236,15 @@ body {
   gap: 12px;
   padding: 6px 20px;
   background: var(--warn-bg);
-  border-bottom: 1px solid #5A4A2C;
+  border-bottom: 1px solid #5a4a2c;
   font-size: 14px;
   font-weight: 600;
   color: var(--warn);
 }
 
-
 #preview-restore-btn {
   padding: 3px 10px;
-  background: #B8862F;
+  background: #b8862f;
   border: none;
   border-radius: 4px;
   color: var(--text);
@@ -254,7 +255,7 @@ body {
 }
 
 #preview-restore-btn:hover {
-  background: #C99A3F;
+  background: #c99a3f;
 }
 
 /* ── 범례 패널 (캔버스 좌상단 접이식) ── */
@@ -280,7 +281,9 @@ body {
   font-weight: 600;
   padding: 5px 12px;
   cursor: pointer;
-  transition: color 0.15s, border-color 0.15s;
+  transition:
+    color 0.15s,
+    border-color 0.15s;
 }
 
 #legend-toggle:hover {
@@ -414,8 +417,8 @@ body {
 }
 
 #warning-badge {
-  background: #3A2F1C;
-  border: 1px solid #5A4A2C;
+  background: #3a2f1c;
+  border: 1px solid #5a4a2c;
   color: var(--warn);
   font-size: 11px;
   font-weight: 700;
@@ -467,23 +470,23 @@ body {
 }
 
 .legend-swatch.cpp-function {
-  background: #1D3A40;
-  border-color: #3FA8B5;
+  background: #1d3a40;
+  border-color: #3fa8b5;
 }
 
 .legend-swatch.csharp-function {
-  background: #1F3A24;
-  border-color: #5FB865;
+  background: #1f3a24;
+  border-color: #5fb865;
 }
 
 .legend-swatch.method {
   background: var(--bg-hover);
-  border-color: #A58BD6;
+  border-color: #a58bd6;
 }
 
 .legend-swatch.variable-swatch {
-  background: #1D3634;
-  border-color: #4FA8A0;
+  background: #1d3634;
+  border-color: #4fa8a0;
   border-radius: 0;
   transform: rotate(45deg);
   width: 10px;
@@ -495,8 +498,8 @@ body {
   height: 2px;
   border: none;
   border-radius: 1px;
-  background: #4FA8A0;
-  border-top: 2px dashed #4FA8A0;
+  background: #4fa8a0;
+  border-top: 2px dashed #4fa8a0;
 }
 
 .legend-swatch.edge-swatch {
@@ -512,8 +515,8 @@ body {
   height: 2px;
   border: none;
   border-radius: 1px;
-  background: #A58BD6;
-  border-top: 2px dashed #A58BD6;
+  background: #a58bd6;
+  border-top: 2px dashed #a58bd6;
 }
 
 .legend-swatch.cycle-swatch {
@@ -526,7 +529,7 @@ body {
 
 .legend-swatch.package-swatch {
   background: var(--bg-editor);
-  border-color: #5FB865;
+  border-color: #5fb865;
   border-style: solid;
 }
 
@@ -622,7 +625,9 @@ body {
   align-items: center;
   justify-content: center;
   gap: 4px;
-  transition: background 0.18s, color 0.18s;
+  transition:
+    background 0.18s,
+    color 0.18s;
 }
 
 .ribbon-btn.hidden {
@@ -698,7 +703,9 @@ body {
   white-space: normal;
   pointer-events: none;
   opacity: 0;
-  transition: opacity 0.12s, transform 0.12s;
+  transition:
+    opacity 0.12s,
+    transform 0.12s;
   z-index: 50;
 }
 
@@ -765,7 +772,10 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
-  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  transition:
+    color 0.15s,
+    border-color 0.15s,
+    background 0.15s;
 }
 
 #hierarchy-toggle svg {
@@ -800,7 +810,10 @@ body {
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-  transition: width 0.3s, min-width 0.3s, opacity 0.3s;
+  transition:
+    width 0.3s,
+    min-width 0.3s,
+    opacity 0.3s;
   overflow: hidden;
 }
 
@@ -851,7 +864,9 @@ body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  transition: background 0.15s, color 0.15s;
+  transition:
+    background 0.15s,
+    color 0.15s;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -935,7 +950,10 @@ body {
   border-left: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-  transition: width 0.3s, min-width 0.3s, opacity 0.3s;
+  transition:
+    width 0.3s,
+    min-width 0.3s,
+    opacity 0.3s;
   overflow: hidden;
 }
 
@@ -1057,13 +1075,20 @@ body.cv-resizing {
   z-index: 0;
   pointer-events: none;
   background: rgba(250, 204, 21, 0.1);
-  box-shadow: inset 0 1px 0 rgba(250, 204, 21, 0.25), inset 0 -1px 0 rgba(250, 204, 21, 0.25);
+  box-shadow:
+    inset 0 1px 0 rgba(250, 204, 21, 0.25),
+    inset 0 -1px 0 rgba(250, 204, 21, 0.25);
   animation: cv-line-flash 1.2s ease-out;
 }
 
 @keyframes cv-line-flash {
-  0%, 30% { background: rgba(250, 204, 21, 0.28); }
-  100% { background: rgba(250, 204, 21, 0.1); }
+  0%,
+  30% {
+    background: rgba(250, 204, 21, 0.28);
+  }
+  100% {
+    background: rgba(250, 204, 21, 0.1);
+  }
 }
 
 #code-viewer-content code {
@@ -1081,7 +1106,6 @@ body.cv-resizing {
   overflow: hidden;
   background-color: var(--bg-editor);
 }
-
 
 #cy {
   width: 100%;
@@ -1118,7 +1142,6 @@ body.cv-resizing {
   z-index: 100;
   overflow-y: auto;
 }
-
 
 .overlay-header {
   display: flex;
@@ -1255,7 +1278,9 @@ body.cv-resizing {
   font-size: var(--ui-font);
   font-family: inherit;
   outline: none;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
 }
 
 #diag-search-input::placeholder {
@@ -1316,7 +1341,10 @@ body.cv-resizing {
   text-overflow: ellipsis;
   white-space: nowrap;
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s;
 }
 
 .diag-file-chip:hover,
@@ -1394,7 +1422,9 @@ body.cv-resizing {
   border-radius: 4px;
   font-size: 13px;
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
 }
 
 .suggestion-preview-btn:hover {
@@ -1415,7 +1445,6 @@ body.cv-resizing {
   justify-content: center;
   z-index: 200;
 }
-
 
 .diff-overlay-inner {
   background: var(--bg-hover);
@@ -1526,7 +1555,9 @@ body.cv-resizing {
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .loading-text {
@@ -1573,10 +1604,15 @@ body.cv-resizing {
   animation: fadeIn 0.12s ease-out;
 }
 
-
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(4px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .fn-preview-header {
@@ -1627,17 +1663,17 @@ body.cv-resizing {
   border-radius: 3px;
   font-size: 10px;
   font-weight: 600;
-  color: #D6A547;
+  color: #d6a547;
   background: rgba(214, 165, 71, 0.14);
 }
 
 .fn-preview-complex.level-2 {
-  color: #E68046;
+  color: #e68046;
   background: rgba(230, 128, 70, 0.14);
 }
 
 .fn-preview-complex.level-3 {
-  color: #E06666;
+  color: #e06666;
   background: rgba(224, 102, 102, 0.14);
 }
 
@@ -1869,7 +1905,7 @@ kbd {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 11px;
-  color: #A58BD6;
+  color: #a58bd6;
 }
 
 /* ── 함수 목록 (코드 뷰어 내) ── */
@@ -1936,7 +1972,6 @@ kbd {
   animation: fadeIn 0.12s ease-out;
 }
 
-
 .edge-preview-header {
   font-size: 12px;
   font-weight: 600;
@@ -2000,7 +2035,10 @@ kbd {
   overflow: hidden;
   cursor: crosshair;
   opacity: 0.7;
-  transition: opacity 0.2s, bottom 0.3s, right 0.3s;
+  transition:
+    opacity 0.2s,
+    bottom 0.3s,
+    right 0.3s;
 }
 
 #minimap-container:hover {
@@ -2008,7 +2046,6 @@ kbd {
   background: var(--bg-panel);
   border-color: var(--border);
 }
-
 
 #minimap-canvas {
   width: 100%;
@@ -2521,7 +2558,10 @@ kbd {
   border: 1px solid var(--accent);
   border-radius: 5px;
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s;
 }
 
 .canvas-card-full-btn:hover {

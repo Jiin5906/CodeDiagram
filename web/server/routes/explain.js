@@ -34,7 +34,9 @@ router.post('/', async (req, res) => {
     res.json({ explanation, cached: false });
   } catch (err) {
     if (err.message.includes('API_KEY')) {
-      return res.status(503).json({ error: 'API 키가 설정되지 않았습니다. .env 파일에 ANTHROPIC_API_KEY를 설정해주세요.' });
+      return res.status(503).json({
+        error: 'API 키가 설정되지 않았습니다. .env 파일에 ANTHROPIC_API_KEY를 설정해주세요.',
+      });
     }
     console.error('Explain error:', err);
     res.status(502).json({ error: 'AI 설명 생성에 실패했습니다.' });

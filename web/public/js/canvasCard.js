@@ -156,14 +156,12 @@ function focusCard(fileId) {
 /* ── 최상위 카드 닫기 (Escape용) ── */
 function closeTopCard() {
   if (_openCards.size === 0) return false;
-  let topCard = null;
   let topZ = -1;
   let topFileId = null;
   for (const [fid, card] of _openCards) {
     const z = parseInt(card.style.zIndex, 10) || 0;
     if (z > topZ) {
       topZ = z;
-      topCard = card;
       topFileId = fid;
     }
   }
@@ -185,7 +183,9 @@ function hasOpenCards() {
 
 function _getGraphRect() {
   const container = document.getElementById('graph-container');
-  return container ? container.getBoundingClientRect() : { left: 0, top: 0, width: 800, height: 600 };
+  return container
+    ? container.getBoundingClientRect()
+    : { left: 0, top: 0, width: 800, height: 600 };
 }
 
 /* 카드 초기 크기: 기본 500x400, 그래프 영역이 작으면 그에 맞춰 줄인다 */
@@ -250,8 +250,8 @@ function _setupCardDrag(card, handle) {
   const onMouseMove = (e) => {
     const dx = e.clientX - startX;
     const dy = e.clientY - startY;
-    card.style.left = (origLeft + dx) + 'px';
-    card.style.top = (origTop + dy) + 'px';
+    card.style.left = origLeft + dx + 'px';
+    card.style.top = origTop + dy + 'px';
   };
 
   const onMouseUp = () => {
@@ -351,7 +351,7 @@ function _selectFunction(card, nodeData, fn, itemEl) {
   //활성 상태 토글
   const sidebar = card.querySelector('.canvas-card-fn-sidebar');
   if (sidebar) {
-    sidebar.querySelectorAll('.canvas-card-fn-item').forEach(el => el.classList.remove('active'));
+    sidebar.querySelectorAll('.canvas-card-fn-item').forEach((el) => el.classList.remove('active'));
   }
   if (itemEl) itemEl.classList.add('active');
   card._activeFn = fn;
@@ -416,7 +416,8 @@ async function _toggleCardFullCode(card, nodeData, btn) {
     btn.textContent = '함수만 보기';
     btn.classList.add('active');
     btn.title = '선택한 함수 코드로 돌아갑니다';
-    if (card._activeFn && card._activeFn.startLine) _scrollCardToLine(card, card._activeFn.startLine);
+    if (card._activeFn && card._activeFn.startLine)
+      _scrollCardToLine(card, card._activeFn.startLine);
   } catch (err) {
     btn.textContent = '코드 보기';
     btn.title = err.message || '파일을 불러오지 못했습니다';
@@ -435,7 +436,10 @@ function _scrollCardToLine(card, line) {
   const style = getComputedStyle(codeEl);
   const lineHeight = parseFloat(style.lineHeight) || 18;
   const padTop = parseFloat(style.paddingTop) || 0;
-  codeArea.scrollTo({ top: Math.max(0, padTop + (line - 1) * lineHeight - lineHeight * 2), behavior: 'smooth' });
+  codeArea.scrollTo({
+    top: Math.max(0, padTop + (line - 1) * lineHeight - lineHeight * 2),
+    behavior: 'smooth',
+  });
 }
 
 /* 외부 파일 함수 점프 */
