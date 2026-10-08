@@ -16,8 +16,8 @@ local.properties
 
 # Claude Code
 .claude/
-# 스크린샷 / 문서
-\docs
+# 스크린샷 / 문서 (docs 폴더는 위치와 관계없이 모두 개인 문서 공간이라 제외)
+docs/
 *.png
 *.jpg
 *.jpeg
@@ -26,6 +26,9 @@ local.properties
 *.svg
 *.pdf
 *.md
+# 팀이 함께 보는 문서는 예외로 추적한다
+!.github/**/*.md
+!CLAUDE.md
 *.pptx
 *.ppt
 *.docx
@@ -47,6 +50,3 @@ Thumbs.db
 
 # 환경변수
 .env
-
-# 클로드
-CLAUDE.md
