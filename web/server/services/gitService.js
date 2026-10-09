@@ -45,7 +45,14 @@ async function cloneRepo(url) {
   }
 
   const git = simpleGit();
-  await git.clone(url, targetDir, ['--depth', '1']);
+  try {
+    //Windows 경로 길이 제한(260자)을 넘는 파일이 있는 저장소도 checkout되도록 longpaths를 켠다
+    await git.clone(url, targetDir, ['--depth', '1', '--config', 'core.longpaths=true']);
+  } catch (err) {
+    //실패한 clone 폴더가 남으면 다음 요청에서 깨진 상태로 재사용되므로 지운다
+    fs.rmSync(targetDir, { recursive: true, force: true });
+    throw err;
+  }
   return targetDir;
 }
 
@@ -112,7 +119,7 @@ function findPythonFiles(dirPath) {
 }
 
 //디렉토리에서 지원하는 모든 파일을 재귀적으로 찾는 함수다.
-//지원 확장자: .py, .html, .css, .js, .cpp, .h, .cs, .ts, .tsx
+//지원 확장자: .py, .html, .css, .js, .cpp, .h, .cs, .ts, .tsx, .java
 //반환값에 language 필드를 포함한다.
 const SUPPORTED_EXTENSIONS = {
   '.py': 'python',
@@ -128,6 +135,7 @@ const SUPPORTED_EXTENSIONS = {
   '.cs': 'csharp',
   '.ts': 'typescript',
   '.tsx': 'typescript',
+  '.java': 'java',
 };
 
 function findFiles(dirPath) {
@@ -169,7 +177,9 @@ function findFiles(dirPath) {
           entry.name === 'Debug' ||
           entry.name === 'Release' ||
           entry.name === 'cmake-build-debug' ||
-          entry.name === 'cmake-build-release'
+          entry.name === 'cmake-build-release' ||
+          entry.name === 'target' ||
+          entry.name === 'out'
         ) {
           continue;
         }

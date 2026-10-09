@@ -13,6 +13,7 @@ const csFixturesDir = path.join(FIXTURES, 'csharp_project');
 const jsFixturesDir = path.join(FIXTURES, 'js_project');
 const webFixturesDir = path.join(FIXTURES, 'web_project');
 const tsFixturesDir = path.join(FIXTURES, 'ts_project');
+const javaFixturesDir = path.join(FIXTURES, 'java_project');
 
 /** @type {string[]} */
 let failures = [];
@@ -357,6 +358,150 @@ test('C# GraphBuilder', async () => {
   assert(csGraph.fileCounts.csharp > 0, '[C#] fileCounts has csharp');
 
   // --- JavaScript Parser Tests ---
+  expect(failures).toEqual([]);
+});
+
+test('Java Parser', async () => {
+  const parseJavaFixture = (relPath) =>
+    parseFile(fs.readFileSync(path.join(javaFixturesDir, relPath), 'utf-8'), relPath, 'java');
+
+  //Calculator.java - implements, 필드, 생성자, Javadoc, this.필드
+  const calc = parseJavaFixture('com/example/math/Calculator.java');
+  const calcClass = calc.classes.find((c) => c.name === 'Calculator');
+  assertDefined(calcClass, '[Java] extracts Calculator class');
+  assert(
+    calcClass && calcClass.superclasses.includes('Operation'),
+    '[Java] implements is recorded as superclass',
+  );
+  const calcNames = calc.functions.map((f) => f.qualifiedName);
+  assertContains(calcNames, 'Calculator.Calculator', '[Java] extracts constructor');
+  assertContains(calcNames, 'Calculator.add', '[Java] extracts Calculator.add');
+  assertContains(calcNames, 'Calculator.clamp', '[Java] extracts private method');
+  const add = calc.functions.find((f) => f.qualifiedName === 'Calculator.add');
+  assert(add && add.docstring.startsWith('/**'), '[Java] Javadoc goes to docstring');
+  const clamp = calc.functions.find((f) => f.qualifiedName === 'Calculator.clamp');
+  assert(
+    clamp && clamp.comment.startsWith('//') && clamp.docstring === '',
+    '[Java] line comment goes to comment',
+  );
+  const calcVars = calc.variables.map((v) => v.name);
+  assertContains(calcVars, 'Calculator.value', '[Java] extracts instance field');
+  assertContains(calcVars, 'Calculator.MAX', '[Java] extracts static final field');
+  assert(
+    calc.variableRefs.some(
+      (r) => r.caller === 'Calculator.multiply' && r.variable === 'Calculator.value',
+    ),
+    '[Java] this.value is recorded as Calculator.value',
+  );
+
+  //Operation.java - body 없는 인터페이스 메서드
+  const op = parseJavaFixture('com/example/math/Operation.java');
+  assertContains(
+    op.functions.map((f) => f.qualifiedName),
+    'Operation.name',
+    '[Java] extracts abstract interface method',
+  );
+  assert(op.calls.length === 0, '[Java] interface method without body has no calls');
+
+  //ScientificCalculator.java - extends, super 호출, 중첩 enum
+  const sci = parseJavaFixture('com/example/math/ScientificCalculator.java');
+  const sciClass = sci.classes.find((c) => c.name === 'ScientificCalculator');
+  assert(
+    sciClass && sciClass.superclasses.includes('Calculator'),
+    '[Java] extends is recorded as superclass',
+  );
+  assertContains(
+    sci.classes.map((c) => c.name),
+    'Mode',
+    '[Java] extracts nested enum',
+  );
+  assert(
+    sci.calls.some((c) => c.caller === 'ScientificCalculator.add' && c.callee === 'Calculator.add'),
+    '[Java] super.add() is recorded as Calculator.add',
+  );
+  assertContains(
+    sci.variables.map((v) => v.name),
+    'ScientificCalculator.history',
+    '[Java] extracts generic field',
+  );
+
+  //StringUtils.java - private 생성자, 같은 클래스 static 호출
+  const utils = parseJavaFixture('com/example/util/StringUtils.java');
+  assertContains(
+    utils.functions.map((f) => f.qualifiedName),
+    'StringUtils.StringUtils',
+    '[Java] extracts private constructor with empty body',
+  );
+  assert(
+    utils.calls.some((c) => c.caller === 'StringUtils.parseNumber' && c.callee === 'trim'),
+    '[Java] parseNumber calls trim',
+  );
+
+  //Main.java - import 3종, new, 람다 안 호출
+  const main = parseJavaFixture('com/example/app/Main.java');
+  assert(main.imports.length === 5, '[Java] extracts 5 imports');
+  assert(
+    main.imports.some(
+      (i) => i.module === 'com.example.util.StringUtils' && i.name === 'StringUtils',
+    ),
+    '[Java] regular import keeps full module',
+  );
+  assert(
+    main.imports.some((i) => i.module === 'com.example.util.StringUtils' && i.name === 'trim'),
+    '[Java] static import splits class and member',
+  );
+  assert(
+    main.imports.some((i) => i.module === 'java.util' && i.name === '*'),
+    '[Java] wildcard import',
+  );
+  const mainCallees = main.calls.filter((c) => c.caller === 'Main.main').map((c) => c.callee);
+  assertContains(mainCallees, 'Calculator', '[Java] new Calculator() is a call');
+  assertContains(mainCallees, 'calc.add', '[Java] object method call');
+  assertContains(mainCallees, 'StringUtils.parseNumber', '[Java] static method call');
+  assertContains(mainCallees, 'trim', '[Java] statically imported call');
+  assertContains(mainCallees, 'greet', '[Java] call inside lambda belongs to enclosing method');
+
+  expect(failures).toEqual([]);
+});
+
+test('Java GraphBuilder', async () => {
+  const javaGraph = await buildGraph(javaFixturesDir);
+  assert(javaGraph.fileCounts.java === 5, '[Java] fileCounts has 5 java files');
+  assert(
+    javaGraph.nodes.filter((n) => n.data.type === 'function').length > 0,
+    '[Java] graph has function nodes',
+  );
+
+  //"파일경로::이름" 형태의 노드 ID에서 이름만 꺼내 비교한다
+  const short = (e) => `${e.source.split('::')[1]} -> ${e.target.split('::')[1]}`;
+  const callEdges = javaGraph.edges.map(short);
+  assertContains(
+    callEdges,
+    'Main.main -> StringUtils.parseNumber',
+    '[Java] cross-package call resolved via import',
+  );
+  assertContains(callEdges, 'Main.main -> StringUtils.trim', '[Java] static import call resolved');
+  assertContains(
+    callEdges,
+    'ScientificCalculator.add -> Calculator.add',
+    '[Java] super call resolved to parent method',
+  );
+  assertContains(callEdges, 'Main.main -> Main.greet', '[Java] lambda call resolved');
+
+  const inheritEdges = javaGraph.inheritanceEdges.map(short);
+  assertContains(
+    inheritEdges,
+    'ScientificCalculator -> Calculator',
+    '[Java] extends inheritance edge',
+  );
+  assertContains(inheritEdges, 'Calculator -> Operation', '[Java] implements inheritance edge');
+
+  assertContains(
+    javaGraph.variableEdges.map(short),
+    'Calculator.multiply -> Calculator.value',
+    '[Java] this.field variable edge',
+  );
+
   expect(failures).toEqual([]);
 });
 
@@ -856,6 +1001,19 @@ test('Edge Case', async () => {
 
   const emptyCsResult = parseFile('', 'empty.cs', 'csharp');
   assert(emptyCsResult.functions.length === 0, '[Edge] empty C# file has no functions');
+
+  const emptyJavaResult = parseFile('', 'empty.java', 'java');
+  assert(emptyJavaResult.functions.length === 0, '[Edge] empty Java file has no functions');
+
+  const badJavaResult = parseFile(
+    'class A {\n  void ok() { run(); }\n  void bad( {\n  void ok2() {}\n}',
+    'Bad.java',
+    'java',
+  );
+  assert(
+    badJavaResult.functions.some((f) => f.qualifiedName === 'A.ok'),
+    '[Edge] Java parser extracts methods from partially invalid code',
+  );
 
   // Syntax error resilience (tree-sitter is partial-parsing capable)
   const badPyCode = `

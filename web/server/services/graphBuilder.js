@@ -1,10 +1,10 @@
 //그래프 데이터 생성 코드
 //parser와 resolver를 조합하여 최종 그래프 JSON을 만든다.
-//지원 언어: Python, C++, C#, TypeScript, JavaScript, HTML, CSS
+//지원 언어: Python, C++, C#, TypeScript, Java, JavaScript, HTML, CSS
 /*
     1. gitService로 모든 지원 파일을 찾음
     2. 각 파일을 청크 단위로 파싱하여 함수, 호출, import, 클래스 정보를 수집
-    3. 티어 기반 언어(Python/C++/C#/TS)는 resolver로,
+    3. 티어 기반 언어(Python/C++/C#/TS/Java)는 resolver로,
        웹 언어(HTML/CSS/JS)는 webResolver로 관계를 엣지로 변환
     4. metricsService로 결합도 계산
     5. diagnosticsService로 진단 실행
@@ -35,18 +35,18 @@ async function buildGraph(projectPath) {
 
   if (files.length === 0) {
     throw new Error(
-      '지원하는 파일을 찾을 수 없습니다 (.py, .html, .css, .js, .ts, .tsx, .cpp, .h, .cs)',
+      '지원하는 파일을 찾을 수 없습니다 (.py, .html, .css, .js, .ts, .tsx, .cpp, .h, .cs, .java)',
     );
   }
 
   //파일을 언어별로 분류
-  //티어 기반 언어: Python, C++, C#, TypeScript (resolver.js로 해석)
+  //티어 기반 언어: Python, C++, C#, TypeScript, Java (resolver.js로 해석)
   //웹 언어: HTML, CSS, JavaScript (webResolver.js로 해석)
-  const TIERED_LANGUAGES = new Set(['python', 'cpp', 'csharp', 'typescript']);
+  const TIERED_LANGUAGES = new Set(['python', 'cpp', 'csharp', 'typescript', 'java']);
   const tieredFiles = files.filter((f) => TIERED_LANGUAGES.has(f.language));
   const webFiles = files.filter((f) => !TIERED_LANGUAGES.has(f.language));
 
-  //티어 기반 언어 데이터 (Python, C++, C#, TypeScript)
+  //티어 기반 언어 데이터 (Python, C++, C#, TypeScript, Java)
   const tieredFunctions = [];
   const tieredCalls = [];
   const tieredImports = [];
@@ -181,7 +181,7 @@ async function buildGraph(projectPath) {
     }
   }
 
-  /* ── 티어 기반 언어 해석 (Python, C++, C#, TypeScript) ── */
+  /* ── 티어 기반 언어 해석 (Python, C++, C#, TypeScript, Java) ── */
   let tieredCallEdges = [];
   let tieredInheritanceEdges = [];
   let tieredVariableEdges = [];
@@ -289,6 +289,7 @@ async function buildGraph(projectPath) {
       cpp: files.filter((f) => f.language === 'cpp').length,
       csharp: files.filter((f) => f.language === 'csharp').length,
       typescript: files.filter((f) => f.language === 'typescript').length,
+      java: files.filter((f) => f.language === 'java').length,
     },
   };
 }
@@ -297,7 +298,7 @@ async function buildGraph(projectPath) {
 //tier(참조 횟수) → file → function/variable 의 3단계 중첩 구조를 만든다.
 //파일 노드는 하나만 생성되며, 파일의 "대표 티어"는 내부 함수 중 최대 참조 횟수로 결정된다.
 //개별 함수의 참조 횟수는 함수 노드의 inboundRefCount 데이터로 유지된다.
-//대상: Python, C++, C#, TypeScript
+//대상: Python, C++, C#, TypeScript, Java
 function buildTieredNodes(
   functions,
   files,

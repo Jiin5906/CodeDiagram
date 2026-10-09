@@ -17,6 +17,7 @@ const PROJECTS = [
   'csharp_project',
   'js_project',
   'ts_project',
+  'java_project',
   'web_project',
   'inline_script_project',
 ];
@@ -39,7 +40,7 @@ describe('parser output schema', () => {
   test('covers every supported fixture language', () => {
     const languages = new Set(cases.map(([, f]) => f.language));
     expect([...languages].sort()).toEqual(
-      ['cpp', 'csharp', 'css', 'html', 'javascript', 'python', 'typescript'].sort(),
+      ['cpp', 'csharp', 'css', 'html', 'java', 'javascript', 'python', 'typescript'].sort(),
     );
   });
 });

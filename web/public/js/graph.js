@@ -14,6 +14,7 @@ const LANG_COLORS = {
   javascript: { bg: '#E3CF5A', border: '#AD9C3C' },
   cpp: { bg: '#D0607F', border: '#A0465F' },
   csharp: { bg: '#5A9E4B', border: '#437836' },
+  java: { bg: '#B07219', border: '#85560F' },
   html: { bg: '#D9663F', border: '#A84C2C' },
   css: { bg: '#8A6CC2', border: '#674F95' },
 };
@@ -43,6 +44,7 @@ const EXT_TO_LANG = {
   tsx: 'typescript',
   py: 'python',
   cs: 'csharp',
+  java: 'java',
   cpp: 'cpp',
   cc: 'cpp',
   h: 'cpp',
@@ -650,6 +652,10 @@ function initGraph(container) {
       {
         selector: 'node[type="file"][language="csharp"]',
         style: { 'border-color': '#5FB865', color: '#A3D6A6' },
+      },
+      {
+        selector: 'node[type="file"][language="java"]',
+        style: { 'border-color': '#C98A2E', color: '#E3B373' },
       },
       {
         selector: 'node[type="file"][language="html"]',

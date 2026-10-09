@@ -14,6 +14,7 @@ const langMap = {
   '.h': 'cpp',
   '.hpp': 'cpp',
   '.cs': 'csharp',
+  '.java': 'java',
 };
 
 //함수 목록용 이름: label에는 "(1↓ 2↑)"가 붙어 있으므로 배지와 겹치지 않게 순수 이름을 쓴다

@@ -73,6 +73,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (data.fileCounts.typescript > 0) parts.push(`TS ${data.fileCounts.typescript}`);
         if (data.fileCounts.cpp > 0) parts.push(`C++ ${data.fileCounts.cpp}`);
         if (data.fileCounts.csharp > 0) parts.push(`C# ${data.fileCounts.csharp}`);
+        if (data.fileCounts.java > 0) parts.push(`Java ${data.fileCounts.java}`);
         fileDetail = parts.join(', ');
       }
 
@@ -234,6 +235,7 @@ const LANG_LEGEND = {
   typescript: { color: LANG_COLORS.typescript.bg, label: 'TypeScript' },
   cpp: { color: LANG_COLORS.cpp.bg, label: 'C++' },
   csharp: { color: LANG_COLORS.csharp.bg, label: 'C#' },
+  java: { color: LANG_COLORS.java.bg, label: 'Java' },
   html: { color: LANG_COLORS.html.bg, label: 'HTML' },
   css: { color: LANG_COLORS.css.bg, label: 'CSS' },
 };

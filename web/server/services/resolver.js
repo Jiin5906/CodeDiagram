@@ -1,7 +1,8 @@
 //파서가 추출한 "함수 A가 funcB를 호출한다"라는 원시 데이터를 실제 어떤 파일의 어떤 함수인지 매칭한다.
-//대상 언어: Python, C++, C#, TypeScript (티어 기반 언어)
+//대상 언어: Python, C++, C#, TypeScript, Java (티어 기반 언어). 추후 Rust도 추가할 예정
 /*
-3단계 우선순위로 해석한다.
+우선순위로 해석한다.
+    0. 클래스까지 붙은 이름(Calculator.add)이 정확히 일치하는 함수가 있으면 그것으로 연결
     1. 같은 파일 내 일치하는 함수가 있으면 그것으로 연결
     2. import 기반: import문을 참고해서 해당 모듈의 함수를 찾음
     3. 전역 탐색: 전체 프로젝트에서 이름이 같은 함수를 찾음
@@ -64,6 +65,13 @@ function resolveCallee(call, funcByQName, funcByFile, importMap) {
   const parts = calleeName.split('.');
   const simpleCallee = parts[parts.length - 1];
 
+  //0. 'Calculator.add'처럼 클래스까지 붙은 이름이 프로젝트 어딘가의 함수와 정확히 일치하면 최우선
+  //(Java super.add()가 같은 파일의 동명 메서드로 잘못 연결되지 않게 한다)
+  if (parts.length > 1) {
+    const exact = (funcByQName.get(calleeName) || []).find((f) => f.qualifiedName === calleeName);
+    if (exact) return exact;
+  }
+
   //1. 같은 파일 내에서 이름이 일치하는 함수 찾기
   const fileFuncs = funcByFile.get(call.filePath) || [];
   const sameFile = fileFuncs.find(
@@ -80,7 +88,7 @@ function resolveCallee(call, funcByQName, funcByFile, importMap) {
     const fromModule = candidates.find((f) => {
       //모듈이 "utils"이고 파일이 "utils.py"일 수 있으니까 확장자 떼고 비교함
       const fileBase = f.filePath
-        .replace(/\.(py|cpp|cc|cxx|h|hpp|cs|ts|tsx|js|jsx)$/, '')
+        .replace(/\.(py|cpp|cc|cxx|h|hpp|cs|ts|tsx|js|jsx|java)$/, '')
         .replace(/\//g, '.');
       return (
         fileBase === importModule ||
@@ -199,7 +207,7 @@ function resolveVariableRefs(allVariables, allVariableRefs, allImports) {
         const candidates = varByName.get(varName) || [];
         target = candidates.find((v) => {
           const fileBase = v.filePath
-            .replace(/\.(py|cpp|cc|cxx|h|hpp|cs|ts|tsx|js|jsx)$/, '')
+            .replace(/\.(py|cpp|cc|cxx|h|hpp|cs|ts|tsx|js|jsx|java)$/, '')
             .replace(/\//g, '.');
           return fileBase === importModule || fileBase.endsWith('.' + importModule);
         });

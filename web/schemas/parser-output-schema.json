@@ -2,12 +2,12 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://codediagram.dev/schemas/parser-output.json",
   "title": "ParseResult",
-  "description": "CodeDiagram 파서의 통합 출력 스키마. 모든 언어(Python, JavaScript, HTML, CSS, C++, C#)의 파싱 결과를 표현한다.",
+  "description": "CodeDiagram 파서의 통합 출력 스키마. 모든 언어(Python, JavaScript, TypeScript, HTML, CSS, C++, C#, Java)의 파싱 결과를 표현한다.",
   "type": "object",
   "properties": {
     "functions": {
       "type": "array",
-      "description": "파일에서 추출된 함수/메서드 목록. Python(function_definition), JS(function_declaration, arrow_function, method_definition), C++(function_definition), C#(method_declaration) 노드에서 추출된다. CSS의 경우 @keyframes가 함수로 표현된다.",
+      "description": "파일에서 추출된 함수/메서드 목록. Python(function_definition), JS(function_declaration, arrow_function, method_definition), C++(function_definition), C#(method_declaration), Java(method_declaration, constructor_declaration) 노드에서 추출된다. CSS의 경우 @keyframes가 함수로 표현된다.",
       "items": { "$ref": "#/$defs/FunctionInfo" }
     },
     "calls": {
@@ -22,7 +22,7 @@
     },
     "classes": {
       "type": "array",
-      "description": "클래스/구조체/인터페이스 정의 목록. Python, JS, C++, C#에서 추출된다.",
+      "description": "클래스/구조체/인터페이스 정의 목록. Python, JS, C++, C#, Java에서 추출된다.",
       "items": { "$ref": "#/$defs/ClassInfo" }
     },
     "variables": {
@@ -104,7 +104,7 @@
         },
         "docstring": {
           "type": "string",
-          "description": "함수의 독스트링 (Python 전용, 다른 언어는 빈 문자열)"
+          "description": "함수의 독스트링 (Python docstring, Java Javadoc. 다른 언어는 빈 문자열)"
         },
         "comment": {
           "type": "string",

@@ -15,6 +15,7 @@ const fileIcons = {
   '.h': { icon: 'h', color: LANG_COLORS.cpp.bg },
   '.hpp': { icon: 'h', color: LANG_COLORS.cpp.bg },
   '.cs': { icon: 'c#', color: LANG_COLORS.csharp.bg },
+  '.java': { icon: 'jv', color: LANG_COLORS.java.bg },
 };
 
 //현재 선택된 파일 경로

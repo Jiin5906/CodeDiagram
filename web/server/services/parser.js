@@ -1,5 +1,5 @@
 //코드 파일을 파싱하는 코드
-//tree-sitter를 사용하여 7개 언어(Python, JS, HTML, CSS, C++, C#, TypeScript)를 파싱한다.
+//tree-sitter를 사용하여 8개 언어(Python, JS, HTML, CSS, C++, C#, TypeScript, Java)를 파싱한다.
 
 const Parser = require('tree-sitter');
 const Python = require('tree-sitter-python');
@@ -9,6 +9,7 @@ const { parseJs } = require('./parsers/jsParser');
 const { parseCpp } = require('./parsers/cppParser');
 const { parseCsharp } = require('./parsers/csharpParser');
 const { parseTs } = require('./parsers/tsParser');
+const { parseJava } = require('./parsers/javaParser');
 
 function createParser() {
   const p = new Parser();
@@ -33,6 +34,8 @@ function parseFile(code, filePath, language) {
         return parseCsharp(code, filePath);
       case 'typescript':
         return parseTs(code, filePath);
+      case 'java':
+        return parseJava(code, filePath);
       default:
         return null;
     }
