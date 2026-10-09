@@ -993,6 +993,19 @@ function initGraph(container) {
           'z-index': 999,
         },
       },
+      //검색 버그 수정 - 디밍, 라벨 페이드 lod보다 뒤에 두어 항상 보이게 한다.
+      {
+        selector: 'node.search-match',
+        style: {
+          'border-color': '#F2C94C',
+          'border-width': 3,
+          'border-opacity': 1,
+          opacity: 1,
+          'text-opacity': 1,
+          color: '#F2D27A',
+          'z-index': 998,
+        },
+      },
     ],
     layout: { name: 'preset' },
     wheelSensitivity: 0.3,
@@ -1917,50 +1930,114 @@ function applyLodStage(index) {
    노드 하이라이트 / 해제
    ══════════════════════════════════════════════════════════════════ */
 
-function highlightNode(nodeId) {
-  if (!cy) return;
-  cy.nodes().removeClass('highlighted dimmed hover-focus neighbor-highlight');
-  cy.edges().removeClass('highlighted dimmed');
+/* ── 하이라이트 상태 ── */
+//검색·hover·선택 하이라이트를 따로 들고 있다가 applyHighlights()가 매번 합성한다.
+//핸들러는 클래스를 직접 칠하지 않고 아래 setter만 부른다.
+const highlightState = {
+  searchIds: null, //검색에 매칭된 노드 ID 배열 (검색 중이 아니면 null)
+  hoveredId: null, //마우스가 올라간 노드 ID
+  selectedId: null, //클릭으로 선택한 노드 ID
+};
 
-  if (currentViewMode === 'file') {
-    //파일 뷰: 포커스 디밍 방식
-    const node = cy.getElementById(nodeId);
-    if (!node.length) return;
+function setSearchMatches(ids) {
+  highlightState.searchIds = ids && ids.length > 0 ? ids : null;
+  applyHighlights();
+}
 
-    const neighborhood = node.closedNeighborhood();
-    const connectedEdges = node.connectedEdges();
+function setHovered(id) {
+  highlightState.hoveredId = id || null;
+  applyHighlights();
+}
 
-    cy.elements().not(neighborhood).addClass('dimmed');
-    neighborhood.removeClass('dimmed');
-    neighborhood.addClass('neighbor-highlight');
-    connectedEdges.addClass('highlighted');
-    connectedEdges.removeClass('dimmed');
-    node.addClass('hover-focus');
+function setSelected(id) {
+  highlightState.selectedId = id || null;
+  applyHighlights();
+}
+
+//다시 렌더링하면 노드가 새로 만들어지므로 이전 ID를 버린다 (검색은 setupInteractions에서 다시 적용)
+function resetHighlightState() {
+  highlightState.searchIds = null;
+  highlightState.hoveredId = null;
+  highlightState.selectedId = null;
+}
+
+//함수 뷰 엣지 표시를 엣지 토글 상태로 되돌린다
+function resetFunctionViewEdges() {
+  if (typeof edgesVisible !== 'undefined' && edgesVisible) {
+    cy.edges().style({ display: 'element', 'line-opacity': 0.3 });
   } else {
-    //함수 뷰: 기존 방식
-    if (typeof edgesVisible !== 'undefined' && edgesVisible) {
-      cy.edges().style({ display: 'element', 'line-opacity': 0.3 });
-    } else {
-      cy.edges().style('display', 'none');
-    }
-
-    const node = cy.getElementById(nodeId);
-    if (node.length) {
-      node.addClass('highlighted');
-      const connectedEdges = node.connectedEdges();
-      const neighborNodes = node.neighborhood('node');
-      connectedEdges.style('display', 'element');
-      connectedEdges.addClass('highlighted');
-
-      const ancestors = node.ancestors();
-      const keepVisible = node.union(neighborNodes).union(ancestors);
-      let neighborAncestors = cy.collection();
-      neighborNodes.forEach((n) => {
-        neighborAncestors = neighborAncestors.union(n.ancestors());
-      });
-      dimNodesExcept(keepVisible.union(neighborAncestors));
-    }
+    cy.edges().style('display', 'none');
   }
+}
+
+//세 상태를 우선순위대로 합성한다: 검색 매칭(항상 유지) 위에 포커스(hover > 선택)를 겹친다
+function applyHighlights() {
+  if (!cy) return;
+  const { searchIds, hoveredId, selectedId } = highlightState;
+  const isFileView = currentViewMode === 'file';
+
+  cy.batch(() => {
+    //1. 관리하는 클래스를 모두 지우고 처음부터 다시 칠한다
+    cy.elements().removeClass('highlighted dimmed hover-focus neighbor-highlight search-match');
+    if (!isFileView) resetFunctionViewEdges();
+
+    let keep = cy.collection(); //흐리지 않을 요소
+    let active = false; //검색이나 포커스 중 하나라도 있으면 나머지를 흐린다
+
+    //2. 검색 매칭
+    if (searchIds) {
+      const idSet = new Set(searchIds);
+      const matched = cy.nodes().filter((n) => idSet.has(n.id()));
+      if (matched.nonempty()) {
+        active = true;
+        matched.addClass('search-match');
+        keep = keep.union(matched);
+        //함수 뷰는 박스가 중첩되므로 부모(파일·티어)까지 살려야 보인다
+        if (!isFileView) keep = keep.union(matched.ancestors());
+      }
+    }
+
+    //3. 포커스 — hover가 선택보다 우선
+    const focus = cy.getElementById(hoveredId || selectedId || '');
+    if (focus.nonempty()) {
+      active = true;
+      const connectedEdges = focus.connectedEdges();
+      if (isFileView) {
+        const neighborhood = focus.closedNeighborhood();
+        neighborhood.addClass('neighbor-highlight');
+        focus.addClass('hover-focus');
+        keep = keep.union(neighborhood);
+      } else {
+        const neighborNodes = focus.neighborhood('node');
+        focus.addClass('highlighted');
+        connectedEdges.style('display', 'element');
+        keep = keep
+          .union(focus)
+          .union(focus.ancestors())
+          .union(focus.descendants()) //파일 박스를 선택하면 안의 함수도 보이게
+          .union(neighborNodes)
+          .union(neighborNodes.ancestors());
+      }
+      connectedEdges.addClass('highlighted');
+      keep = keep.union(connectedEdges);
+    }
+
+    //4. 검색·포커스 어느 쪽에도 속하지 않는 요소만 흐린다
+    if (active) {
+      if (isFileView) {
+        cy.elements().not(keep).addClass('dimmed');
+      } else {
+        dimNodesExcept(keep);
+      }
+    }
+  });
+}
+
+//노드 선택 하이라이트 — 기존 호출부(노드 클릭, 진단 이동, 길게 누르기 등)는 그대로 이 함수를 부른다
+function highlightNode(nodeOrId) {
+  //fileTree.js처럼 노드 객체를 넘기는 곳도 있어서 둘 다 받는다
+  const id = typeof nodeOrId === 'string' ? nodeOrId : nodeOrId && nodeOrId.id();
+  setSelected(id);
 }
 
 //keep에 없는 노드를 흐리게 한다.
@@ -1991,16 +2068,9 @@ const EDGE_TYPE_LABELS = {
   'css-var': 'CSS 변수',
 };
 
+//선택·hover 하이라이트만 해제한다 (검색 하이라이트는 검색창을 비울 때만 해제)
 function clearHighlights() {
-  if (!cy) return;
-  cy.nodes().removeClass('highlighted dimmed hover-focus neighbor-highlight');
-  cy.edges().removeClass('highlighted dimmed');
-
-  if (currentViewMode !== 'file') {
-    if (typeof edgesVisible !== 'undefined' && edgesVisible) {
-      cy.edges().style({ display: 'element', 'line-opacity': 0.3 });
-    } else {
-      cy.edges().style('display', 'none');
-    }
-  }
+  highlightState.hoveredId = null;
+  highlightState.selectedId = null;
+  applyHighlights();
 }

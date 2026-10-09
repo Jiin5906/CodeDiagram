@@ -34,6 +34,11 @@ function setupInteractions() {
     }
   });
 
+  //다시 렌더링하면 노드가 새로 만들어지므로 이전 하이라이트 상태를 버리고, 남아 있는 검색어는 다시 적용한다
+  resetHighlightState();
+  const searchInput = document.getElementById('search-input');
+  if (searchInput && searchInput.value.trim()) applySearch();
+
   //DOM 이벤트 리스너는 한 번만 등록
   if (!domListenersBound) {
     domListenersBound = true;
@@ -70,20 +75,7 @@ function setupFileViewInteractions() {
       return;
     }
 
-    const neighborhood = node.closedNeighborhood();
-    const connectedEdges = node.connectedEdges();
-
-    cy.batch(() => {
-      cy.elements().not(neighborhood).addClass('dimmed');
-      cy.elements().not(neighborhood).removeClass('neighbor-highlight hover-focus');
-
-      neighborhood.removeClass('dimmed');
-      neighborhood.addClass('neighbor-highlight');
-      connectedEdges.addClass('highlighted');
-      connectedEdges.removeClass('dimmed');
-
-      node.addClass('hover-focus');
-    });
+    setHovered(node.id());
 
     //함수 프리뷰 툴팁 표시
     const functions = node.data('functions') || [];
@@ -97,9 +89,7 @@ function setupFileViewInteractions() {
     hideFunctionPreview();
     dimTimeout = setTimeout(() => {
       if (typeof isLocalGraphActive === 'function' && isLocalGraphActive()) return;
-      cy.batch(() => {
-        cy.elements().removeClass('dimmed neighbor-highlight highlighted hover-focus');
-      });
+      setHovered(null);
     }, 150);
   });
 
@@ -917,43 +907,33 @@ function formatExplanation(text) {
 
 /* ── 검색/필터 기능 ── */
 
+//검색어에 매칭되는 노드를 찾는다 (입력·Enter·다시 렌더링에서 함께 쓴다)
+function findSearchMatches(query) {
+  //파일 뷰에서는 file-node도 검색 대상
+  const searchSelector =
+    currentViewMode === 'file'
+      ? 'node[type="file-node"]'
+      : 'node[type="function"], node[type="file"], node[type="js-function"], node[type="ts-function"], node[type="cpp-function"], node[type="csharp-function"]';
+  return cy
+    .nodes(searchSelector)
+    .filter((node) => (node.data('label') || '').toLowerCase().includes(query));
+}
+
+//검색창의 현재 값으로 검색 하이라이트를 적용한다
+function applySearch() {
+  const input = document.getElementById('search-input');
+  const query = input ? input.value.trim().toLowerCase() : '';
+  if (!cy || !query) {
+    clearSearch();
+    return;
+  }
+  setSearchMatches(findSearchMatches(query).map((n) => n.id()));
+}
+
 function setupSearch() {
   const input = document.getElementById('search-input');
 
-  input.addEventListener('input', () => {
-    const query = input.value.trim().toLowerCase();
-    if (!cy || !query) {
-      clearSearch();
-      return;
-    }
-
-    //파일 뷰에서는 file-node도 검색 대상
-    const searchSelector =
-      currentViewMode === 'file'
-        ? 'node[type="file-node"]'
-        : 'node[type="function"], node[type="file"], node[type="js-function"], node[type="ts-function"], node[type="cpp-function"], node[type="csharp-function"]';
-
-    const matched = cy.nodes(searchSelector).filter((node) => {
-      const label = (node.data('label') || '').toLowerCase();
-      return label.includes(query);
-    });
-
-    if (matched.length === 0) {
-      clearSearch();
-      return;
-    }
-
-    let keepVisible = matched;
-    if (currentViewMode !== 'file') {
-      matched.forEach((n) => {
-        keepVisible = keepVisible.union(n.ancestors());
-      });
-    }
-
-    cy.nodes().removeClass('highlighted dimmed');
-    matched.addClass('highlighted');
-    dimNodesExcept(keepVisible);
-  });
+  input.addEventListener('input', applySearch);
 
   input.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
@@ -961,21 +941,11 @@ function setupSearch() {
       const query = input.value.trim().toLowerCase();
       if (!cy || !query) return;
 
-      const searchSelector =
-        currentViewMode === 'file'
-          ? 'node[type="file-node"]'
-          : 'node[type="function"], node[type="file"]';
-
-      const matched = cy.nodes(searchSelector).filter((node) => {
-        const label = (node.data('label') || '').toLowerCase();
-        return label.includes(query);
-      });
-
+      const matched = findSearchMatches(query);
       if (matched.length > 0) {
-        const first = matched[0];
         cy.animate(
           {
-            center: { eles: first },
+            center: { eles: matched[0] },
             zoom: currentViewMode === 'file' ? 1.5 : 2,
           },
           { duration: 400, easing: 'ease-out-cubic' },
@@ -991,10 +961,9 @@ function setupSearch() {
   });
 }
 
+//검색 하이라이트만 해제한다 (선택·hover는 유지)
 function clearSearch() {
-  if (!cy) return;
-  cy.nodes().removeClass('highlighted dimmed');
-  cy.edges().removeClass('highlighted dimmed');
+  setSearchMatches(null);
 }
 
 /* ── 키보드 단축키 ── */

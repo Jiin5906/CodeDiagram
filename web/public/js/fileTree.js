@@ -205,23 +205,8 @@ function focusFileNode(filePath) {
 
   const target = fileNodes[0];
 
-  if (currentViewMode === 'file') {
-    //파일 뷰: 포커스 디밍 스타일 사용
-    highlightNode(target);
-  } else {
-    //함수 뷰: 기존 하이라이트 로직
-    cy.nodes().removeClass('highlighted dimmed');
-    cy.edges().removeClass('highlighted dimmed');
-
-    target.addClass('highlighted');
-
-    const children = target.children();
-    children.addClass('highlighted');
-
-    const ancestors = target.ancestors();
-    const keepVisible = target.union(children).union(ancestors);
-    cy.nodes().not(keepVisible).addClass('dimmed');
-  }
+  //선택 하이라이트 — 검색 하이라이트는 유지된 채 겹쳐진다
+  highlightNode(target);
 
   //카메라 이동
   cy.animate(
