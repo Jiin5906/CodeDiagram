@@ -1011,6 +1011,8 @@ function initGraph(container) {
     wheelSensitivity: 0.3,
     minZoom: 0.05,
     maxZoom: 5,
+    //패닝·줌하는 동안 요소를 다시 그리지 않고 캐시한 화면 이미지만 옮긴다 (대형 그래프 패닝 렉 완화)
+    textureOnViewport: true,
   });
 
   return cy;
@@ -1447,28 +1449,8 @@ function renderFunctionView(data) {
     }
   }
 
-  //fcose 레이아웃 + 컨테이너 재배치
-  cy.layout({
-    name: 'fcose',
-    animate: false,
-    fit: false,
-    padding: 30,
-    nodeDimensionsIncludeLabels: true,
-    idealEdgeLength: 80,
-    nodeRepulsion: 6000,
-    edgeElasticity: 0.3,
-    nestingFactor: 0.4,
-    gravity: 0.3,
-    gravityRange: 2.0,
-    quality: 'default',
-    randomize: true,
-    numIter: 800,
-    nodeSeparation: 120,
-    avoidOverlap: true,
-    stop: function () {
-      arrangeContainers(containerIds);
-    },
-  }).run();
+  //컨테이너 배치 -> fcos 결과가 arrangeContainers를 전부 덮어써서 쓰지 않도록 바꿨다.
+  arrangeContainers(containerIds);
 
   const legendPanel = document.getElementById('legend-panel');
   if (legendPanel) legendPanel.classList.remove('hidden');
