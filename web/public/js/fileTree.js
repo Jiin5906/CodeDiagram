@@ -21,11 +21,26 @@ const fileIcons = {
 //현재 선택된 파일 경로
 let activeFilePath = null;
 
+//파일 위치 탐색기에서 접힌 폴더 경로 목록
+const collapseDirs = new Set();
+
+function isFileHidden(filePath) {
+  //경로가 없거나 접힌 폴더가 없으면 숨길 게 없다
+  if (!filePath || collapseDirs.size === 0) return false;
+
+  //접힌 폴더 중 하나라도 이 파일의 상위 폴더면 숨긴다
+  for (const dir of collapseDirs) {
+    if (filePath.startsWith(dir + '/')) return true;
+  }
+  return false;
+}
+
 function buildFileTree(data) {
   const panel = document.getElementById('file-tree-content');
   if (!panel || !data) return;
 
   panel.textContent = '';
+  collapseDirs.clear();
 
   //파일 경로 수집 (중복 제거) + 함수 카운트
   const filePaths = new Set();
@@ -63,12 +78,13 @@ function buildFileTree(data) {
   }
 
   //DOM 생성
-  function renderTree(obj, container, depth) {
+  function renderTree(obj, container, depth, parentPath) {
     //디렉토리 먼저
     const dirs = Object.keys(obj)
       .filter((k) => k !== '_files')
       .sort();
     for (const dir of dirs) {
+      const dirPath = parentPath ? `${parentPath}/${dir}` : dir;
       const dirEl = document.createElement('div');
       dirEl.className = 'tree-dir';
 
@@ -78,6 +94,10 @@ function buildFileTree(data) {
       dirHeader.textContent = dir;
       dirHeader.addEventListener('click', () => {
         dirEl.classList.toggle('collapsed');
+        //접힌 폴더의 파일은 그래프에서 빼고 다시 그림
+        if (dirEl.classList.contains('collapsed')) collapseDirs.add(dirPath);
+        else collapseDirs.delete(dirPath);
+        refreshGraphForTree();
       });
 
       const dirContent = document.createElement('div');
@@ -87,7 +107,7 @@ function buildFileTree(data) {
       dirEl.appendChild(dirContent);
       container.appendChild(dirEl);
 
-      renderTree(obj[dir], dirContent, depth + 1);
+      renderTree(obj[dir], dirContent, depth + 1, dirPath);
     }
 
     //파일
@@ -174,7 +194,15 @@ function buildFileTree(data) {
     }
   }
 
-  renderTree(tree, panel, 0);
+  renderTree(tree, panel, 0, '');
+}
+
+//폴더 접힘이 바뀌면 현재 뷰를 다시 그린다 (파일 상세 뷰는 파일 하나만 보므로 그대로 둔다)
+function refreshGraphForTree() {
+  if (!graphData || typeof setViewMode !== 'function') return;
+  if (currentViewMode === 'file' || currentViewMode === 'function') {
+    setViewMode(currentViewMode);
+  }
 }
 
 //활성 파일 항목 토글

@@ -1038,6 +1038,7 @@ function renderGraph(data) {
 
   for (const node of data.nodes) {
     if (node.data.type === 'file') {
+      if (typeof isFileHidden === 'function' && isFileHidden(node.data.fullPath)) continue;
       fileNodeMap.set(node.data.id, {
         ...node.data,
         functions: [],
@@ -1341,10 +1342,13 @@ function renderFunctionView(data) {
     }
   }
 
+  //파일 탐색기에서 접은 폴더에 속한 리프 노드인지 확인
+  const isHidden = (node) => typeof isFileHidden === 'function' && isFileHidden(node.data.filePath);
+
   //유지할 노드 ID 결정
   const keptIds = new Set();
   for (const node of data.nodes) {
-    if (LEAF_TYPES.has(node.data.type) && connectedIds.has(node.data.id)) {
+    if (LEAF_TYPES.has(node.data.type) && connectedIds.has(node.data.id) && !isHidden(node)) {
       keptIds.add(node.data.id);
     }
   }
@@ -1360,7 +1364,8 @@ function renderFunctionView(data) {
   const containerTypes = new Set(['file', 'tier', 'lang']);
   const elements = [];
   for (const node of data.nodes) {
-    if (LEAF_TYPES.has(node.data.type) && !connectedIds.has(node.data.id)) continue;
+    if (LEAF_TYPES.has(node.data.type) && (!connectedIds.has(node.data.id) || isHidden(node)))
+      continue;
     if (containerTypes.has(node.data.type) && !keptIds.has(node.data.id)) continue;
     elements.push(node);
   }
