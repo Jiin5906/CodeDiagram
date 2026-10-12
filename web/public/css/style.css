@@ -1365,6 +1365,74 @@ body.cv-resizing {
   outline-offset: 1px;
 }
 
+/* ── 파일 결합도 표 (CR-RFC-2026-002) ── */
+.coupling-criteria {
+  margin-bottom: 6px;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--text-2);
+}
+
+/* 판정 · 파일 · I · Ca · Ce · CBO — 머리줄과 행이 같은 칸 너비를 쓴다 */
+.coupling-row {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr) 44px 26px 26px 34px;
+  align-items: center;
+  column-gap: 6px;
+}
+
+/* 머리줄은 행의 왼쪽 띠(2px)와 안쪽 여백(8px)만큼 들여 칸을 맞춘다 */
+.coupling-header {
+  padding: 0 8px 4px 10px;
+  font-size: 11px;
+  color: var(--text-3);
+}
+
+.coupling-header .coupling-cell:nth-child(n + 3),
+.coupling-num {
+  text-align: right;
+}
+
+.coupling-num {
+  font-family: var(--font-code);
+  font-variant-numeric: tabular-nums;
+}
+
+.coupling-file {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-code);
+}
+
+.coupling-status {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.coupling-status.status-hazard {
+  color: #ef4444;
+}
+
+.coupling-status.status-warn {
+  color: #eab308;
+}
+
+.coupling-status.status-safe {
+  color: #22c55e;
+}
+
+.coupling-status.status-na {
+  color: var(--text-3);
+}
+
+/* HAZARD 사유는 파일 칸부터 끝까지 한 줄을 차지한다 */
+.coupling-reason {
+  grid-column: 2 / -1;
+  font-size: 11px;
+  color: var(--text-2);
+}
+
 .diag-empty {
   color: var(--text-3);
   padding: 6px 0;

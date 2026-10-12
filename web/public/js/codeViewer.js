@@ -22,23 +22,23 @@ function fnDisplayName(fn) {
   return fn.qualifiedName || String(fn.name || '').replace(/\s*\([\d↓↑ ]+\)$/, '');
 }
 
-//참조 배지: N↓ = 다른 코드가 이 함수를 부른 횟수, N↑ = 이 함수가 다른 함수를 부른 횟수.
-//그래프 노드 라벨의 "(N↓ M↑)" 표기와 같은 규칙이다.
+//참조 배지: N↓ = 이 함수를 호출하는 함수 수(inDegree), N↑ = 이 함수가 호출하는 함수 수(outDegree).
+//같은 함수를 여러 번 호출해도 1로 센다. 그래프 노드 라벨의 "(N↓ M↑)" 표기와 같은 규칙이다.
 function appendRefBadges(parent, fn, className) {
-  const inCount = fn.inboundRefCount || 0;
-  const outCount = fn.outboundRefCount || 0;
+  const inCount = fn.inDegree || 0;
+  const outCount = fn.outDegree || 0;
   if (inCount > 0) {
     const el = document.createElement('span');
     el.className = className + ' ref-in';
     el.textContent = inCount + '↓';
-    el.title = '다른 코드가 이 함수를 ' + inCount + '번 부릅니다';
+    el.title = inCount + '개 함수가 이 함수를 호출합니다';
     parent.appendChild(el);
   }
   if (outCount > 0) {
     const el = document.createElement('span');
     el.className = className + ' ref-out';
     el.textContent = outCount + '↑';
-    el.title = '이 함수가 다른 함수를 ' + outCount + '번 부릅니다';
+    el.title = '이 함수가 ' + outCount + '개 함수를 호출합니다';
     parent.appendChild(el);
   }
 }

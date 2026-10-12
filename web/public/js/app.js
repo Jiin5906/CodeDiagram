@@ -281,27 +281,46 @@ function renderDynamicLegend(data) {
   if (edgeItems.length)
     fileView.appendChild(_legendSection('선 색 (마우스를 올리면 표시)', edgeItems));
 
-  //3) 진단 표시 — codeEffects.js의 글로우와 같은 기준
+  //3) 진단 표시 — codeEffects.js의 테두리·글로우, graph.js의 결합도 링과 같은 기준
   const diag = data.diagnostics || {};
   const hasCycle = ((diag.cycles && diag.cycles.files) || []).length > 0;
-  const hasWarning = [...(diag.couplingIssues || []), ...(diag.antiPatterns || [])].some(
+  const hasWarning = (diag.antiPatterns || []).some(
     (i) => i.severity === 'warning' || i.severity === 'error',
   );
+  //결합도 판정 (CR-RFC-2026-002) — 기준 숫자는 서버가 보낸 criteria를 그대로 쓴다
+  const coupling = diag.coupling || { files: [] };
+  const criteria = coupling.criteria;
+  const hazardCount = coupling.files.filter((e) => e.metrics.status === 'HAZARD').length;
   const diagItems = [];
   if (hasCycle)
     diagItems.push(_legendRow(_legendRing('#E06666'), '서로를 참조하는 파일 (순환 참조)'));
   if (hasWarning)
-    diagItems.push(_legendRow(_legendRing('#D6A547'), '결합도가 높은 등 살펴볼 파일'));
+    diagItems.push(
+      _legendRow(_legendRing('#D6A547'), '경고 진단이 있는 파일 (이벤트 리스너 과다 등)'),
+    );
+  if (hazardCount > 0 && criteria)
+    diagItems.push(
+      _legendRow(
+        _legendOuterRing(COUPLING_HAZARD_COLOR),
+        `바깥 빨간 링: 결합도 HAZARD (I > ${criteria.warnMax} 또는 Ce ≥ ${criteria.ceHazard})`,
+        hazardCount,
+      ),
+    );
   //복잡도 글로우 — codeEffects.js가 renderGraph 중에 이미 골라 두었다
   if (typeof complexFileCount === 'function' && complexFileCount() > 0) {
     diagItems.push(
       _legendRow(
         _legendDot('#E68046', true),
-        '원 뒤로 빛이 나는 파일: 복잡도가 높음 (길거나 많은 함수, 높은 결합도). 빛이 넓고 붉을수록 복잡',
+        '원 뒤로 빛이 나는 파일: 복잡도가 높음 (길거나 많은 함수, 결합도 HAZARD·WARN). 빛이 넓고 붉을수록 복잡',
         complexFileCount(),
       ),
     );
   }
+  //판정 기준 — HAZARD가 없어도 어떤 기준으로 판정했는지는 항상 보여준다
+  if (criteria)
+    diagItems.push(
+      _legendRow(_legendSymbol('I'), `판정 기준: ${criteria.name} (I = Ce / (Ca + Ce))`),
+    );
   if (diagItems.length) fileView.appendChild(_legendSection('진단 표시', diagItems));
 
   //4) 읽는 법
@@ -323,18 +342,18 @@ function renderDynamicLegend(data) {
       _legendRow(_legendSymbol('◆'), '변수'),
       _legendRow(
         _legendSymbol('3↓', 'refs'),
-        '다른 코드가 이 함수를 부른 횟수. 많을수록 여기저기서 쓰는 함수',
+        '이 함수를 호출하는 함수 수. 많을수록 여기저기서 쓰는 함수',
       ),
       _legendRow(
         _legendSymbol('2↑', 'refs out'),
-        '이 함수가 다른 함수를 부른 횟수. 많을수록 의존하는 곳이 많음',
+        '이 함수가 호출하는 함수 수. 많을수록 의존하는 곳이 많음',
       ),
     ]),
   );
 
   //함수 뷰 범례
   const funcItems = [
-    { cls: 'tier', label: '참조 횟수 그룹' },
+    { cls: 'tier', label: '참조 수 그룹' },
     { cls: 'file', label: '파일' },
     { cls: 'function', label: '함수' },
     { cls: 'method', label: '클래스 메서드' },
@@ -357,10 +376,21 @@ function renderDynamicLegend(data) {
   );
   funcView.appendChild(
     _legendSection('함수 이름 옆 숫자', [
-      _legendRow(_legendSymbol('3↓', 'refs'), '다른 코드가 이 함수를 부른 횟수'),
-      _legendRow(_legendSymbol('2↑', 'refs out'), '이 함수가 다른 함수를 부른 횟수'),
+      _legendRow(_legendSymbol('3↓', 'refs'), '이 함수를 호출하는 함수 수'),
+      _legendRow(_legendSymbol('2↑', 'refs out'), '이 함수가 호출하는 함수 수'),
     ]),
   );
+  //결합도 HAZARD 파일 박스 (graph.js의 함수·패키지 뷰 파일 박스 테두리와 같은 색)
+  if (hazardCount > 0)
+    funcView.appendChild(
+      _legendSection('결합도', [
+        _legendRow(
+          _legendRing(COUPLING_HAZARD_COLOR),
+          '빨간 굵은 테두리 박스: 결합도 HAZARD 파일',
+          hazardCount,
+        ),
+      ]),
+    );
 
   //범례 접기/펼치기 — 분석 직후 그래프를 가리지 않도록 기본은 접힘, 펼친 상태는 기억
   const toggle = document.getElementById('legend-toggle');
@@ -439,6 +469,15 @@ function _legendLine(color) {
   line.className = 'legend-line';
   line.style.background = color;
   return line;
+}
+//결합도 HAZARD 표시용 바깥 링 (그래프에서 파일 원 밖으로 띄운 outline과 같은 모양)
+function _legendOuterRing(color) {
+  const ring = _legendRing('#6F737A');
+  ring.style.outline = `2px solid ${color}`;
+  ring.style.outlineOffset = '2px';
+  //outline은 자리를 차지하지 않으므로 옆 글자·위아래 줄과 겹치지 않게 여백을 둔다
+  ring.style.margin = '4px';
+  return ring;
 }
 
 function _legendSymbol(symbol, variant) {

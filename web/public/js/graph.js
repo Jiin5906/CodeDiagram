@@ -19,6 +19,16 @@ const LANG_COLORS = {
   css: { bg: '#8A6CC2', border: '#674F95' },
 };
 
+//결합도 HAZARD 표시색 (CR-RFC-2026-002). 판정은 서버가 하고, 그래프는 HAZARD만 표시한다.
+//파일 노드의 채움색(언어)과 크기(함수 수)는 바꾸지 않는다.
+const COUPLING_HAZARD_COLOR = '#EF4444';
+
+//파일 노드 데이터에서 결합도 판정을 꺼낸다.
+//Cytoscape 셀렉터는 metrics.status 같은 중첩 필드를 읽기 어려워 couplingStatus로 평평하게 붙여 쓴다.
+function couplingStatusOf(data) {
+  return (data.metrics && data.metrics.status) || 'N/A';
+}
+
 //엣지 타입별 색상 매핑
 const EDGE_TYPE_COLORS = {
   call: '#548AF7',
@@ -104,11 +114,14 @@ function initGraph(container) {
           'transition-timing-function': 'ease-out',
         },
       },
-      //결합도 높은 노드 — 테두리를 조금 두껍게
+      //결합도 HAZARD 파일 — 원 밖으로 띄운 빨간 링 (테두리는 순환 참조·선택·검색 표시가 쓰므로 겹치지 않게 outline을 쓴다)
       {
-        selector: 'node[type="file-node"][couplingScore > 0.3]',
+        selector: 'node[type="file-node"][couplingStatus = "HAZARD"]',
         style: {
-          'border-width': 'mapData(couplingScore, 0.3, 1, 1.5, 3)',
+          'outline-width': 2,
+          'outline-offset': 2,
+          'outline-color': COUPLING_HAZARD_COLOR,
+          'outline-opacity': 0.9,
         },
       },
       //클릭 시 기본 회색 사각 오버레이 제거
@@ -338,11 +351,13 @@ function initGraph(container) {
           'text-background-shape': 'roundrectangle',
         },
       },
+      //결합도 HAZARD 파일 박스 (함수·패키지 뷰) — 빨간 굵은 테두리, 나머지는 기본 파란 테두리 그대로
       {
-        selector: 'node[type="file"][couplingScore > 0.3]',
+        selector: 'node[type="file"][couplingStatus = "HAZARD"]',
         style: {
-          'border-width': 'mapData(couplingScore, 0, 1, 2, 7)',
-          'border-color': 'mapData(couplingScore, 0, 1, #3574F0, #D6A547)',
+          'border-color': COUPLING_HAZARD_COLOR,
+          'border-width': 5,
+          'border-opacity': 1,
         },
       },
       //함수 노드 — 둥근 알약 모양
@@ -366,86 +381,86 @@ function initGraph(container) {
           'z-compound-depth': 'top',
         },
       },
-      //inbound 참조 횟수에 따른 함수 노드 스타일
+      //inDegree(이 함수를 호출하는 함수 수)에 따른 함수 노드 스타일
       {
-        selector: 'node[type="function"][inboundRefCount > 0]',
+        selector: 'node[type="function"][inDegree > 0]',
         style: {
-          'border-width': 'mapData(inboundRefCount, 0, 10, 1.5, 5)',
-          'border-color': 'mapData(inboundRefCount, 0, 10, #4E5157, #D6A547)',
-          'background-color': 'mapData(inboundRefCount, 0, 10, #2B2D30, #3A2F1C)',
+          'border-width': 'mapData(inDegree, 0, 10, 1.5, 5)',
+          'border-color': 'mapData(inDegree, 0, 10, #4E5157, #D6A547)',
+          'background-color': 'mapData(inDegree, 0, 10, #2B2D30, #3A2F1C)',
         },
       },
       {
-        selector: 'node[type="js-function"][inboundRefCount > 0]',
+        selector: 'node[type="js-function"][inDegree > 0]',
         style: {
-          'border-width': 'mapData(inboundRefCount, 0, 10, 1.5, 5)',
-          'border-color': 'mapData(inboundRefCount, 0, 10, #B8862F, #D6A547)',
-          'background-color': 'mapData(inboundRefCount, 0, 10, #3A2F1C, #4A3A1E)',
+          'border-width': 'mapData(inDegree, 0, 10, 1.5, 5)',
+          'border-color': 'mapData(inDegree, 0, 10, #B8862F, #D6A547)',
+          'background-color': 'mapData(inDegree, 0, 10, #3A2F1C, #4A3A1E)',
         },
       },
       {
-        selector: 'node[type="ts-function"][inboundRefCount > 0]',
+        selector: 'node[type="ts-function"][inDegree > 0]',
         style: {
-          'border-width': 'mapData(inboundRefCount, 0, 10, 1.5, 5)',
-          'border-color': 'mapData(inboundRefCount, 0, 10, #3574F0, #D6A547)',
-          'background-color': 'mapData(inboundRefCount, 0, 10, #25324D, #3A2F1C)',
+          'border-width': 'mapData(inDegree, 0, 10, 1.5, 5)',
+          'border-color': 'mapData(inDegree, 0, 10, #3574F0, #D6A547)',
+          'background-color': 'mapData(inDegree, 0, 10, #25324D, #3A2F1C)',
         },
       },
       {
-        selector: 'node[type="cpp-function"][inboundRefCount > 0]',
+        selector: 'node[type="cpp-function"][inDegree > 0]',
         style: {
-          'border-width': 'mapData(inboundRefCount, 0, 10, 1.5, 5)',
-          'border-color': 'mapData(inboundRefCount, 0, 10, #3FA8B5, #D6A547)',
-          'background-color': 'mapData(inboundRefCount, 0, 10, #1D3A40, #3A2F1C)',
+          'border-width': 'mapData(inDegree, 0, 10, 1.5, 5)',
+          'border-color': 'mapData(inDegree, 0, 10, #3FA8B5, #D6A547)',
+          'background-color': 'mapData(inDegree, 0, 10, #1D3A40, #3A2F1C)',
         },
       },
       {
-        selector: 'node[type="csharp-function"][inboundRefCount > 0]',
+        selector: 'node[type="csharp-function"][inDegree > 0]',
         style: {
-          'border-width': 'mapData(inboundRefCount, 0, 10, 1.5, 5)',
-          'border-color': 'mapData(inboundRefCount, 0, 10, #5FB865, #D6A547)',
-          'background-color': 'mapData(inboundRefCount, 0, 10, #1F3A24, #3A2F1C)',
+          'border-width': 'mapData(inDegree, 0, 10, 1.5, 5)',
+          'border-color': 'mapData(inDegree, 0, 10, #5FB865, #D6A547)',
+          'background-color': 'mapData(inDegree, 0, 10, #1F3A24, #3A2F1C)',
         },
       },
-      //outbound 참조 횟수에 따른 함수 노드 스타일 (inbound=0인 경우만)
+      //outDegree(이 함수가 호출하는 함수 수)에 따른 함수 노드 스타일 (inDegree=0인 경우만)
       {
-        selector: 'node[type="function"][outboundRefCount > 0][inboundRefCount = 0]',
+        selector: 'node[type="function"][outDegree > 0][inDegree = 0]',
         style: {
-          'border-width': 'mapData(outboundRefCount, 0, 10, 1.5, 5)',
-          'border-color': 'mapData(outboundRefCount, 0, 10, #4E5157, #548AF7)',
-          'background-color': 'mapData(outboundRefCount, 0, 10, #2B2D30, #1F2A44)',
-        },
-      },
-      {
-        selector: 'node[type="js-function"][outboundRefCount > 0][inboundRefCount = 0]',
-        style: {
-          'border-width': 'mapData(outboundRefCount, 0, 10, 1.5, 5)',
-          'border-color': 'mapData(outboundRefCount, 0, 10, #B8862F, #548AF7)',
-          'background-color': 'mapData(outboundRefCount, 0, 10, #3A2F1C, #1F2A44)',
+          'border-width': 'mapData(outDegree, 0, 10, 1.5, 5)',
+          'border-color': 'mapData(outDegree, 0, 10, #4E5157, #548AF7)',
+          'background-color': 'mapData(outDegree, 0, 10, #2B2D30, #1F2A44)',
         },
       },
       {
-        selector: 'node[type="ts-function"][outboundRefCount > 0][inboundRefCount = 0]',
+        selector: 'node[type="js-function"][outDegree > 0][inDegree = 0]',
         style: {
-          'border-width': 'mapData(outboundRefCount, 0, 10, 1.5, 5)',
-          'border-color': 'mapData(outboundRefCount, 0, 10, #3574F0, #548AF7)',
-          'background-color': 'mapData(outboundRefCount, 0, 10, #25324D, #1F2A44)',
+          'border-width': 'mapData(outDegree, 0, 10, 1.5, 5)',
+          'border-color': 'mapData(outDegree, 0, 10, #B8862F, #548AF7)',
+          'background-color': 'mapData(outDegree, 0, 10, #3A2F1C, #1F2A44)',
         },
       },
       {
-        selector: 'node[type="cpp-function"][outboundRefCount > 0][inboundRefCount = 0]',
+        selector: 'node[type="ts-function"][outDegree > 0][inDegree = 0]',
         style: {
-          'border-width': 'mapData(outboundRefCount, 0, 10, 1.5, 5)',
-          'border-color': 'mapData(outboundRefCount, 0, 10, #3FA8B5, #548AF7)',
-          'background-color': 'mapData(outboundRefCount, 0, 10, #1D3A40, #1F2A44)',
+          'border-width': 'mapData(outDegree, 0, 10, 1.5, 5)',
+          'border-color': 'mapData(outDegree, 0, 10, #3574F0, #548AF7)',
+          'background-color': 'mapData(outDegree, 0, 10, #25324D, #1F2A44)',
         },
       },
       {
-        selector: 'node[type="csharp-function"][outboundRefCount > 0][inboundRefCount = 0]',
+        selector: 'node[type="cpp-function"][outDegree > 0][inDegree = 0]',
         style: {
-          'border-width': 'mapData(outboundRefCount, 0, 10, 1.5, 5)',
-          'border-color': 'mapData(outboundRefCount, 0, 10, #5FB865, #548AF7)',
-          'background-color': 'mapData(outboundRefCount, 0, 10, #1F3A24, #1F2A44)',
+          'border-width': 'mapData(outDegree, 0, 10, 1.5, 5)',
+          'border-color': 'mapData(outDegree, 0, 10, #3FA8B5, #548AF7)',
+          'background-color': 'mapData(outDegree, 0, 10, #1D3A40, #1F2A44)',
+        },
+      },
+      {
+        selector: 'node[type="csharp-function"][outDegree > 0][inDegree = 0]',
+        style: {
+          'border-width': 'mapData(outDegree, 0, 10, 1.5, 5)',
+          'border-color': 'mapData(outDegree, 0, 10, #5FB865, #548AF7)',
+          'background-color': 'mapData(outDegree, 0, 10, #1F3A24, #1F2A44)',
         },
       },
       //변수 노드
@@ -1062,8 +1077,8 @@ function renderGraph(data) {
           //코드 뷰어 줄 강조와 복잡도 글로우(codeEffects.js) 계산에 쓴다
           startLine: node.data.startLine,
           endLine: node.data.endLine,
-          inboundRefCount: node.data.inboundRefCount || 0,
-          outboundRefCount: node.data.outboundRefCount || 0,
+          inDegree: node.data.inDegree || 0,
+          outDegree: node.data.outDegree || 0,
         });
         fileInfo.funcCount++;
       }
@@ -1189,7 +1204,7 @@ function renderGraph(data) {
     const size = 14 + Math.sqrt(funcCount / maxFuncCount) * 28;
 
     //함수를 inbound 참조 순으로 정렬
-    fileInfo.functions.sort((a, b) => (b.inboundRefCount || 0) - (a.inboundRefCount || 0));
+    fileInfo.functions.sort((a, b) => (b.inDegree || 0) - (a.inDegree || 0));
 
     const fileName = fileInfo.label || fileId.replace('file__', '');
     const shortName = fileName.replace(/\.[^.]+$/, '');
@@ -1208,7 +1223,8 @@ function renderGraph(data) {
         borderColor: colors.border,
         funcCount: funcCount,
         functions: fileInfo.functions,
-        couplingScore: fileInfo.couplingScore || 0,
+        metrics: fileInfo.metrics,
+        couplingStatus: couplingStatusOf(fileInfo),
         size: size,
       },
     });
@@ -1367,7 +1383,11 @@ function renderFunctionView(data) {
     if (LEAF_TYPES.has(node.data.type) && (!connectedIds.has(node.data.id) || isHidden(node)))
       continue;
     if (containerTypes.has(node.data.type) && !keptIds.has(node.data.id)) continue;
-    elements.push(node);
+    elements.push(
+      node.data.type === 'file'
+        ? { data: { ...node.data, couplingStatus: couplingStatusOf(node.data) } }
+        : node,
+    );
   }
 
   //엣지 추가
@@ -1493,7 +1513,7 @@ function renderPackageView(data) {
           type: 'file',
           fullPath: filePath,
           parent: `pkg__${dir}`,
-          couplingScore: node.data.couplingScore || 0,
+          couplingStatus: couplingStatusOf(node.data),
         },
       });
     }

@@ -1,8 +1,6 @@
-//진단 서비스 — 순환 참조, 결합도 과다, 안티패턴을 탐지한다.
+//진단 서비스 — 순환 참조, 파일 결합도(CR-RFC-2026-002), 안티패턴을 진단한다.
+const { COUPLING_CRITERIA } = require('../config/couplingThresholds');
 
-//결합도 과다 기준값
-const INBOUND_THRESHOLD = 8;
-const OUTBOUND_THRESHOLD = 6;
 //안티패턴 기준값
 const GOD_FUNCTION_LINES = 50;
 const GOD_CLASS_METHODS = 10;
@@ -74,44 +72,28 @@ function detectFileCycles(edges) {
   return detectCycles(fileEdges);
 }
 
-/* ── 결합도 과다 진단 ── */
+/* ── 파일 결합도 (CR-RFC-2026-002) ── */
 
-//함수별 inbound/outbound 호출 수를 분석하여 경고를 생성한다.
-function detectCouplingIssues(edges) {
-  const inbound = {};
-  const outbound = {};
+//진단 탭 정렬 순서: 위험한 등급이 먼저 온다
+const STATUS_ORDER = { HAZARD: 0, WARN: 1, SAFE: 2, 'N/A': 3 };
 
-  for (const edge of edges) {
-    const refCount = edge.references ? edge.references.length : 1;
-    if (!inbound[edge.target]) inbound[edge.target] = 0;
-    if (!outbound[edge.source]) outbound[edge.source] = 0;
-    inbound[edge.target] += refCount;
-    outbound[edge.source] += refCount;
-  }
-
-  const issues = [];
-  const allFuncs = new Set([...Object.keys(inbound), ...Object.keys(outbound)]);
-  for (const func of allFuncs) {
-    const inCount = inbound[func] || 0;
-    const outCount = outbound[func] || 0;
-    if (inCount >= INBOUND_THRESHOLD) {
-      issues.push({
-        type: 'high_inbound',
-        nodeId: func,
-        message: `인바운드 호출 ${inCount}회 — 너무 많은 곳에서 의존합니다`,
-        severity: 'warning',
-      });
-    }
-    if (outCount >= OUTBOUND_THRESHOLD) {
-      issues.push({
-        type: 'high_outbound',
-        nodeId: func,
-        message: `아웃바운드 호출 ${outCount}회 — 너무 많은 외부 함수에 의존합니다`,
-        severity: 'warning',
-      });
-    }
-  }
-  return issues;
+//파일별 결합도 항목을 진단 탭용으로 정렬하고 판정 기준을 함께 묶는다.
+//판정은 metricsService에서 끝났으므로 여기서는 다시 판단하지 않는다.
+function summarizeCoupling(fileEntries) {
+  const files = [...fileEntries].sort((a, b) => {
+    const byStatus = STATUS_ORDER[a.metrics.status] - STATUS_ORDER[b.metrics.status];
+    if (byStatus !== 0) return byStatus;
+    //같은 등급이라면? I가 더 큰(더 불안정한) 파일이 먼저 온다.
+    const byInstability = (b.metrics.instability ?? -1) - (a.metrics.instability ?? -1);
+    if (byInstability !== 0) return byInstability;
+    const byCbo = b.metrics.cbo - a.metrics.cbo;
+    if (byCbo !== 0) return byCbo;
+    //마지막은 경로순 - 실행 환경과 관계없이 항상 같은 순서가 나오게 한다.
+    if (a.file < b.file) return -1;
+    if (a.file > b.file) return 1;
+    return 0;
+  });
+  return { criteria: COUPLING_CRITERIA, files };
 }
 
 /* ── 안티패턴 탐지 ── */
@@ -300,10 +282,11 @@ function detectWebAntiPatterns(webParsedFiles) {
 }
 
 //전체 진단을 실행하고 결과를 반환한다.
-function runDiagnostics(edges, functions, classes, webParsedFiles) {
+//fileCouplingEntries: graphBuilder가 만든 [{ node_id, file, metrics, refactor_target }]
+function runDiagnostics(edges, functions, classes, webParsedFiles, fileCouplingEntries = []) {
   const funcCycles = detectCycles(edges);
   const fileCycles = detectFileCycles(edges);
-  const couplingIssues = detectCouplingIssues(edges);
+  const coupling = summarizeCoupling(fileCouplingEntries);
   const antiPatterns = detectAntiPatterns(functions, classes || []);
 
   //웹 전용 안티패턴 추가
@@ -315,7 +298,7 @@ function runDiagnostics(edges, functions, classes, webParsedFiles) {
       functions: funcCycles,
       files: fileCycles,
     },
-    couplingIssues,
+    coupling,
     antiPatterns,
   };
 }
@@ -324,6 +307,6 @@ module.exports = {
   runDiagnostics,
   detectCycles,
   detectFileCycles,
-  detectCouplingIssues,
+  summarizeCoupling,
   detectAntiPatterns,
 };

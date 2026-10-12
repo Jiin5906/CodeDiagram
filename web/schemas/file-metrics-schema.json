@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://codediagram.dev/schemas/file-metrics.json",
+  "title": "FileCouplingEntry",
+  "description": "파일 하나의 결합도 지표 (CR-RFC-2026-002). 파일 노드(node_id = data.id)와 diagnostics.coupling.files의 각 항목이 이 형식을 따른다. 판정 임계값 숫자는 server/config/couplingThresholds.js에만 두므로 여기서는 값의 범위와 필드 사이의 관계만 검사한다.",
+  "type": "object",
+  "properties": {
+    "node_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "그래프의 파일 노드 ID. 티어 언어는 경로 그대로, 웹 언어는 '경로__언어'."
+    },
+    "file": {
+      "type": "string",
+      "minLength": 1,
+      "description": "프로젝트 루트 기준 파일 경로. diagnostics.coupling.files 항목에만 있다."
+    },
+    "metrics": { "$ref": "#/$defs/Metrics" },
+    "refactor_target": {
+      "type": "boolean",
+      "description": "리팩토링 제안 대상 여부. status가 HAZARD일 때만 true."
+    }
+  },
+  "required": ["node_id", "metrics", "refactor_target"],
+  "additionalProperties": false,
+  "if": {
+    "properties": { "metrics": { "properties": { "status": { "const": "HAZARD" } } } }
+  },
+  "then": { "properties": { "refactor_target": { "const": true } } },
+  "else": { "properties": { "refactor_target": { "const": false } } },
+
+  "$defs": {
+    "Metrics": {
+      "type": "object",
+      "description": "Robert C. Martin 지표. 같은 파일 내부 참조와 저장소 밖 참조는 세지 않는다.",
+      "properties": {
+        "ca": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "이 파일을 참조하는 고유 파일 수 (afferent)"
+        },
+        "ce": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "이 파일이 참조하는 고유 파일 수 (efferent)"
+        },
+        "cbo": { "type": "integer", "minimum": 0, "description": "Ca + Ce" },
+        "instability": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "maximum": 1,
+          "description": "I = Ce / (Ca + Ce), 소수점 셋째 자리 반올림. Ca + Ce = 0이면 null."
+        },
+        "status": { "enum": ["SAFE", "WARN", "HAZARD", "N/A"] },
+        "hazard_reasons": {
+          "type": "array",
+          "items": { "enum": ["instability", "efferent"] },
+          "uniqueItems": true,
+          "description": "HAZARD 판정 사유. instability: I가 상한 초과, efferent: Ce가 기준 이상."
+        }
+      },
+      "required": ["ca", "ce", "cbo", "instability", "status", "hazard_reasons"],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": { "properties": { "status": { "const": "N/A" } } },
+          "then": {
+            "properties": {
+              "ca": { "const": 0 },
+              "ce": { "const": 0 },
+              "cbo": { "const": 0 },
+              "instability": { "type": "null" }
+            }
+          },
+          "else": { "properties": { "instability": { "type": "number" } } }
+        },
+        {
+          "if": { "properties": { "status": { "const": "HAZARD" } } },
+          "then": { "properties": { "hazard_reasons": { "minItems": 1 } } },
+          "else": { "properties": { "hazard_reasons": { "maxItems": 0 } } }
+        }
+      ]
+    },
+
+    "CouplingSummary": {
+      "type": "object",
+      "description": "diagnostics.coupling — 진단 탭이 읽는 판정 기준과 정렬된 파일 목록.",
+      "properties": {
+        "criteria": { "$ref": "#/$defs/Criteria" },
+        "files": { "type": "array", "items": { "$ref": "#" } }
+      },
+      "required": ["criteria", "files"],
+      "additionalProperties": false
+    },
+
+    "Criteria": {
+      "type": "object",
+      "description": "판정 기준. 값은 server/config/couplingThresholds.js에서 그대로 온다.",
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "safeMax": { "type": "number", "minimum": 0, "maximum": 1 },
+        "warnMax": { "type": "number", "minimum": 0, "maximum": 1 },
+        "ceHazard": { "type": "integer", "minimum": 1 }
+      },
+      "required": ["name", "safeMax", "warnMax", "ceHazard"],
+      "additionalProperties": false
+    }
+  }
+}

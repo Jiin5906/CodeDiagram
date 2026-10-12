@@ -6,7 +6,7 @@
     2. 각 파일을 청크 단위로 파싱하여 함수, 호출, import, 클래스 정보를 수집
     3. 티어 기반 언어(Python/C++/C#/TS/Java)는 resolver로,
        웹 언어(HTML/CSS/JS)는 webResolver로 관계를 엣지로 변환
-    4. metricsService로 결합도 계산
+    4. metricsService로 파일 결합도 지표(Ca·Ce·I·CBO) 계산 (CR-RFC-2026-002)
     5. diagnosticsService로 진단 실행
     6. refactoringService로 리팩토링 제안 생성
     7. buildNodes로 Cytoscape.js 호환 노드 목록 생성
@@ -17,7 +17,7 @@ const { parseFile } = require('./parser');
 const { resolveCalls, resolveInheritance, resolveVariableRefs } = require('./resolver');
 const { resolveWebRelations, resolveJsCalls } = require('./webResolver');
 const { findFiles } = require('./gitService');
-const { computeFileCoupling, normalizeCoupling } = require('./metricsService');
+const { computeFileMetrics } = require('./metricsService');
 const { runDiagnostics } = require('./diagnosticsService');
 const { generateSuggestions } = require('./refactoringService');
 
@@ -27,6 +27,24 @@ const CHUNK_SIZE = 20;
 //이벤트 루프 양보 유틸리티
 function yieldToEventLoop() {
   return new Promise((resolve) => setImmediate(resolve));
+}
+
+//티어 기반 언어: Python, C++, C#, TypeScript, Java (resolver.js로 해석)
+//웹 언어: HTML, CSS, JavaScript (webResolver.js로 해석)
+const TIERED_LANGUAGES = new Set(['python', 'cpp', 'csharp', 'typescript', 'java']);
+
+//파일 노드 ID 규칙: 티어 언어는 경로 그대로, 웹 언어는 경로에 언어 접미사를 붙인다.
+//HTML 인라인 스크립트처럼 한 경로에 언어별 파일 노드가 여럿 생길 수 있어서다.
+function fileNodeIdOf(file) {
+  return TIERED_LANGUAGES.has(file.language)
+    ? file.relativePath
+    : `${file.relativePath}__${file.language}`;
+}
+
+//파일 노드와 진단 항목에 공통으로 싣는 결합도 데이터 (응답 스키마: metrics, refactor_target)
+function fileCouplingData(metricsByFile, filePath) {
+  const metrics = metricsByFile[filePath];
+  return { metrics, refactor_target: metrics.status === 'HAZARD' };
 }
 
 //프로젝트 디렉토리에서 그래프를 만드는 비동기 함수다.
@@ -40,9 +58,6 @@ async function buildGraph(projectPath) {
   }
 
   //파일을 언어별로 분류
-  //티어 기반 언어: Python, C++, C#, TypeScript, Java (resolver.js로 해석)
-  //웹 언어: HTML, CSS, JavaScript (webResolver.js로 해석)
-  const TIERED_LANGUAGES = new Set(['python', 'cpp', 'csharp', 'typescript', 'java']);
   const tieredFiles = files.filter((f) => TIERED_LANGUAGES.has(f.language));
   const webFiles = files.filter((f) => !TIERED_LANGUAGES.has(f.language));
 
@@ -214,39 +229,50 @@ async function buildGraph(projectPath) {
   const allInheritanceEdges = [...tieredInheritanceEdges, ...jsInheritanceEdges];
   const allVariableEdges = [...tieredVariableEdges, ...jsVariableEdges];
 
-  //결합도 계산
-  const { fileCounts } = computeFileCoupling(allCallEdges);
-  const couplingScores = normalizeCoupling(fileCounts);
+  //파일 결합도 지표 (CR-RFC-2026-002): 호출·상속·변수 참조 엣지를 파일 단위로 접어 Ca·Ce·I를 구한다
+  const metricsByFile = computeFileMetrics(
+    [allCallEdges, allInheritanceEdges, allVariableEdges],
+    files.map((f) => f.relativePath),
+  );
+  //진단 탭·리팩토링 제안용 파일별 항목
+  const fileCouplingEntries = files.map((f) => ({
+    node_id: fileNodeIdOf(f),
+    file: f.relativePath,
+    ...fileCouplingData(metricsByFile, f.relativePath),
+  }));
 
   //전체 함수·클래스 목록 (티어 기반 + JS)
   const allFunctions = [...tieredFunctions, ...jsFunctions];
   const allClasses = [...tieredClasses, ...jsClasses];
 
   //진단 실행
-  const diagnostics = runDiagnostics(allCallEdges, allFunctions, allClasses, webParsedFiles);
+  const diagnostics = runDiagnostics(
+    allCallEdges,
+    allFunctions,
+    allClasses,
+    webParsedFiles,
+    fileCouplingEntries,
+  );
 
   //리팩토링 제안 생성
   const suggestions = generateSuggestions(diagnostics);
 
-  //참조 횟수 계산 (inbound: 호출당한 횟수, outbound: 호출한 횟수)
-  const inboundCountMap = {};
-  const outboundCountMap = {};
+  //함수별 고유 연결 수 (inDegree: 이 함수를 호출하는 함수 수, outDegree: 이 함수가 호출하는 함수 수)
+  //resolver가 같은 호출자→대상 쌍을 엣지 하나로 묶으므로 엣지 수가 곧 고유 함수 수다
+  const inDegreeMap = {};
+  const outDegreeMap = {};
   for (const edge of allCallEdges) {
-    const targetId = edge.target;
-    const sourceId = edge.source;
-    if (!inboundCountMap[targetId]) inboundCountMap[targetId] = 0;
-    inboundCountMap[targetId] += edge.references.length;
-    if (!outboundCountMap[sourceId]) outboundCountMap[sourceId] = 0;
-    outboundCountMap[sourceId] += edge.references.length;
+    inDegreeMap[edge.target] = (inDegreeMap[edge.target] || 0) + 1;
+    outDegreeMap[edge.source] = (outDegreeMap[edge.source] || 0) + 1;
   }
 
-  //3단계 노드 생성 (티어 기반 언어 — 참조 횟수별 계층 구조)
+  //3단계 노드 생성 (티어 기반 언어 — 고유 연결 수별 계층 구조)
   const { nodes, tiers } = buildTieredNodes(
     tieredFunctions,
     tieredFiles,
-    inboundCountMap,
-    outboundCountMap,
-    couplingScores,
+    inDegreeMap,
+    outDegreeMap,
+    metricsByFile,
     tieredVariables,
   );
 
@@ -255,9 +281,9 @@ async function buildGraph(projectPath) {
     webParsedFiles,
     webEdges,
     jsFunctions,
-    inboundCountMap,
-    outboundCountMap,
-    couplingScores,
+    inDegreeMap,
+    outDegreeMap,
+    metricsByFile,
   );
   nodes.push(...webNodes);
 
@@ -277,7 +303,6 @@ async function buildGraph(projectPath) {
     tiers,
     langs,
     warnings,
-    couplingScores,
     diagnostics,
     suggestions,
     cycleEdgeIds,
@@ -295,30 +320,30 @@ async function buildGraph(projectPath) {
 }
 
 //3단계 Cytoscape 호환 노드 목록 생성 함수다.
-//tier(참조 횟수) → file → function/variable 의 3단계 중첩 구조를 만든다.
-//파일 노드는 하나만 생성되며, 파일의 "대표 티어"는 내부 함수 중 최대 참조 횟수로 결정된다.
-//개별 함수의 참조 횟수는 함수 노드의 inboundRefCount 데이터로 유지된다.
+//tier(고유 연결 수) → file → function/variable 의 3단계 중첩 구조를 만든다.
+//파일 노드는 하나만 생성되며, 파일의 "대표 티어"는 내부 함수 중 최대 inDegree로 결정된다.
+//개별 함수의 고유 연결 수는 함수 노드의 inDegree·outDegree 데이터로 유지된다.
 //대상: Python, C++, C#, TypeScript, Java
 function buildTieredNodes(
   functions,
   files,
-  inboundCountMap,
-  outboundCountMap,
-  couplingScores,
+  inDegreeMap,
+  outDegreeMap,
+  metricsByFile,
   allVariables,
 ) {
   const nodes = [];
 
-  //각 함수의 참조 횟수 결정 (inbound + outbound)
+  //각 함수의 고유 연결 수 결정 (inbound + outbound)
   const funcInboundMap = {};
   const funcOutboundMap = {};
   for (const func of functions) {
     const nodeId = `${func.filePath}::${func.qualifiedName}`;
-    funcInboundMap[nodeId] = inboundCountMap[nodeId] || 0;
-    funcOutboundMap[nodeId] = outboundCountMap[nodeId] || 0;
+    funcInboundMap[nodeId] = inDegreeMap[nodeId] || 0;
+    funcOutboundMap[nodeId] = outDegreeMap[nodeId] || 0;
   }
 
-  //파일별 최대 참조 횟수(대표 티어) 계산 — inbound 기준
+  //파일별 최대 inDegree(대표 티어) 계산
   const fileMaxTier = {};
   for (const func of functions) {
     const nodeId = `${func.filePath}::${func.qualifiedName}`;
@@ -338,7 +363,7 @@ function buildTieredNodes(
         id: `tier__${tierValue}`,
         type: 'tier',
         tierValue: tierValue,
-        label: `${tierValue}회 참조`,
+        label: `${tierValue}곳에서 참조`,
       },
     });
   }
@@ -380,7 +405,7 @@ function buildTieredNodes(
           type: 'file',
           fullPath: filePath,
           parent: `tier__${representativeTier}`,
-          couplingScore: couplingScores[filePath] || 0,
+          ...fileCouplingData(metricsByFile, filePath),
           language: fileLangMap[filePath] || 'unknown',
         },
       });
@@ -393,7 +418,7 @@ function buildTieredNodes(
       //언어별 노드 타입 구분
       const lang = fileLangMap[func.filePath] || 'unknown';
       const nodeType = lang === 'javascript' ? 'js-function' : 'function';
-      //참조 횟수를 라벨에 표시 (in↓ out↑)
+      //고유 연결 수를 라벨에 표시 (in↓ out↑)
       const refParts = [];
       if (inCount > 0) refParts.push(`${inCount}↓`);
       if (outCount > 0) refParts.push(`${outCount}↑`);
@@ -415,8 +440,8 @@ function buildTieredNodes(
           code: func.code,
           docstring: func.docstring,
           comment: func.comment,
-          inboundRefCount: inCount,
-          outboundRefCount: outCount,
+          inDegree: inCount,
+          outDegree: outCount,
           language: lang,
         },
       });
@@ -444,7 +469,7 @@ function buildTieredNodes(
             type: 'file',
             fullPath: v.filePath,
             parent: `tier__${representativeTier}`,
-            couplingScore: couplingScores[v.filePath] || 0,
+            ...fileCouplingData(metricsByFile, v.filePath),
             language: fileLangMap[v.filePath] || 'unknown',
           },
         });
@@ -493,9 +518,9 @@ function buildWebNodes(
   webParsedFiles,
   webEdges,
   jsFunctions,
-  inboundCountMap,
-  outboundCountMap,
-  couplingScores,
+  inDegreeMap,
+  outDegreeMap,
+  metricsByFile,
 ) {
   const nodes = [];
   const langs = [];
@@ -574,10 +599,10 @@ function buildWebNodes(
     }
   }
 
-  //JS 함수의 참조 횟수 사전 수집 (inbound 기준)
+  //JS 함수의 고유 연결 수 사전 수집 (inDegree 기준)
   for (const func of jsFunctions) {
     const nodeId = `${func.filePath}::${func.qualifiedName}`;
-    const tierValue = inboundCountMap[nodeId] || 0;
+    const tierValue = inDegreeMap[nodeId] || 0;
     const langFileKey = `javascript::${func.filePath}`;
     fileMaxTier[langFileKey] = Math.max(fileMaxTier[langFileKey] || 0, tierValue);
   }
@@ -613,7 +638,8 @@ function buildWebNodes(
           id: subTierId,
           type: 'tier',
           tierValue: maxTier,
-          label: `${maxTier}회 참조`,
+          //JS는 함수 고유 연결 수, HTML·CSS는 웹 관계 참조 횟수로 묶는다
+          label: language === 'javascript' ? `${maxTier}곳에서 참조` : `${maxTier}회 참조`,
           parent: langId,
         },
       });
@@ -630,7 +656,7 @@ function buildWebNodes(
           type: 'file',
           fullPath: filePath,
           parent: subTierId,
-          couplingScore: couplingScores[filePath] || 0,
+          ...fileCouplingData(metricsByFile, filePath),
           language: language,
         },
       });
@@ -762,8 +788,8 @@ function buildWebNodes(
   //JS 함수 노드 생성
   for (const func of jsFunctions) {
     const nodeId = `${func.filePath}::${func.qualifiedName}`;
-    const inCount = inboundCountMap[nodeId] || 0;
-    const outCount = outboundCountMap[nodeId] || 0;
+    const inCount = inDegreeMap[nodeId] || 0;
+    const outCount = outDegreeMap[nodeId] || 0;
     const fileNodeId = ensureLangTierAndFile('javascript', func.filePath);
     //참조 횟수를 라벨에 표시 (in↓ out↑)
     const refParts = [];
@@ -786,8 +812,8 @@ function buildWebNodes(
         code: func.code,
         docstring: func.docstring,
         comment: func.comment,
-        inboundRefCount: inCount,
-        outboundRefCount: outCount,
+        inDegree: inCount,
+        outDegree: outCount,
         language: 'javascript',
       },
     });

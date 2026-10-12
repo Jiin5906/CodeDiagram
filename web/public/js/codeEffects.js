@@ -16,6 +16,7 @@ const COMPLEX_TOP_RATIO = 0.12; //복잡도 점수 상위 12% 파일만 표시
 const COMPLEX_MAX_FILES = 15; //한 번에 표시하는 최대 파일 수 (그래프가 산만해지지 않도록)
 const COMPLEX_MIN_SCORE = 2; //점수가 이보다 낮으면 상위권이어도 표시하지 않음 (작은 프로젝트 대비)
 const COMPLEX_LONG_FN_LINES = 50; //긴 함수 기준 (진단의 God Function 기준과 같음)
+const COMPLEX_COUPLING_WEIGHT = { HAZARD: 2, WARN: 1 }; //결합도 판정(CR-RFC-2026-002)별 복잡도 가중치 — 예전 결합도 점수(0~1)×2처럼 최대 2점이다
 const COMPLEX_LEVEL_SCORES = [5, 8]; //2단계, 3단계가 되는 점수 (예: 700줄·긴 함수 3개인 파일 ≈ 8.8)
 const COMPLEX_LEVELS = [
   { color: '214, 165, 71', spread: 1.1, strength: 0.38 }, //1단계: 주황, 은은하게
@@ -103,7 +104,8 @@ function _applyDiagnosticGlow(diagnostics) {
   }
 
   //warning 등급 진단 (info는 미사용 함수 등 수가 많아 그래프가 산만해지므로 제외)
-  const issues = [...(diagnostics.couplingIssues || []), ...(diagnostics.antiPatterns || [])];
+  //결합도는 진단 테두리가 아니라 HAZARD 바깥 링(graph.js)으로 따로 표시한다
+  const issues = diagnostics.antiPatterns || [];
   for (const issue of issues) {
     if (!issue.nodeId || (issue.severity !== 'warning' && issue.severity !== 'error')) continue;
     const id = resolve(issue.nodeId);
@@ -164,7 +166,7 @@ function _startEdgeFlow() {
 
 /* ── 복잡도 글로우 ── */
 
-//파일 복잡도 점수: 함수 줄 수 합, 긴 함수 수, 함수 개수, 결합도, God Class 진단을 합친다.
+//파일 복잡도 점수: 함수 줄 수 합, 긴 함수 수, 함수 개수, 결합도 판정, God Class 진단을 합친다.
 //진단 목록에는 info 등급이라 테두리로 표시되지 않는 "크고 복잡한 파일"을 원 뒤의 빛으로 드러낸다.
 function _fileComplexityScore(node, godClassCount) {
   const fns = (node.data('functions') || []).filter(
@@ -178,8 +180,8 @@ function _fileComplexityScore(node, godClassCount) {
     lines += n;
     if (n >= COMPLEX_LONG_FN_LINES) longFns++;
   }
-  const coupling = node.data('couplingScore') || 0;
-  return lines / 150 + longFns + fns.length / 12 + coupling * 2 + godClassCount * 1.5;
+  const coupling = COMPLEX_COUPLING_WEIGHT[couplingStatusOf(node.data())] || 0;
+  return lines / 150 + longFns + fns.length / 12 + coupling + godClassCount * 1.5;
 }
 
 //복잡도 상위 파일을 골라 단계(1~3)를 매긴다

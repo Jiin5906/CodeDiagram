@@ -533,6 +533,100 @@ function _makeDiagItem(severity, message, nodeIds) {
   return item;
 }
 
+/* ── 파일 결합도 표 (CR-RFC-2026-002) ── */
+
+//판정별 진단 항목 등급 — 왼쪽 띠 색(error 빨강, warning 노랑, info 파랑)을 기존 진단 항목과 맞춘다
+const COUPLING_SEVERITY = { HAZARD: 'error', WARN: 'warning', SAFE: 'info', 'N/A': 'info' };
+
+//HAZARD 사유를 기준 숫자와 함께 문장으로 만든다 (숫자는 서버 criteria에서 읽는다)
+function _couplingReasonText(reasons, criteria) {
+  const labels = {
+    instability: `I > ${criteria.warnMax}`,
+    efferent: `Ce ≥ ${criteria.ceHazard}`,
+  };
+  if (reasons.length === 2) return `둘 다 (${labels.instability}, ${labels.efferent})`;
+  return reasons.map((r) => labels[r]).join(', ');
+}
+
+//표의 한 칸
+function _couplingCell(text, className) {
+  const cell = document.createElement('span');
+  cell.className = 'coupling-cell' + (className ? ' ' + className : '');
+  cell.textContent = text;
+  return cell;
+}
+
+//표 머리줄 — 검색·개수 대상이 아니므로 diag-item이 아니다
+function _makeCouplingHeader() {
+  const header = document.createElement('div');
+  header.className = 'coupling-row coupling-header';
+  for (const title of ['판정', '파일', 'I', 'Ca', 'Ce', 'CBO']) {
+    header.appendChild(_couplingCell(title));
+  }
+  return header;
+}
+
+//파일 한 줄. diag-item으로 만들어 기존 검색 필터·클릭 이동·키보드 조작을 그대로 쓴다.
+function _makeCouplingRow(entry, criteria) {
+  const { status, instability, ca, ce, cbo, hazard_reasons: reasons } = entry.metrics;
+  const item = document.createElement('div');
+  item.className = `diag-item coupling-row severity-${COUPLING_SEVERITY[status]}`;
+  item.tabIndex = 0;
+  item.setAttribute('role', 'button');
+  item.title = `${entry.file} — 클릭하면 코드로 이동합니다`;
+
+  const statusClass = 'status-' + (status === 'N/A' ? 'na' : status.toLowerCase());
+  item.appendChild(_couplingCell(status, 'coupling-status ' + statusClass));
+  item.appendChild(_couplingCell(entry.file.split('/').pop(), 'coupling-file'));
+  item.appendChild(_couplingCell(instability === null ? '—' : String(instability), 'coupling-num'));
+  item.appendChild(_couplingCell(String(ca), 'coupling-num'));
+  item.appendChild(_couplingCell(String(ce), 'coupling-num'));
+  item.appendChild(_couplingCell(String(cbo), 'coupling-num'));
+
+  //HAZARD 사유는 아래 줄에 따로 — I 때문인지, Ce 때문인지, 둘 다인지 구분한다
+  let reason = '';
+  if (status === 'HAZARD') {
+    reason = _couplingReasonText(reasons, criteria);
+    item.appendChild(_couplingCell('사유: ' + reason, 'coupling-reason'));
+  }
+
+  item.dataset.search = [status, entry.file, reason].join(' ').toLowerCase();
+  const open = () => _openDiagLocation(entry.file, '', item);
+  item.addEventListener('click', open);
+  item.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      open();
+    }
+  });
+  return item;
+}
+
+//파일 결합도 섹션 — 서버가 HAZARD → WARN → SAFE → N/A 순으로 정렬해 보낸 목록을 그대로 표로 그린다
+function _makeCouplingSection(coupling) {
+  const files = (coupling && coupling.files) || [];
+  const criteria = coupling && coupling.criteria;
+  const hazardCount = files.filter((e) => e.metrics.status === 'HAZARD').length;
+  const rows = files.map((entry) => _makeCouplingRow(entry, criteria));
+  const section = _makeDiagSection(
+    `파일 결합도 (HAZARD ${hazardCount})`,
+    rows,
+    '분석된 파일이 없습니다',
+  );
+  if (rows.length) {
+    //판정 기준 한 줄과 머리줄을 첫 행 앞에 끼워 넣는다
+    const note = document.createElement('div');
+    note.className = 'coupling-criteria';
+    note.textContent =
+      `판정 기준 ${criteria.name} · I = Ce/(Ca+Ce) · ` +
+      `SAFE ≤ ${criteria.safeMax} < WARN ≤ ${criteria.warnMax} < HAZARD, ` +
+      `또는 Ce ≥ ${criteria.ceHazard}이면 HAZARD`;
+    section.insertBefore(note, rows[0]);
+    section.insertBefore(_makeCouplingHeader(), rows[0]);
+  }
+  return section;
+}
+
 function _makeDiagSection(title, items, emptyText) {
   const section = document.createElement('div');
   section.className = 'diag-section';
@@ -642,11 +736,8 @@ function showDiagnosticsPanel(diagnostics, suggestions) {
   ];
   content.appendChild(_makeDiagSection('순환 참조', cycleItems, '순환 참조가 없습니다'));
 
-  //결합도 과다 섹션
-  const couplingItems = (diagnostics.couplingIssues || []).map((issue) =>
-    _makeDiagItem('warning', `${issue.nodeId.split('::').pop()}: ${issue.message}`, [issue.nodeId]),
-  );
-  content.appendChild(_makeDiagSection('결합도 과다', couplingItems, '결합도 문제가 없습니다'));
+  //파일 결합도 섹션 (CR-RFC-2026-002) — 파일별 판정과 원값 표
+  content.appendChild(_makeCouplingSection(diagnostics.coupling));
 
   //안티패턴 섹션
   const antiItems = (diagnostics.antiPatterns || []).map((issue) =>
