@@ -1,0 +1,102 @@
+# CD: v* 태그를 푸시하면 CI 검사를 다시 통과한 뒤
+#  1) 웹 서버 Docker 이미지를 GHCR(ghcr.io)에 푸시하고
+#  2) GitHub Release를 만든다 (변경 내역 자동 생성).
+# Android APK 첨부는 앱 출시 계획이 없어 보류했다 (android.yml 주석 참고).
+# 실제 배포 대상은 아직 없다. deploy job은 GitHub Environments(production) 승인 자리만 만들어 둔 것이다.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+# 같은 태그로 동시에 두 번 배포하지 않는다 (진행 중인 배포는 취소하지 않음)
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  HUSKY: '0'
+
+jobs:
+  verify:
+    name: CI 검사
+    uses: ./.github/workflows/ci.yml
+
+  image:
+    name: Docker 이미지 → GHCR
+    needs: verify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    # GHCR 푸시 권한은 이 job에만 준다
+    permissions:
+      contents: read
+      packages: write
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: web/.nvmrc
+      - name: 이미지 이름 정하기
+        # GHCR 이미지 이름은 소문자여야 한다
+        run: echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/code-diagram" >> "$GITHUB_ENV"
+      - name: prod 이미지 빌드
+        run: >-
+          docker build --target prod
+          --label "org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}"
+          --label "org.opencontainers.image.version=${GITHUB_REF_NAME}"
+          --label "org.opencontainers.image.revision=${GITHUB_SHA}"
+          -t "$IMAGE:${GITHUB_REF_NAME}" -t "$IMAGE:latest" .
+      # 푸시하기 전에 취약점을 검사한다 (고칠 수 있는 HIGH 이상이면 중단)
+      - name: 이미지 취약점 (Trivy)
+        run: node scripts/scan.js image "$IMAGE:${GITHUB_REF_NAME}"
+      - name: GHCR 로그인
+        # 토큰은 표준 입력으로 넘겨서 명령줄·로그에 남지 않게 한다
+        run: echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: 이미지 푸시
+        run: |
+          docker push "$IMAGE:${GITHUB_REF_NAME}"
+          docker push "$IMAGE:latest"
+      - name: 로그아웃
+        if: always()
+        run: docker logout ghcr.io
+
+  release:
+    name: GitHub Release 생성
+    needs: image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    # Release 생성 권한은 빌드를 하지 않는 이 job에만 준다
+    permissions:
+      contents: write
+    steps:
+      - name: Release 생성
+        run: >-
+          gh release create "$GITHUB_REF_NAME"
+          --repo "$GITHUB_REPOSITORY"
+          --title "$GITHUB_REF_NAME"
+          --generate-notes
+          --verify-tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  deploy:
+    name: 운영 배포 (자리만 준비)
+    needs: release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    # 저장소 Settings → Environments에서 production에 승인자를 지정하면 이 job 전에 승인을 기다린다.
+    # 주의: Free 요금제 비공개 저장소에서는 승인자(required reviewers)가 적용되지 않는다.
+    environment: production
+    steps:
+      - name: 배포 대상 없음
+        run: echo "배포 대상이 정해지면 이 단계에 배포 명령을 넣는다."

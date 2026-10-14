@@ -1,17 +1,50 @@
-//파이썬 파일을 파싱하는 코드
-//tree-sitter를 사용하여 파이썬 파일을 파싱한다.
+//코드 파일을 파싱하는 코드
+//tree-sitter를 사용하여 8개 언어(Python, JS, HTML, CSS, C++, C#, TypeScript, Java)를 파싱한다.
 
 const Parser = require('tree-sitter');
 const Python = require('tree-sitter-python');
+const { parseHtml } = require('./parsers/htmlParser');
+const { parseCss } = require('./parsers/cssParser');
+const { parseJs } = require('./parsers/jsParser');
+const { parseCpp } = require('./parsers/cppParser');
+const { parseCsharp } = require('./parsers/csharpParser');
+const { parseTs } = require('./parsers/tsParser');
+const { parseJava } = require('./parsers/javaParser');
 
 function createParser() {
   const p = new Parser();
-  p.setLanguage(Python);
+  //문법 패키지의 타입 정의가 tree-sitter 0.22 타입과 맞지 않아 캐스팅한다 (런타임 동작은 같다)
+  p.setLanguage(/** @type {any} */ (Python));
   return p;
 }
 
+//언어별 파서 팩토리. language를 지정하면 해당 파서를, 생략하면 Python 파서를 사용한다.
+function parseFile(code, filePath, language) {
+  if (language && language !== 'python') {
+    switch (language) {
+      case 'html':
+        return parseHtml(code, filePath);
+      case 'css':
+        return parseCss(code, filePath);
+      case 'javascript':
+        return parseJs(code, filePath);
+      case 'cpp':
+        return parseCpp(code, filePath);
+      case 'csharp':
+        return parseCsharp(code, filePath);
+      case 'typescript':
+        return parseTs(code, filePath);
+      case 'java':
+        return parseJava(code, filePath);
+      default:
+        return null;
+    }
+  }
+  return parsePython(code, filePath);
+}
+
 //파이썬 파일 하나를 파싱해서 함수, 호출, import, 클래스 정보를 추출하는 함수다.
-function parseFile(code, filePath) {
+function parsePython(code, filePath) {
   const parser = createParser();
   const tree = parser.parse(code);
   const root = tree.rootNode;
@@ -111,6 +144,9 @@ function collectDefinitions(node, code, filePath, functions, calls, classes, cla
       if (body) {
         collectDefinitions(body, code, filePath, functions, calls, classes, clsName);
       }
+    } else if (child.type === 'decorated_definition') {
+      //데코레이터가 붙은 함수/클래스 정의를 내부 정의로 재귀 처리
+      collectDefinitions(child, code, filePath, functions, calls, classes, className);
     } else if (child.type === 'function_definition') {
       const funcInfo = extractFunction(child, code, filePath, className);
       functions.push(funcInfo);
@@ -198,15 +234,62 @@ function collectCalls(node, callerName, filePath, calls) {
 //변수/필드를 수집하는 함수다.
 //모듈 최상위 assignment와 클래스 body 내 assignment에서 변수명을 추출한다.
 const VARIABLE_BLACKLIST = new Set([
-  'self', 'cls', 'True', 'False', 'None', 'print', 'len', 'range',
-  'int', 'str', 'float', 'bool', 'list', 'dict', 'set', 'tuple',
-  'type', 'super', 'object', 'isinstance', 'issubclass', 'hasattr',
-  'getattr', 'setattr', 'delattr', 'property', 'staticmethod',
-  'classmethod', 'enumerate', 'zip', 'map', 'filter', 'sorted',
-  'reversed', 'min', 'max', 'sum', 'abs', 'round', 'input', 'open',
-  'Exception', 'ValueError', 'TypeError', 'KeyError', 'IndexError',
-  'AttributeError', 'RuntimeError', 'StopIteration', 'NotImplementedError',
-  '__name__', '__main__', '__init__', '__all__', '__file__', '__doc__',
+  'self',
+  'cls',
+  'True',
+  'False',
+  'None',
+  'print',
+  'len',
+  'range',
+  'int',
+  'str',
+  'float',
+  'bool',
+  'list',
+  'dict',
+  'set',
+  'tuple',
+  'type',
+  'super',
+  'object',
+  'isinstance',
+  'issubclass',
+  'hasattr',
+  'getattr',
+  'setattr',
+  'delattr',
+  'property',
+  'staticmethod',
+  'classmethod',
+  'enumerate',
+  'zip',
+  'map',
+  'filter',
+  'sorted',
+  'reversed',
+  'min',
+  'max',
+  'sum',
+  'abs',
+  'round',
+  'input',
+  'open',
+  'Exception',
+  'ValueError',
+  'TypeError',
+  'KeyError',
+  'IndexError',
+  'AttributeError',
+  'RuntimeError',
+  'StopIteration',
+  'NotImplementedError',
+  '__name__',
+  '__main__',
+  '__init__',
+  '__all__',
+  '__file__',
+  '__doc__',
 ]);
 
 function collectVariables(node, filePath, variables, className) {

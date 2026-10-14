@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CodeDiagram Render Benchmark</title>
+    <script src="https://unpkg.com/cytoscape@3.30.4/dist/cytoscape.min.js"></script>
+    <script src="https://unpkg.com/layout-base@2.0.1/layout-base.js"></script>
+    <script src="https://unpkg.com/cose-base@2.2.0/cose-base.js"></script>
+    <script src="https://unpkg.com/cytoscape-fcose@2.2.0/cytoscape-fcose.js"></script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        background: #0a0e17;
+        color: #e1e4e8;
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+      }
+      #controls {
+        padding: 16px;
+        background: #111827;
+        border-bottom: 1px solid #1e293b;
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      button {
+        padding: 6px 14px;
+        background: #2563eb;
+        color: #fff;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 14px;
+      }
+      button:hover {
+        background: #3b82f6;
+      }
+      button:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+      #fps-display {
+        font-size: 20px;
+        font-weight: 700;
+        color: #4ade80;
+        min-width: 120px;
+      }
+      #cy-bench {
+        flex: 1;
+      }
+      #results {
+        padding: 16px;
+        background: #111827;
+        border-top: 1px solid #1e293b;
+        font-size: 14px;
+        max-height: 200px;
+        overflow-y: auto;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      th,
+      td {
+        padding: 6px 12px;
+        text-align: left;
+        border-bottom: 1px solid #1e293b;
+      }
+      th {
+        color: #93c5fd;
+        font-weight: 600;
+      }
+      td {
+        color: #cbd5e1;
+      }
+      .good {
+        color: #4ade80;
+      }
+      .warn {
+        color: #fbbf24;
+      }
+      .bad {
+        color: #f87171;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="controls">
+      <button id="btn-100">100 Nodes</button>
+      <button id="btn-500">500 Nodes</button>
+      <button id="btn-1000">1000 Nodes</button>
+      <span id="fps-display">FPS: --</span>
+      <span id="status-text" style="color: #64748b; font-size: 13px"></span>
+    </div>
+    <div id="cy-bench"></div>
+    <div id="results">
+      <table>
+        <thead>
+          <tr>
+            <th>Nodes</th>
+            <th>Layout (ms)</th>
+            <th>Avg FPS</th>
+            <th>Min FPS</th>
+            <th>Dropped</th>
+          </tr>
+        </thead>
+        <tbody id="results-body"></tbody>
+      </table>
+    </div>
+
+    <script>
+      let cy = null;
+
+      document.getElementById('btn-100').addEventListener('click', function () {
+        runBenchmark(100);
+      });
+      document.getElementById('btn-500').addEventListener('click', function () {
+        runBenchmark(500);
+      });
+      document.getElementById('btn-1000').addEventListener('click', function () {
+        runBenchmark(1000);
+      });
+
+      function initBenchCy() {
+        if (cy) cy.destroy();
+        cy = cytoscape({
+          container: document.getElementById('cy-bench'),
+          style: [
+            {
+              selector: 'node',
+              style: {
+                shape: 'roundrectangle',
+                'background-color': '#1e293b',
+                'border-color': '#475569',
+                'border-width': 1.5,
+                label: 'data(label)',
+                'text-valign': 'center',
+                'font-size': '12px',
+                color: '#e2e8f0',
+                width: 80,
+                height: 30,
+              },
+            },
+            {
+              selector: 'edge',
+              style: {
+                width: 1,
+                'line-color': '#60a5fa',
+                'line-opacity': 0.3,
+                'target-arrow-shape': 'triangle',
+                'target-arrow-color': '#60a5fa',
+                'arrow-scale': 0.6,
+                'curve-style': 'bezier',
+              },
+            },
+          ],
+          layout: { name: 'preset' },
+          wheelSensitivity: 0.3,
+        });
+      }
+
+      function generateNodes(count) {
+        var elements = [];
+        for (var i = 0; i < count; i++) {
+          elements.push({
+            data: { id: 'n' + i, label: 'fn_' + i },
+            position: { x: Math.random() * 2000, y: Math.random() * 2000 },
+          });
+        }
+        var edgeCount = Math.floor(count * 1.2);
+        for (var i = 0; i < edgeCount; i++) {
+          var s = Math.floor(Math.random() * count);
+          var t = Math.floor(Math.random() * count);
+          if (s === t) t = (t + 1) % count;
+          elements.push({ data: { id: 'e' + i, source: 'n' + s, target: 'n' + t } });
+        }
+        return elements;
+      }
+
+      function measureFPS(duration) {
+        return new Promise(function (resolve) {
+          var frames = [];
+          var lastTime = performance.now();
+          var elapsed = 0;
+
+          function tick(now) {
+            var dt = now - lastTime;
+            lastTime = now;
+            elapsed += dt;
+            if (dt > 0) frames.push(1000 / dt);
+            if (elapsed < duration) {
+              requestAnimationFrame(tick);
+            } else {
+              resolve(frames);
+            }
+          }
+          requestAnimationFrame(tick);
+        });
+      }
+
+      function addResultRow(nodeCount, layoutTime, avgFps, minFps, dropped, totalFrames) {
+        var tbody = document.getElementById('results-body');
+        var row = document.createElement('tr');
+        var fpsClass = avgFps >= 50 ? 'good' : avgFps >= 30 ? 'warn' : 'bad';
+
+        var td1 = document.createElement('td');
+        td1.textContent = nodeCount;
+        var td2 = document.createElement('td');
+        td2.textContent = layoutTime.toFixed(0);
+        var td3 = document.createElement('td');
+        td3.textContent = avgFps.toFixed(1);
+        td3.className = fpsClass;
+        var td4 = document.createElement('td');
+        td4.textContent = minFps.toFixed(1);
+        td4.className = fpsClass;
+        var td5 = document.createElement('td');
+        td5.textContent = dropped + ' / ' + totalFrames;
+
+        row.appendChild(td1);
+        row.appendChild(td2);
+        row.appendChild(td3);
+        row.appendChild(td4);
+        row.appendChild(td5);
+        tbody.appendChild(row);
+      }
+
+      async function runBenchmark(nodeCount) {
+        var statusEl = document.getElementById('status-text');
+        var fpsEl = document.getElementById('fps-display');
+
+        statusEl.textContent = nodeCount + ' nodes generating...';
+        document.querySelectorAll('button').forEach(function (b) {
+          b.disabled = true;
+        });
+
+        initBenchCy();
+        var elements = generateNodes(nodeCount);
+        cy.add(elements);
+
+        statusEl.textContent = 'Layout running...';
+        var layoutStart = performance.now();
+        await new Promise(function (resolve) {
+          cy.layout({
+            name: 'fcose',
+            animate: false,
+            fit: true,
+            padding: 30,
+            quality: 'default',
+            randomize: true,
+            numIter: 500,
+            stop: resolve,
+          }).run();
+        });
+        var layoutTime = performance.now() - layoutStart;
+
+        statusEl.textContent = 'Measuring FPS (pan/zoom)...';
+        cy.edges().style('display', 'element');
+
+        var panStep = 0;
+        var panInterval = setInterval(function () {
+          cy.panBy({ x: Math.sin(panStep) * 5, y: Math.cos(panStep) * 3 });
+          cy.zoom(cy.zoom() + Math.sin(panStep * 0.5) * 0.01);
+          panStep += 0.1;
+        }, 16);
+
+        var frames = await measureFPS(3000);
+        clearInterval(panInterval);
+
+        var avgFps =
+          frames.length > 0
+            ? frames.reduce(function (a, b) {
+                return a + b;
+              }) / frames.length
+            : 0;
+        var minFps = frames.length > 0 ? Math.min.apply(null, frames) : 0;
+        var dropped = frames.filter(function (f) {
+          return f < 30;
+        }).length;
+
+        fpsEl.textContent = 'FPS: ' + avgFps.toFixed(1);
+        fpsEl.className = avgFps >= 50 ? 'good' : avgFps >= 30 ? 'warn' : 'bad';
+
+        addResultRow(nodeCount, layoutTime, avgFps, minFps, dropped, frames.length);
+
+        statusEl.textContent = 'Done';
+        document.querySelectorAll('button').forEach(function (b) {
+          b.disabled = false;
+        });
+      }
+
+      initBenchCy();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <script src="app.js"></script>
+</head>
+<body>
+  <button id="save-btn" onclick="handleSave()">저장</button>
+  <button id="close-btn">닫기</button>
+  <script>
+    // 익명 함수 핸들러: 파서가 handler를 null로 반환한다 (회귀 테스트 대상)
+    document.getElementById('close-btn').addEventListener('click', () => {
+      console.log('closed');
+    });
+  </script>
+</body>
+</html>

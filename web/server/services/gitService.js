@@ -1,6 +1,6 @@
 //파일명 그대로 깃과 파일을 관리해주는 서비스 코드다.
 
-const simpleGit = require('simple-git');
+const { simpleGit } = require('simple-git');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
@@ -21,9 +21,11 @@ async function getProjectPath(source) {
 
   //로컬 경로인 경우
   const absPath = path.resolve(source);
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- TODO(security): 사용자 입력 로컬 경로를 제한 없이 허용함, 수정 여부 결정 필요
   if (!fs.existsSync(absPath)) {
     throw new Error(`Local path does not exist: ${absPath}`);
   }
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- TODO(security): 사용자 입력 로컬 경로를 제한 없이 허용함, 수정 여부 결정 필요
   const stat = fs.statSync(absPath);
   if (!stat.isDirectory()) {
     throw new Error(`Path is not a directory: ${absPath}`);
@@ -37,12 +39,20 @@ async function cloneRepo(url) {
   const repoName = url.split('/').pop().replace('.git', '') || 'repo';
   const targetDir = path.join(REPOS_DIR, `${repoName}-${hash}`);
 
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- REPOS_DIR 아래 해시로 만든 경로
   if (fs.existsSync(targetDir)) {
     return targetDir;
   }
 
   const git = simpleGit();
-  await git.clone(url, targetDir, ['--depth', '1']);
+  try {
+    //Windows 경로 길이 제한(260자)을 넘는 파일이 있는 저장소도 checkout되도록 longpaths를 켠다
+    await git.clone(url, targetDir, ['--depth', '1', '--config', 'core.longpaths=true']);
+  } catch (err) {
+    //실패한 clone 폴더가 남으면 다음 요청에서 깨진 상태로 재사용되므로 지운다
+    fs.rmSync(targetDir, { recursive: true, force: true });
+    throw err;
+  }
   return targetDir;
 }
 
@@ -58,6 +68,7 @@ function findPythonFiles(dirPath) {
 
     let entries;
     try {
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- 프로젝트 루트 아래 디렉터리 순회
       entries = fs.readdirSync(dir, { withFileTypes: true });
     } catch {
       return;
@@ -70,16 +81,24 @@ function findPythonFiles(dirPath) {
 
       //숨김 폴더, __pycache__, venv, node_modules, .git 등은 건너뜀
       if (entry.isDirectory()) {
-        if (entry.name.startsWith('.') || entry.name === '__pycache__' ||
-            entry.name === 'venv' || entry.name === 'node_modules' ||
-            entry.name === '.git' || entry.name === 'env') {
+        if (
+          entry.name.startsWith('.') ||
+          entry.name === '__pycache__' ||
+          entry.name === 'venv' ||
+          entry.name === 'node_modules' ||
+          entry.name === '.git' ||
+          entry.name === 'env'
+        ) {
           continue;
         }
         walk(fullPath);
       } else if (entry.name.endsWith('.py')) {
+        // eslint-disable-next-line security/detect-non-literal-fs-filename -- 프로젝트 루트 아래 디렉터리 순회
         const stat = fs.statSync(fullPath);
         if (stat.size > MAX_SIZE) {
-          warnings.push(`Skipped ${path.relative(dirPath, fullPath)}: file too large (${Math.round(stat.size / 1024)}KB)`);
+          warnings.push(
+            `Skipped ${path.relative(dirPath, fullPath)}: file too large (${Math.round(stat.size / 1024)}KB)`,
+          );
           continue;
         }
         files.push({
@@ -99,4 +118,101 @@ function findPythonFiles(dirPath) {
   return { files, warnings };
 }
 
-module.exports = { getProjectPath, findPythonFiles };
+//디렉토리에서 지원하는 모든 파일을 재귀적으로 찾는 함수다.
+//지원 확장자: .py, .html, .css, .js, .cpp, .h, .cs, .ts, .tsx, .java
+//반환값에 language 필드를 포함한다.
+const SUPPORTED_EXTENSIONS = {
+  '.py': 'python',
+  '.html': 'html',
+  '.htm': 'html',
+  '.css': 'css',
+  '.js': 'javascript',
+  '.cpp': 'cpp',
+  '.cc': 'cpp',
+  '.cxx': 'cpp',
+  '.h': 'cpp',
+  '.hpp': 'cpp',
+  '.cs': 'csharp',
+  '.ts': 'typescript',
+  '.tsx': 'typescript',
+  '.java': 'java',
+};
+
+function findFiles(dirPath) {
+  const files = [];
+  const warnings = [];
+  const MAX_FILES = 200;
+  const MAX_SIZE = 100 * 1024; // 100KB
+
+  function walk(dir) {
+    if (files.length >= MAX_FILES) return;
+
+    let entries;
+    try {
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- 프로젝트 루트 아래 디렉터리 순회
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+
+    for (const entry of entries) {
+      if (files.length >= MAX_FILES) break;
+
+      const fullPath = path.join(dir, entry.name);
+
+      if (entry.isDirectory()) {
+        if (
+          entry.name.startsWith('.') ||
+          entry.name === '__pycache__' ||
+          entry.name === 'venv' ||
+          entry.name === 'node_modules' ||
+          entry.name === '.git' ||
+          entry.name === 'env' ||
+          entry.name === 'dist' ||
+          entry.name === 'build' ||
+          entry.name === 'vendor' ||
+          entry.name === 'bower_components' ||
+          entry.name === 'bin' ||
+          entry.name === 'obj' ||
+          entry.name === 'Debug' ||
+          entry.name === 'Release' ||
+          entry.name === 'cmake-build-debug' ||
+          entry.name === 'cmake-build-release' ||
+          entry.name === 'target' ||
+          entry.name === 'out'
+        ) {
+          continue;
+        }
+        walk(fullPath);
+      } else {
+        const ext = path.extname(entry.name).toLowerCase();
+        const language = SUPPORTED_EXTENSIONS[ext];
+        if (!language) continue;
+
+        // eslint-disable-next-line security/detect-non-literal-fs-filename -- 프로젝트 루트 아래 디렉터리 순회
+        const stat = fs.statSync(fullPath);
+        if (stat.size > MAX_SIZE) {
+          warnings.push(
+            `Skipped ${path.relative(dirPath, fullPath)}: file too large (${Math.round(stat.size / 1024)}KB)`,
+          );
+          continue;
+        }
+        files.push({
+          path: fullPath,
+          relativePath: path.relative(dirPath, fullPath).replace(/\\/g, '/'),
+          language,
+        });
+      }
+    }
+  }
+
+  walk(dirPath);
+
+  if (files.length >= MAX_FILES) {
+    warnings.push(`Stopped after ${MAX_FILES} files`);
+  }
+
+  return { files, warnings };
+}
+
+module.exports = { getProjectPath, findPythonFiles, findFiles, SUPPORTED_EXTENSIONS };

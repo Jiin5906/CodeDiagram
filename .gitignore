@@ -16,8 +16,40 @@ local.properties
 
 # Claude Code
 .claude/
-
 # 스크린샷 / 문서
+# 개인 보고서·작업 문서는 docs/ 폴더에 둔다. 위치와 관계없이(루트, web/docs 등) 모든 docs 폴더를 제외한다.
+# 파서 스키마처럼 저장소에 필요한 파일은 docs/가 아닌 곳(web/schemas/ 등)에 둔다.
+docs/
 *.png
+*.jpg
+*.jpeg
+*.gif
+*.bmp
+*.svg
 *.pdf
+# 문서(*.md)는 기본으로 제외하고, 팀이 함께 보는 문서만 예외로 추적한다
 *.md
+!README.md
+!.github/**/*.md
+!CLAUDE.md
+*.pptx
+*.ppt
+*.docx
+*.doc
+*.xlsx
+*.xls
+*.hwp
+*.hwpx
+
+# Node
+node_modules/
+
+# IDE
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 환경변수
+.env

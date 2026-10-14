@@ -70,8 +70,8 @@ function showDiffView(suggestion) {
   content.textContent = '';
   title.textContent = `Diff: ${suggestion.title}`;
 
-  let beforeLines = [];
-  let afterLines = [];
+  const beforeLines = [];
+  const afterLines = [];
 
   if (suggestion.type === 'cycle') {
     //순환 경로 엣지 제거 전후
@@ -95,21 +95,29 @@ function showDiffView(suggestion) {
       afterLines.push(`- ${removedFrom} → ${removedTo}  (제거)`);
     }
   } else if (suggestion.type === 'coupling') {
-    //직접 호출 → 간접 호출 전환
-    const nodeId = suggestion.nodeId || '';
-    const name = nodeId.split('::').pop() || '대상 함수';
+    //파일 결합도 HAZARD (CR-RFC-2026-002) — 제안에 실린 원값과 사유에 맞춰 구조 전환을 보여준다
+    const file = (suggestion.relatedNodes && suggestion.relatedNodes[0]) || '';
+    const name = file.split('/').pop() || '대상 파일';
+    const m = suggestion.metrics || {};
+    const reasons = m.hazard_reasons || [];
 
-    beforeLines.push('# 현재 구조 (높은 결합도)');
-    beforeLines.push(`  ${name}: 다수의 외부 모듈과 직접 의존`);
-    beforeLines.push(`  모듈A → ${name}`);
-    beforeLines.push(`  모듈B → ${name}`);
-    beforeLines.push(`  모듈C → ${name}`);
+    beforeLines.push(`# 현재 구조 (결합도 HAZARD — Ca ${m.ca} · Ce ${m.ce} · I ${m.instability})`);
+    beforeLines.push(`  ${m.ca}개 파일 → ${name}   (이 파일에 의존)`);
+    beforeLines.push(`  ${name} → ${m.ce}개 파일   (이 파일이 의존)`);
 
-    afterLines.push('# 제안 구조 (인터페이스 분리)');
-    afterLines.push(`  인터페이스 레이어 도입:`);
-    afterLines.push(`+ 모듈A → Interface → ${name}`);
-    afterLines.push(`+ 모듈B → Interface → ${name}`);
-    afterLines.push(`+ 모듈C → Interface → ${name}`);
+    afterLines.push('# 제안 구조');
+    //I가 높음: 구체 구현 대신 추상화에 의존하게 바꾼다 (의존성 역전)
+    if (reasons.includes('instability')) {
+      afterLines.push(`- ${name} → 구체 구현 파일들에 직접 의존`);
+      afterLines.push(`+ ${name} → Interface (추상화)`);
+      afterLines.push(`+ 구체 구현 파일들 → Interface 구현`);
+    }
+    //Ce가 많음: 의존 대상을 파사드 하나로 모은다
+    if (reasons.includes('efferent')) {
+      afterLines.push(`- ${name} → ${m.ce}개 파일에 직접 의존`);
+      afterLines.push(`+ ${name} → Facade → ${m.ce}개 파일`);
+    }
+    afterLines.push(`  ${suggestion.suggestion}`);
   } else if (suggestion.type === 'antipattern') {
     //대형 유닛 → 분할 제안
     const nodeId = suggestion.nodeId || '';

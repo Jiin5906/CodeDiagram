@@ -1,0 +1,12 @@
+# 커밋 전 검사 (husky). 실패하면 커밋이 막힌다. --no-verify로 건너뛰지 말고 원인을 고친다.
+# package.json은 web/에 있으므로 web/에서 실행한다.
+cd web
+
+# 1) 스테이징된 파일만 ESLint 자동 수정 + Prettier 포맷 (고친 내용은 다시 스테이징됨)
+npx --no-install lint-staged
+
+# 2) 스테이징된 변경에 비밀값이 있는지 gitleaks로 검사
+node scripts/scan.js staged
+
+# 3) 빠른 단위 테스트
+npm run --silent test:unit

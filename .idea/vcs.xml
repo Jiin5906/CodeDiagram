@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<project version="4">
-  <component name="VcsDirectoryMappings">
-    <mapping directory="$PROJECT_DIR$" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/web/repos/flask-bb69cc12b4b0" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/web/repos/requests-0d1a89c543ba" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/web/repos/thefuck-a5521db86e5c" vcs="Git" />
-  </component>
-</project>

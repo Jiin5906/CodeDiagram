@@ -1,0 +1,501 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://codediagram.dev/schemas/parser-output.json",
+  "title": "ParseResult",
+  "description": "CodeDiagram 파서의 통합 출력 스키마. 모든 언어(Python, JavaScript, TypeScript, HTML, CSS, C++, C#, Java)의 파싱 결과를 표현한다.",
+  "type": "object",
+  "properties": {
+    "functions": {
+      "type": "array",
+      "description": "파일에서 추출된 함수/메서드 목록. Python(function_definition), JS(function_declaration, arrow_function, method_definition), C++(function_definition), C#(method_declaration), Java(method_declaration, constructor_declaration) 노드에서 추출된다. CSS의 경우 @keyframes가 함수로 표현된다.",
+      "items": { "$ref": "#/$defs/FunctionInfo" }
+    },
+    "calls": {
+      "type": "array",
+      "description": "함수 호출 관계 목록. 각 함수 body 내에서 발견된 호출 표현식을 기록한다. HTML/CSS에는 해당 없음.",
+      "items": { "$ref": "#/$defs/CallInfo" }
+    },
+    "imports": {
+      "type": "array",
+      "description": "파일의 의존성(import/require/include) 목록. 언어별 형태가 다르다.",
+      "items": { "$ref": "#/$defs/ImportInfo" }
+    },
+    "classes": {
+      "type": "array",
+      "description": "클래스/구조체/인터페이스 정의 목록. Python, JS, C++, C#, Java에서 추출된다.",
+      "items": { "$ref": "#/$defs/ClassInfo" }
+    },
+    "variables": {
+      "type": "array",
+      "description": "변수/필드/프로퍼티 정의 목록. CSS 커스텀 프로퍼티(--variable)도 포함된다.",
+      "items": { "$ref": "#/$defs/VariableInfo" }
+    },
+    "variableRefs": {
+      "type": "array",
+      "description": "함수 body 내에서의 변수 참조 목록. CSS의 var() 참조도 포함된다.",
+      "items": { "$ref": "#/$defs/VariableRefInfo" }
+    },
+    "elements": {
+      "type": "array",
+      "description": "HTML 전용. HTML 요소 목록 (id, class, data-* 속성 포함).",
+      "items": { "$ref": "#/$defs/HtmlElementInfo" }
+    },
+    "selectors": {
+      "type": "array",
+      "description": "CSS 전용. CSS 셀렉터 목록 (파싱된 ID, 클래스, 태그, 속성 정보 포함).",
+      "items": { "$ref": "#/$defs/CssSelectorInfo" }
+    },
+    "eventBindings": {
+      "type": "array",
+      "description": "HTML/JS 전용. 이벤트 바인딩 목록 (addEventListener 호출 및 인라인 이벤트 핸들러).",
+      "items": { "$ref": "#/$defs/EventBindingInfo" }
+    },
+    "domAccesses": {
+      "type": "array",
+      "description": "JS 전용. DOM 접근 메서드 호출 목록 (getElementById, querySelector 등).",
+      "items": { "$ref": "#/$defs/DomAccessInfo" }
+    },
+    "inlineScripts": {
+      "type": "array",
+      "description": "HTML 전용. <script> 태그 내 인라인 JavaScript 코드 목록.",
+      "items": { "$ref": "#/$defs/InlineCodeInfo" }
+    },
+    "inlineStyles": {
+      "type": "array",
+      "description": "HTML 전용. <style> 태그 내 인라인 CSS 코드 목록.",
+      "items": { "$ref": "#/$defs/InlineCodeInfo" }
+    }
+  },
+  "required": ["functions", "calls", "imports", "classes", "variables", "variableRefs"],
+  "$defs": {
+    "FunctionInfo": {
+      "type": "object",
+      "description": "함수 또는 메서드 정보.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "함수의 단순 이름 (예: 'add', 'constructor')"
+        },
+        "qualifiedName": {
+          "type": "string",
+          "description": "클래스를 포함한 정규화된 이름 (예: 'Calculator.add'). 최상위 함수는 name과 동일."
+        },
+        "className": {
+          "type": ["string", "null"],
+          "description": "소속 클래스 이름. 최상위 함수는 null."
+        },
+        "filePath": {
+          "type": "string",
+          "description": "프로젝트 루트 기준 상대 파일 경로 (예: 'src/utils.py')"
+        },
+        "startLine": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "함수 시작 줄 번호 (1-based)"
+        },
+        "endLine": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "함수 끝 줄 번호 (1-based)"
+        },
+        "code": {
+          "type": "string",
+          "description": "함수의 전체 소스 코드 텍스트"
+        },
+        "docstring": {
+          "type": "string",
+          "description": "함수의 독스트링 (Python docstring, Java Javadoc. 다른 언어는 빈 문자열)"
+        },
+        "comment": {
+          "type": "string",
+          "description": "함수 바로 위에 있는 주석 텍스트"
+        },
+        "type": {
+          "type": "string",
+          "description": "CSS 전용. 'css-keyframes'로 설정됨.",
+          "enum": ["css-keyframes"]
+        }
+      },
+      "required": ["name", "qualifiedName", "filePath", "startLine", "endLine", "code"]
+    },
+    "CallInfo": {
+      "type": "object",
+      "description": "함수 호출 정보.",
+      "properties": {
+        "caller": {
+          "type": "string",
+          "description": "호출하는 함수의 qualifiedName (예: 'main', 'Calculator.add')"
+        },
+        "callee": {
+          "type": "string",
+          "description": "호출되는 함수/메서드 이름 (예: 'helper_func', 'this.render')"
+        },
+        "filePath": {
+          "type": "string",
+          "description": "호출이 발생한 파일 경로"
+        },
+        "line": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "호출 발생 줄 번호 (1-based)"
+        }
+      },
+      "required": ["caller", "callee", "filePath", "line"]
+    },
+    "ImportInfo": {
+      "type": "object",
+      "description": "파일 의존성 정보. 언어별로 필드 구성이 다르다. Python/JS/C++/C#는 name, HTML/CSS는 href를 반드시 가진다.",
+      "properties": {
+        "module": {
+          "type": "string",
+          "description": "Python: 모듈 경로 (예: 'utils'). JS: 모듈 경로 (예: './utils.js'). C++/C#에서는 미사용."
+        },
+        "name": {
+          "type": "string",
+          "description": "Python: import된 이름 (예: 'helper_func'). JS: 모듈명. C++: 헤더 파일명 (예: 'calculator.h'). C#: 네임스페이스 (예: 'System')."
+        },
+        "alias": {
+          "type": "string",
+          "description": "Python: as 별칭 (예: import numpy as np → alias='np')"
+        },
+        "type": {
+          "type": "string",
+          "description": "import 유형. JS: 'es6-import', 'commonjs-require', 'es6-reexport'. HTML: 'script-ref', 'style-ref', 'link-ref', 'resource-ref'. CSS: 'css-import'. C++: 'include', 'using'. C#: 'using'.",
+          "enum": [
+            "es6-import",
+            "commonjs-require",
+            "es6-reexport",
+            "script-ref",
+            "style-ref",
+            "link-ref",
+            "resource-ref",
+            "css-import",
+            "include",
+            "using"
+          ]
+        },
+        "href": {
+          "type": "string",
+          "description": "HTML/CSS 전용. 참조 URL 또는 파일 경로."
+        },
+        "filePath": {
+          "type": "string",
+          "description": "이 import가 선언된 파일 경로"
+        },
+        "line": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "import 선언 줄 번호 (1-based)"
+        }
+      },
+      "anyOf": [{ "required": ["name"] }, { "required": ["href"] }]
+    },
+    "ClassInfo": {
+      "type": "object",
+      "description": "클래스/구조체/인터페이스 정보.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "클래스 이름 (예: 'Calculator', 'UserCard')"
+        },
+        "filePath": {
+          "type": "string",
+          "description": "클래스가 정의된 파일 경로"
+        },
+        "superclasses": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "상속 부모 클래스 이름 목록 (예: ['Component'] 또는 ['Base1', 'Base2'])"
+        },
+        "startLine": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "클래스 시작 줄 번호 (1-based)"
+        },
+        "endLine": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "클래스 끝 줄 번호 (1-based)"
+        }
+      },
+      "required": ["name", "filePath", "superclasses", "startLine", "endLine"]
+    },
+    "VariableInfo": {
+      "type": "object",
+      "description": "변수/필드/프로퍼티 정의 정보.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "변수 이름. 클래스 필드는 'ClassName.fieldName' 형태. CSS 변수는 '--variable-name' 형태."
+        },
+        "className": {
+          "type": ["string", "null"],
+          "description": "소속 클래스 이름. 최상위 변수는 null."
+        },
+        "filePath": {
+          "type": "string",
+          "description": "변수가 정의된 파일 경로"
+        },
+        "line": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "변수 정의 줄 번호 (1-based)"
+        },
+        "type": {
+          "type": "string",
+          "description": "변수 유형. CSS 커스텀 프로퍼티의 경우 'css-variable'.",
+          "enum": ["css-variable"]
+        }
+      },
+      "required": ["name", "filePath", "line"]
+    },
+    "VariableRefInfo": {
+      "type": "object",
+      "description": "변수 참조 정보.",
+      "properties": {
+        "caller": {
+          "type": "string",
+          "description": "변수를 참조하는 함수의 qualifiedName. CSS의 경우 filePath."
+        },
+        "variable": {
+          "type": "string",
+          "description": "참조되는 변수 이름 (예: 'count', 'self.value', '--primary-color')"
+        },
+        "filePath": {
+          "type": "string",
+          "description": "참조가 발생한 파일 경로"
+        },
+        "line": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "참조 발생 줄 번호 (1-based)"
+        },
+        "type": {
+          "type": "string",
+          "description": "CSS 전용. 'css-var-ref'로 설정됨.",
+          "enum": ["css-var-ref"]
+        }
+      },
+      "required": ["caller", "variable", "filePath", "line"]
+    },
+    "HtmlElementInfo": {
+      "type": "object",
+      "description": "HTML 전용. HTML 요소 정보.",
+      "properties": {
+        "tag": {
+          "type": "string",
+          "description": "HTML 태그명 (소문자, 예: 'div', 'input', 'header')"
+        },
+        "id": {
+          "type": ["string", "null"],
+          "description": "요소의 id 속성값. 없으면 null."
+        },
+        "classes": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "요소의 class 속성에서 추출한 클래스명 목록"
+        },
+        "dataAttrs": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "description": "요소의 data-* 속성 맵 (예: { 'data-role': 'navigation' })"
+        },
+        "filePath": {
+          "type": "string",
+          "description": "요소가 정의된 파일 경로"
+        },
+        "line": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "요소의 줄 번호 (1-based)"
+        }
+      },
+      "required": ["tag", "id", "classes", "dataAttrs", "filePath", "line"]
+    },
+    "CssSelectorInfo": {
+      "type": "object",
+      "description": "CSS 전용. CSS 셀렉터 정보.",
+      "properties": {
+        "raw": {
+          "type": "string",
+          "description": "원본 셀렉터 문자열 (예: '.nav-item:hover', '#main-header')"
+        },
+        "ids": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "셀렉터에서 추출된 ID 목록 (# 제외, 예: ['main-header'])"
+        },
+        "classes": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "셀렉터에서 추출된 클래스 목록 (. 제외, 예: ['nav-item'])"
+        },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "셀렉터에서 추출된 태그 목록 (예: ['div', 'body'])"
+        },
+        "attributes": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "셀렉터에서 추출된 속성 셀렉터 이름 목록 (예: ['data-validate'])"
+        },
+        "filePath": {
+          "type": "string",
+          "description": "셀렉터가 정의된 파일 경로"
+        },
+        "line": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "셀렉터의 줄 번호 (1-based)"
+        }
+      },
+      "required": ["raw", "ids", "classes", "tags", "attributes", "filePath", "line"]
+    },
+    "EventBindingInfo": {
+      "type": "object",
+      "description": "이벤트 바인딩 정보. HTML 인라인 이벤트와 JS addEventListener 모두 포함.",
+      "properties": {
+        "eventType": {
+          "type": "string",
+          "description": "이벤트 유형 (예: 'click', 'submit', 'input')"
+        },
+        "handler": {
+          "type": ["string", "null"],
+          "description": "이벤트 핸들러 이름 또는 인라인 코드. JS addEventListener의 경우 핸들러 함수 식별자."
+        },
+        "filePath": {
+          "type": "string",
+          "description": "이벤트 바인딩이 정의된 파일 경로"
+        },
+        "line": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "이벤트 바인딩 줄 번호 (1-based)"
+        },
+        "isInline": {
+          "type": "boolean",
+          "description": "true: HTML 인라인 이벤트 핸들러 (onclick 등), false: JS addEventListener"
+        },
+        "elementId": {
+          "type": ["string", "null"],
+          "description": "HTML 전용. 이벤트가 바인딩된 요소의 id"
+        },
+        "elementClasses": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "HTML 전용. 이벤트가 바인딩된 요소의 클래스 목록"
+        },
+        "elementTag": {
+          "type": "string",
+          "description": "HTML 전용. 이벤트가 바인딩된 요소의 태그명"
+        },
+        "caller": {
+          "type": ["string", "null"],
+          "description": "JS 전용. addEventListener를 호출한 함수의 qualifiedName"
+        }
+      },
+      "required": ["eventType", "filePath", "line", "isInline"]
+    },
+    "DomAccessInfo": {
+      "type": "object",
+      "description": "JS 전용. DOM 접근 메서드 호출 정보.",
+      "properties": {
+        "method": {
+          "type": "string",
+          "description": "호출된 DOM 메서드 (예: 'getElementById', 'querySelector', 'classList.add', 'style-modify')"
+        },
+        "queryType": {
+          "type": "string",
+          "description": "쿼리 유형: 'id', 'class', 'tag', 'selector', 'style'",
+          "enum": ["id", "class", "tag", "selector", "style"]
+        },
+        "query": {
+          "type": "string",
+          "description": "DOM 쿼리 문자열 (예: 'app', '.header', 'active')"
+        },
+        "filePath": {
+          "type": "string",
+          "description": "DOM 접근이 발생한 파일 경로"
+        },
+        "line": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "DOM 접근 줄 번호 (1-based)"
+        },
+        "caller": {
+          "type": ["string", "null"],
+          "description": "DOM 접근을 수행한 함수의 qualifiedName"
+        }
+      },
+      "required": ["method", "queryType", "query", "filePath", "line"]
+    },
+    "InlineCodeInfo": {
+      "type": "object",
+      "description": "HTML 전용. 인라인 <script> 또는 <style> 태그의 코드 정보.",
+      "properties": {
+        "code": {
+          "type": "string",
+          "description": "인라인 코드의 텍스트 내용"
+        },
+        "filePath": {
+          "type": "string",
+          "description": "인라인 코드가 포함된 HTML 파일 경로"
+        },
+        "line": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "인라인 태그의 줄 번호 (1-based)"
+        }
+      },
+      "required": ["code", "filePath", "line"]
+    }
+  },
+  "examples": [
+    {
+      "description": "Python 파일 파싱 결과 예시",
+      "value": {
+        "functions": [
+          {
+            "name": "add",
+            "qualifiedName": "Calculator.add",
+            "className": "Calculator",
+            "filePath": "math_ops.py",
+            "startLine": 5,
+            "endLine": 7,
+            "code": "def add(self, a, b):\n    return a + b",
+            "docstring": "",
+            "comment": ""
+          }
+        ],
+        "calls": [{ "caller": "main", "callee": "add", "filePath": "main.py", "line": 10 }],
+        "imports": [{ "module": "math_ops", "name": "add" }],
+        "classes": [
+          {
+            "name": "Calculator",
+            "filePath": "math_ops.py",
+            "superclasses": [],
+            "startLine": 1,
+            "endLine": 20
+          }
+        ],
+        "variables": [
+          {
+            "name": "Calculator.value",
+            "className": "Calculator",
+            "filePath": "math_ops.py",
+            "line": 3
+          }
+        ],
+        "variableRefs": [
+          {
+            "caller": "Calculator.add",
+            "variable": "self.value",
+            "filePath": "math_ops.py",
+            "line": 6
+          }
+        ]
+      }
+    }
+  ]
+}

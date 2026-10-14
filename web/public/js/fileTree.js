@@ -1,17 +1,58 @@
 //파일 트리 탐색기 코드
 //분석된 파일 목록에서 디렉토리 트리를 구축하고 패널에 표시한다.
 
+//확장자별 아이콘 매핑 — 이모지 대신 짧은 글자 표식, 색은 그래프의 언어 색(LANG_COLORS)과 같다
+const fileIcons = {
+  '.py': { icon: 'py', color: LANG_COLORS.python.bg },
+  '.js': { icon: 'js', color: LANG_COLORS.javascript.bg },
+  '.ts': { icon: 'ts', color: LANG_COLORS.typescript.bg },
+  '.tsx': { icon: 'tsx', color: LANG_COLORS.typescript.bg },
+  '.html': { icon: '<>', color: LANG_COLORS.html.bg },
+  '.htm': { icon: '<>', color: LANG_COLORS.html.bg },
+  '.css': { icon: '{}', color: LANG_COLORS.css.bg },
+  '.cpp': { icon: 'c++', color: LANG_COLORS.cpp.bg },
+  '.cc': { icon: 'c++', color: LANG_COLORS.cpp.bg },
+  '.h': { icon: 'h', color: LANG_COLORS.cpp.bg },
+  '.hpp': { icon: 'h', color: LANG_COLORS.cpp.bg },
+  '.cs': { icon: 'c#', color: LANG_COLORS.csharp.bg },
+  '.java': { icon: 'jv', color: LANG_COLORS.java.bg },
+};
+
+//현재 선택된 파일 경로
+let activeFilePath = null;
+
+//파일 위치 탐색기에서 접힌 폴더 경로 목록
+const collapseDirs = new Set();
+
+function isFileHidden(filePath) {
+  //경로가 없거나 접힌 폴더가 없으면 숨길 게 없다
+  if (!filePath || collapseDirs.size === 0) return false;
+
+  //접힌 폴더 중 하나라도 이 파일의 상위 폴더면 숨긴다
+  for (const dir of collapseDirs) {
+    if (filePath.startsWith(dir + '/')) return true;
+  }
+  return false;
+}
+
 function buildFileTree(data) {
   const panel = document.getElementById('file-tree-content');
   if (!panel || !data) return;
 
   panel.textContent = '';
+  collapseDirs.clear();
 
-  //파일 경로 수집 (중복 제거)
+  //파일 경로 수집 (중복 제거) + 함수 카운트
   const filePaths = new Set();
+  const fileFuncCounts = {};
   for (const node of data.nodes) {
     if (node.data.type === 'file' && node.data.fullPath) {
       filePaths.add(node.data.fullPath);
+    }
+    //함수 노드의 파일별 카운트
+    const funcTypes = ['function', 'js-function', 'ts-function', 'cpp-function', 'csharp-function'];
+    if (funcTypes.includes(node.data.type) && node.data.filePath) {
+      fileFuncCounts[node.data.filePath] = (fileFuncCounts[node.data.filePath] || 0) + 1;
     }
   }
 
@@ -37,10 +78,13 @@ function buildFileTree(data) {
   }
 
   //DOM 생성
-  function renderTree(obj, container, depth) {
+  function renderTree(obj, container, depth, parentPath) {
     //디렉토리 먼저
-    const dirs = Object.keys(obj).filter(k => k !== '_files').sort();
+    const dirs = Object.keys(obj)
+      .filter((k) => k !== '_files')
+      .sort();
     for (const dir of dirs) {
+      const dirPath = parentPath ? `${parentPath}/${dir}` : dir;
       const dirEl = document.createElement('div');
       dirEl.className = 'tree-dir';
 
@@ -50,6 +94,10 @@ function buildFileTree(data) {
       dirHeader.textContent = dir;
       dirHeader.addEventListener('click', () => {
         dirEl.classList.toggle('collapsed');
+        //접힌 폴더의 파일은 그래프에서 빼고 다시 그림
+        if (dirEl.classList.contains('collapsed')) collapseDirs.add(dirPath);
+        else collapseDirs.delete(dirPath);
+        refreshGraphForTree();
       });
 
       const dirContent = document.createElement('div');
@@ -59,7 +107,7 @@ function buildFileTree(data) {
       dirEl.appendChild(dirContent);
       container.appendChild(dirEl);
 
-      renderTree(obj[dir], dirContent, depth + 1);
+      renderTree(obj[dir], dirContent, depth + 1, dirPath);
     }
 
     //파일
@@ -68,36 +116,134 @@ function buildFileTree(data) {
         const fileEl = document.createElement('div');
         fileEl.className = 'tree-item';
         fileEl.style.paddingLeft = `${depth * 16 + 8}px`;
-        fileEl.textContent = file.name;
+        fileEl.dataset.filePath = file.fullPath;
+
+        //아이콘
+        const ext = '.' + file.name.split('.').pop().toLowerCase();
+        const iconInfo = fileIcons[ext];
+        const iconSpan = document.createElement('span');
+        iconSpan.className = 'tree-file-icon';
+        if (iconInfo) {
+          iconSpan.textContent = iconInfo.icon;
+          iconSpan.style.color = iconInfo.color;
+        } else {
+          iconSpan.textContent = '·';
+        }
+
+        //파일명
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'tree-file-name';
+        nameSpan.textContent = file.name;
+
+        //함수 개수 배지
+        const funcCount = fileFuncCounts[file.fullPath] || 0;
+        const badgeSpan = document.createElement('span');
+        badgeSpan.className = 'tree-func-badge';
+        if (funcCount > 0) {
+          badgeSpan.textContent = funcCount;
+        }
+
+        fileEl.appendChild(iconSpan);
+        fileEl.appendChild(nameSpan);
+        if (funcCount > 0) fileEl.appendChild(badgeSpan);
+
+        //클릭 → 그래프 포커스
         fileEl.addEventListener('click', () => {
           focusFileNode(file.fullPath);
+          setActiveTreeItem(fileEl);
         });
+
+        //더블클릭 → 파일 상세 뷰
+        fileEl.addEventListener('dblclick', () => {
+          if (typeof renderFileDetailView === 'function' && graphData) {
+            renderFileDetailView(graphData, file.fullPath);
+            setupInteractions();
+          }
+        });
+
+        //드래그 앤 드롭
+        fileEl.draggable = true;
+        fileEl.addEventListener('dragstart', (e) => {
+          e.dataTransfer.setData('text/plain', file.fullPath);
+          fileEl.classList.add('dragging');
+        });
+        fileEl.addEventListener('dragend', () => {
+          fileEl.classList.remove('dragging');
+          document
+            .querySelectorAll('.tree-item.drop-target')
+            .forEach((el) => el.classList.remove('drop-target'));
+        });
+        fileEl.addEventListener('dragover', (e) => {
+          e.preventDefault();
+          fileEl.classList.add('drop-target');
+        });
+        fileEl.addEventListener('dragleave', () => {
+          fileEl.classList.remove('drop-target');
+        });
+        fileEl.addEventListener('drop', (e) => {
+          e.preventDefault();
+          fileEl.classList.remove('drop-target');
+          const draggedPath = e.dataTransfer.getData('text/plain');
+          if (draggedPath && draggedPath !== file.fullPath) {
+            reorderTreeItems(draggedPath, file.fullPath, container);
+          }
+        });
+
         container.appendChild(fileEl);
       }
     }
   }
 
-  renderTree(tree, panel, 0);
+  renderTree(tree, panel, 0, '');
+}
+
+//폴더 접힘이 바뀌면 현재 뷰를 다시 그린다 (파일 상세 뷰는 파일 하나만 보므로 그대로 둔다)
+function refreshGraphForTree() {
+  if (!graphData || typeof setViewMode !== 'function') return;
+  if (currentViewMode === 'file' || currentViewMode === 'function') {
+    setViewMode(currentViewMode);
+  }
+}
+
+//활성 파일 항목 토글
+function setActiveTreeItem(fileEl) {
+  document.querySelectorAll('.tree-item.active').forEach((el) => el.classList.remove('active'));
+  fileEl.classList.add('active');
+  activeFilePath = fileEl.dataset.filePath;
+}
+
+//드래그 앤 드롭으로 파일 순서 변경
+function reorderTreeItems(draggedPath, targetPath, container) {
+  const items = Array.from(container.querySelectorAll('.tree-item'));
+  const draggedEl = items.find((el) => el.dataset.filePath === draggedPath);
+  const targetEl = items.find((el) => el.dataset.filePath === targetPath);
+  if (!draggedEl || !targetEl || draggedEl.parentNode !== targetEl.parentNode) return;
+
+  const parent = targetEl.parentNode;
+  parent.insertBefore(draggedEl, targetEl);
 }
 
 function focusFileNode(filePath) {
   if (!cy) return;
 
-  //해당 파일 노드 찾기
-  const fileNodes = cy.nodes('[type="file"]').filter(n => n.data('fullPath') === filePath);
+  //뷰 모드에 따라 적절한 노드 타입으로 검색
+  const selector = currentViewMode === 'file' ? '[type="file-node"]' : '[type="file"]';
+  const fileNodes = cy.nodes(selector).filter((n) => n.data('fullPath') === filePath);
   if (fileNodes.length === 0) return;
 
   const target = fileNodes[0];
 
-  //하이라이트
-  cy.nodes().removeClass('highlighted dimmed');
-  target.addClass('highlighted');
+  //선택 하이라이트 — 검색 하이라이트는 유지된 채 겹쳐진다
+  highlightNode(target);
 
   //카메라 이동
-  cy.animate({
-    center: { eles: target },
-    zoom: 2,
-  }, { duration: 400 });
+  cy.animate(
+    {
+      center: { eles: target },
+      zoom: currentViewMode === 'file' ? 1.5 : 2,
+    },
+    { duration: 400, easing: 'ease-out-cubic' },
+  );
 }
 
 let fileTreeListenersBound = false;
@@ -114,9 +260,12 @@ function setupFileTree() {
 
   toggleBtn.addEventListener('click', () => {
     panel.classList.toggle('collapsed');
-    //패널 전환 후 그래프 리사이즈
+    //패널 전환 후 그래프 리사이즈 + 화면 맞춤
     setTimeout(() => {
-      if (cy) cy.resize();
+      if (cy) {
+        cy.resize();
+        cy.fit(undefined, 30);
+      }
     }, 310);
   });
 
@@ -124,7 +273,10 @@ function setupFileTree() {
     closeBtn.addEventListener('click', () => {
       panel.classList.add('collapsed');
       setTimeout(() => {
-        if (cy) cy.resize();
+        if (cy) {
+          cy.resize();
+          cy.fit(undefined, 30);
+        }
       }, 310);
     });
   }
