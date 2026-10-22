@@ -602,16 +602,22 @@ function _makeCouplingRow(entry, criteria) {
   return item;
 }
 
-//파일 결합도 섹션 — 서버가 HAZARD → WARN → SAFE → N/A 순으로 정렬해 보낸 목록을 그대로 표로 그린다
+//진단 패널에 보여줄 결합도 판정 (SAFE·N/A는 손볼 필요가 없으므로 뺀다)
+const COUPLING_SHOWN_STATUSES = ['HAZARD', 'WARN'];
+
+//파일 결합도 섹션 — 서버가 HAZARD → WARN → SAFE → N/A 순으로 정렬해 보낸 목록에서 WARN 이상만 표로 그린다
 function _makeCouplingSection(coupling) {
-  const files = (coupling && coupling.files) || [];
+  const files = ((coupling && coupling.files) || []).filter((e) =>
+    COUPLING_SHOWN_STATUSES.includes(e.metrics.status),
+  );
   const criteria = coupling && coupling.criteria;
   const hazardCount = files.filter((e) => e.metrics.status === 'HAZARD').length;
+  const warnCount = files.length - hazardCount;
   const rows = files.map((entry) => _makeCouplingRow(entry, criteria));
   const section = _makeDiagSection(
-    `파일 결합도 (HAZARD ${hazardCount})`,
+    `파일 결합도 (HAZARD ${hazardCount} · WARN ${warnCount})`,
     rows,
-    '분석된 파일이 없습니다',
+    '결합도가 높은 파일이 없습니다',
   );
   if (rows.length) {
     //판정 기준 한 줄과 머리줄을 첫 행 앞에 끼워 넣는다
@@ -736,14 +742,8 @@ function showDiagnosticsPanel(diagnostics, suggestions) {
   ];
   content.appendChild(_makeDiagSection('순환 참조', cycleItems, '순환 참조가 없습니다'));
 
-  //파일 결합도 섹션 (CR-RFC-2026-002) — 파일별 판정과 원값 표
+  //파일 결합도 섹션 (CR-RFC-2026-002) — WARN 이상 파일의 판정과 원값 표
   content.appendChild(_makeCouplingSection(diagnostics.coupling));
-
-  //안티패턴 섹션
-  const antiItems = (diagnostics.antiPatterns || []).map((issue) =>
-    _makeDiagItem('info', issue.message, [issue.nodeId]),
-  );
-  content.appendChild(_makeDiagSection('안티패턴', antiItems, '안티패턴이 없습니다'));
 
   //리팩토링 제안 표시
   if (suggestions && suggestions.length > 0) {

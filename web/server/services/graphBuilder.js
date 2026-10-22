@@ -241,18 +241,8 @@ async function buildGraph(projectPath) {
     ...fileCouplingData(metricsByFile, f.relativePath),
   }));
 
-  //전체 함수·클래스 목록 (티어 기반 + JS)
-  const allFunctions = [...tieredFunctions, ...jsFunctions];
-  const allClasses = [...tieredClasses, ...jsClasses];
-
   //진단 실행
-  const diagnostics = runDiagnostics(
-    allCallEdges,
-    allFunctions,
-    allClasses,
-    webParsedFiles,
-    fileCouplingEntries,
-  );
+  const diagnostics = runDiagnostics(allCallEdges, fileCouplingEntries);
 
   //리팩토링 제안 생성
   const suggestions = generateSuggestions(diagnostics);

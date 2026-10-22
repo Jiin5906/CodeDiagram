@@ -142,10 +142,6 @@ function initGraph(container) {
 
       //진단 표시 (codeEffects.js가 클래스를 붙인다) — 깜빡임 없이 바깥 테두리 색으로 고정 표시
       {
-        selector: 'node[type="file-node"].diag-warning',
-        style: { 'border-color': '#D6A547', 'border-width': 2.5 },
-      },
-      {
         selector: 'node[type="file-node"].diag-error',
         style: { 'border-color': '#E06666', 'border-width': 2.5 },
       },
@@ -1310,7 +1306,6 @@ function renderGraph(data) {
   console.log(`[renderGraph] 파일 노드 뷰: ${fileCount}개 파일, ${fileEdgeMap.size}개 엣지`);
 
   setupSemanticZoom();
-  if (typeof initMinimap === 'function') initMinimap();
   if (typeof applyCodeEffects === 'function') applyCodeEffects(data);
 
   return cy;
@@ -1326,7 +1321,6 @@ function renderFunctionView(data) {
   if (typeof stopCodeEffects === 'function') stopCodeEffects();
 
   teardownSemanticZoom();
-  if (typeof destroyMinimap === 'function') destroyMinimap();
 
   graphData = data;
   currentViewMode = 'function';
