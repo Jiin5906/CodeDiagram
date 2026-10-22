@@ -402,6 +402,7 @@ function _diagFilePath(nodeId) {
 //진단 항목 클릭 → 그래프에서 해당 노드(파일 뷰면 파일 노드)로 이동
 function _focusDiagTarget(nodeId) {
   if (!cy || !nodeId) return;
+  if (typeof isLocalGraphActive === 'function' && isLocalGraphActive()) exitLocalGraph(false);
   let target = cy.getElementById(nodeId);
   if (!target.length) {
     //노드가 없으면(파일 뷰 등) 같은 경로의 파일 노드로 이동
@@ -413,7 +414,10 @@ function _focusDiagTarget(nodeId) {
   }
   if (!target.length) return;
   highlightNode(target.id());
-  cy.animate({ center: { eles: target } }, { duration: 350, easing: 'ease-out-cubic' });
+  cy.animate(
+    { fit: { eles: target.closedNeighborhood().nodes(), padding: 60 } },
+    { duration: 350, easing: 'ease-out-cubic' },
+  );
 }
 
 //진단 대상의 코드 위치를 찾는다 → { filePath, startLine, endLine, name }
@@ -821,6 +825,11 @@ function showDiagnosticsPanel(diagnostics, suggestions) {
       });
     }
     filterDiagnostics(searchInput.value);
+  }
+
+  const fileTreePanel = document.getElementById('file-tree-panel');
+  if (fileTreePanel && !fileTreePanel.classList.contains('collapsed')) {
+    fileTreePanel.classList.add('collapsed');
   }
 
   panel.classList.remove('hidden');

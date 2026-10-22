@@ -1957,6 +1957,7 @@ function setHovered(id) {
 }
 
 function setSelected(id) {
+  highlightState.hoveredId = null;
   highlightState.selectedId = id || null;
   applyHighlights();
 }
