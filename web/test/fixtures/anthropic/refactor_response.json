@@ -1,0 +1,18 @@
+{
+  "id": "msg_01RefactorFixture",
+  "type": "message",
+  "role": "assistant",
+  "model": "claude-haiku-5-5",
+  "content": [
+    {
+      "type": "text",
+      "text": "{\"summary\":\"process_data의 정리 단계를 헬퍼로 분리합니다.\",\"steps\":[\"clean 호출 부분을 clean_all로 추출한다\",\"process_data는 clean_all만 호출한다\"],\"changes\":[{\"file\":\"main.py\",\"before\":\"def process_data(data):\\n    return [clean(v) for v in data]\",\"after\":\"def clean_all(data):\\n    return [clean(v) for v in data]\\n\\n\\ndef process_data(data):\\n    return clean_all(data)\",\"explanation\":\"목록 정리를 별도 함수로 옮겼습니다.\"}],\"graphDelta\":{\"addedNodes\":[{\"id\":\"main.py::clean_all\",\"label\":\"clean_all\"}],\"removedEdges\":[{\"source\":\"main.py::process_data\",\"target\":\"main.py::clean\"}],\"addedEdges\":[{\"source\":\"main.py::process_data\",\"target\":\"main.py::clean_all\"},{\"source\":\"main.py::clean_all\",\"target\":\"main.py::clean\"}]},\"risks\":[\"clean_all의 이름이 기존 함수와 겹치지 않는지 확인한다\"]}"
+    }
+  ],
+  "stop_reason": "end_turn",
+  "stop_sequence": null,
+  "usage": {
+    "input_tokens": 900,
+    "output_tokens": 300
+  }
+}

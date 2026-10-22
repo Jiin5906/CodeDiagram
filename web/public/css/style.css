@@ -1565,6 +1565,50 @@ body.cv-resizing {
   color: #86efac;
 }
 
+/* AI 리팩토링 결과 — 구역을 세로로 쌓고, 코드 변경만 전/후 두 칸으로 나눈다 */
+#diff-content.ai-refactor {
+  flex-direction: column;
+}
+
+.ai-refactor-meta,
+.ai-refactor-note {
+  font-size: 13px;
+  color: var(--text);
+  opacity: 0.8;
+}
+
+.ai-refactor-list {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.6;
+}
+
+.ai-refactor-cols {
+  display: flex;
+  gap: 12px;
+  margin-top: 6px;
+}
+
+.ai-refactor-col-title {
+  font-size: 12px;
+  color: var(--text);
+  opacity: 0.7;
+  margin-bottom: 4px;
+}
+
+.ai-refactor-code {
+  margin: 0;
+  padding: 8px;
+  border-radius: 4px;
+  background: var(--bg-field);
+  font-family: var(--font-code);
+  font-size: 12px;
+  overflow-x: auto;
+  white-space: pre;
+}
+
 /* ── 빈 상태 (Empty State) ── */
 #empty-state {
   position: absolute;

@@ -11,6 +11,7 @@ const path = require('path');
 const analyzeRouter = require('./routes/analyze');
 const explainRouter = require('./routes/explain');
 const fileRouter = require('./routes/file');
+const refactorRouter = require('./routes/refactor');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -22,6 +23,7 @@ app.use(express.static(path.join(__dirname, '..', 'public')));
 app.use('/api/analyze', analyzeRouter);
 app.use('/api/explain', explainRouter);
 app.use('/api/file', fileRouter);
+app.use('/api/refactor', refactorRouter);
 
 //node server/index.js로 직접 실행할 때만 포트를 연다. 테스트는 app만 require해서 supertest로 호출한다.
 if (require.main === module) {

@@ -794,6 +794,14 @@ function showDiagnosticsPanel(diagnostics, suggestions) {
         if (typeof showDiffView === 'function') showDiffView(sug);
       });
       actions.appendChild(diffBtn);
+
+      const aiBtn = document.createElement('button');
+      aiBtn.className = 'suggestion-preview-btn';
+      aiBtn.textContent = 'AI 리팩토링';
+      aiBtn.addEventListener('click', () => {
+        if (typeof showAiRefactor === 'function') showAiRefactor(sug);
+      });
+      actions.appendChild(aiBtn);
       item.appendChild(actions);
 
       suggestionsContent.appendChild(item);
