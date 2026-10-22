@@ -1,6 +1,6 @@
 //CodeDiagram 전용 그래프 효과 코드 (파일 뷰 전용)
 //옵시디언에는 없는, 코드 분석 정보를 그래프 위에 드러내는 효과들이다.
-//- 진단 글로우: 순환 참조 파일은 붉게, warning 진단이 있는 파일은 주황으로 숨 쉬듯 깜빡인다
+//- 진단 글로우: 순환 참조 파일은 붉게 숨 쉬듯 깜빡인다
 //- 호출 방향 입자: 강조된 선 위로 점들이 호출 방향(source → target)으로 흐른다
 //- 복잡도 글로우: 복잡도가 높은 파일은 원 뒤로 빛이 번지며 천천히 숨 쉬듯 밝아졌다 어두워진다 (복잡할수록 넓고 붉다)
 
@@ -15,7 +15,7 @@ let _flowEdges = null;
 const COMPLEX_TOP_RATIO = 0.12; //복잡도 점수 상위 12% 파일만 표시
 const COMPLEX_MAX_FILES = 15; //한 번에 표시하는 최대 파일 수 (그래프가 산만해지지 않도록)
 const COMPLEX_MIN_SCORE = 2; //점수가 이보다 낮으면 상위권이어도 표시하지 않음 (작은 프로젝트 대비)
-const COMPLEX_LONG_FN_LINES = 50; //긴 함수 기준 (진단의 God Function 기준과 같음)
+const COMPLEX_LONG_FN_LINES = 50; //긴 함수 기준 (줄 수)
 const COMPLEX_COUPLING_WEIGHT = { HAZARD: 2, WARN: 1 }; //결합도 판정(CR-RFC-2026-002)별 복잡도 가중치 — 예전 결합도 점수(0~1)×2처럼 최대 2점이다
 const COMPLEX_LEVEL_SCORES = [5, 8]; //2단계, 3단계가 되는 점수 (예: 700줄·긴 함수 3개인 파일 ≈ 8.8)
 const COMPLEX_LEVELS = [
@@ -44,7 +44,7 @@ function applyCodeEffects(data) {
 
   _applyDiagnosticGlow(data.diagnostics);
   //움직임 줄이기 설정이면 숨 쉬는 효과 없이 일정한 밝기로 그린다
-  _startComplexityGlow(data.diagnostics, _prefersReducedMotion());
+  _startComplexityGlow(_prefersReducedMotion());
 
   if (_prefersReducedMotion()) return;
   //진단 깜빡임은 쓰지 않는다 — 계속 움직이는 요소가 그래프 읽기를 방해한다. 선택한 선 위 입자 흐름만 유지.
@@ -85,12 +85,11 @@ function _buildPathResolver() {
 }
 
 function _applyDiagnosticGlow(diagnostics) {
-  cy.elements().removeClass('diag-error diag-warning diag-cycle-edge diag-pulse');
+  cy.elements().removeClass('diag-error diag-cycle-edge diag-pulse');
   if (!diagnostics) return;
 
   const resolve = _buildPathResolver();
   const errorIds = new Set();
-  const warningIds = new Set();
   const cycleEdgeIds = new Set();
 
   //파일 간 순환 참조 → 경로의 파일과 순환을 이루는 집약 엣지
@@ -103,31 +102,23 @@ function _applyDiagnosticGlow(diagnostics) {
     }
   }
 
-  //warning 등급 진단 (info는 미사용 함수 등 수가 많아 그래프가 산만해지므로 제외)
   //결합도는 진단 테두리가 아니라 HAZARD 바깥 링(graph.js)으로 따로 표시한다
-  const issues = diagnostics.antiPatterns || [];
-  for (const issue of issues) {
-    if (!issue.nodeId || (issue.severity !== 'warning' && issue.severity !== 'error')) continue;
-    const id = resolve(issue.nodeId);
-    if (id && !errorIds.has(id)) warningIds.add(id);
-  }
 
   cy.batch(() => {
     errorIds.forEach((id) => cy.getElementById(id).addClass('diag-error'));
-    warningIds.forEach((id) => cy.getElementById(id).addClass('diag-warning'));
     cycleEdgeIds.forEach((id) => cy.getElementById(id).addClass('diag-cycle-edge'));
   });
 }
 
 //diag-pulse 클래스를 주기적으로 토글하면 스타일 transition이 숨 쉬는 듯한 글로우를 만든다
 function _startDiagPulse() {
-  if (cy.nodes('.diag-error, .diag-warning').empty()) return;
+  if (cy.nodes('.diag-error').empty()) return;
   _diagPulseTimer = setInterval(() => {
     if (!cy || currentViewMode !== 'file') {
       stopCodeEffects();
       return;
     }
-    cy.nodes('.diag-error, .diag-warning').toggleClass('diag-pulse');
+    cy.nodes('.diag-error').toggleClass('diag-pulse');
   }, DIAG_PULSE_INTERVAL);
 }
 
@@ -166,9 +157,9 @@ function _startEdgeFlow() {
 
 /* ── 복잡도 글로우 ── */
 
-//파일 복잡도 점수: 함수 줄 수 합, 긴 함수 수, 함수 개수, 결합도 판정, God Class 진단을 합친다.
+//파일 복잡도 점수: 함수 줄 수 합, 긴 함수 수, 함수 개수, 결합도 판정을 합친다.
 //진단 목록에는 info 등급이라 테두리로 표시되지 않는 "크고 복잡한 파일"을 원 뒤의 빛으로 드러낸다.
-function _fileComplexityScore(node, godClassCount) {
+function _fileComplexityScore(node) {
   const fns = (node.data('functions') || []).filter(
     (fn) => fn.type !== 'variable' && fn.type !== 'class',
   );
@@ -181,25 +172,16 @@ function _fileComplexityScore(node, godClassCount) {
     if (n >= COMPLEX_LONG_FN_LINES) longFns++;
   }
   const coupling = COMPLEX_COUPLING_WEIGHT[couplingStatusOf(node.data())] || 0;
-  return lines / 150 + longFns + fns.length / 12 + coupling + godClassCount * 1.5;
+  return lines / 150 + longFns + fns.length / 12 + coupling;
 }
 
 //복잡도 상위 파일을 골라 단계(1~3)를 매긴다
-function _pickComplexFiles(diagnostics) {
+function _pickComplexFiles() {
   const fileNodes = cy.nodes('[type="file-node"]');
   if (fileNodes.empty()) return [];
 
-  //God Class 진단을 파일별로 센다
-  const godByFile = new Map();
-  const resolve = _buildPathResolver();
-  for (const issue of (diagnostics && diagnostics.antiPatterns) || []) {
-    if (issue.type !== 'god_class' || !issue.nodeId) continue;
-    const id = resolve(issue.nodeId);
-    if (id) godByFile.set(id, (godByFile.get(id) || 0) + 1);
-  }
-
   const scored = fileNodes
-    .map((node) => ({ node, score: _fileComplexityScore(node, godByFile.get(node.id()) || 0) }))
+    .map((node) => ({ node, score: _fileComplexityScore(node) }))
     .filter((e) => e.score >= COMPLEX_MIN_SCORE)
     .sort((a, b) => b.score - a.score);
 
@@ -241,9 +223,9 @@ function _ensureGlowCanvas() {
   return canvas;
 }
 
-function _startComplexityGlow(diagnostics, still) {
+function _startComplexityGlow(still) {
   if (cy) cy.nodes('[type="file-node"]').removeData('complexityLevel');
-  _glowNodes = _pickComplexFiles(diagnostics);
+  _glowNodes = _pickComplexFiles();
   if (!_glowNodes.length) return;
 
   _glowCanvas = _ensureGlowCanvas();

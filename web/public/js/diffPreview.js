@@ -118,22 +118,6 @@ function showDiffView(suggestion) {
       afterLines.push(`+ ${name} → Facade → ${m.ce}개 파일`);
     }
     afterLines.push(`  ${suggestion.suggestion}`);
-  } else if (suggestion.type === 'antipattern') {
-    //대형 유닛 → 분할 제안
-    const nodeId = suggestion.nodeId || '';
-    const name = nodeId.split('::').pop() || '대형 함수';
-
-    beforeLines.push('# 현재 구조 (대형 유닛)');
-    beforeLines.push(`  ${name}: 과도한 책임 집중`);
-    beforeLines.push(`  - 기능 A 처리`);
-    beforeLines.push(`  - 기능 B 처리`);
-    beforeLines.push(`  - 기능 C 처리`);
-
-    afterLines.push('# 제안 구조 (책임 분리)');
-    afterLines.push(`+ ${name}_processA(): 기능 A 전담`);
-    afterLines.push(`+ ${name}_processB(): 기능 B 전담`);
-    afterLines.push(`+ ${name}_processC(): 기능 C 전담`);
-    afterLines.push(`  ${name}: 오케스트레이션만 담당`);
   } else {
     beforeLines.push('# 현재 구조');
     beforeLines.push(`  ${suggestion.description || '변경 없음'}`);

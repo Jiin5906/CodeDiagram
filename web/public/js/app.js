@@ -284,9 +284,6 @@ function renderDynamicLegend(data) {
   //3) 진단 표시 — codeEffects.js의 테두리·글로우, graph.js의 결합도 링과 같은 기준
   const diag = data.diagnostics || {};
   const hasCycle = ((diag.cycles && diag.cycles.files) || []).length > 0;
-  const hasWarning = (diag.antiPatterns || []).some(
-    (i) => i.severity === 'warning' || i.severity === 'error',
-  );
   //결합도 판정 (CR-RFC-2026-002) — 기준 숫자는 서버가 보낸 criteria를 그대로 쓴다
   const coupling = diag.coupling || { files: [] };
   const criteria = coupling.criteria;
@@ -294,10 +291,6 @@ function renderDynamicLegend(data) {
   const diagItems = [];
   if (hasCycle)
     diagItems.push(_legendRow(_legendRing('#E06666'), '서로를 참조하는 파일 (순환 참조)'));
-  if (hasWarning)
-    diagItems.push(
-      _legendRow(_legendRing('#D6A547'), '경고 진단이 있는 파일 (이벤트 리스너 과다 등)'),
-    );
   if (hazardCount > 0 && criteria)
     diagItems.push(
       _legendRow(

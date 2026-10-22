@@ -69,32 +69,6 @@ function generateSuggestions(diagnostics) {
 
   //파일 결합도 HAZARD 제안 (CR-RFC-2026-002)
   suggestions.push(...buildCouplingSuggestions(diagnostics.coupling));
-
-  //안티패턴 관련 제안
-  for (const issue of diagnostics.antiPatterns) {
-    const name = issue.nodeId.split('::').pop();
-    if (issue.type === 'god_function') {
-      suggestions.push({
-        type: 'antipattern',
-        severity: 'info',
-        title: `${name}: God Function`,
-        description: issue.message,
-        suggestion:
-          '논리적 단위별로 헬퍼 함수를 추출하고, 주 함수는 조율(orchestration) 역할만 하도록 하세요.',
-        relatedNodes: [issue.nodeId],
-      });
-    } else if (issue.type === 'god_class') {
-      suggestions.push({
-        type: 'antipattern',
-        severity: 'info',
-        title: `${name}: God Class`,
-        description: issue.message,
-        suggestion: '단일 책임 원칙(SRP)에 따라 관련 메서드끼리 별도 클래스로 분리하세요.',
-        relatedNodes: [issue.nodeId],
-      });
-    }
-  }
-
   return suggestions;
 }
 
