@@ -209,6 +209,14 @@ async function showAiRefactor(suggestion) {
     if (seq !== aiRefactorSeq) return;
 
     content.textContent = '';
+    if (response.status === 401) {
+      //로그인하지 않았거나 키가 거부됐다. 로그인에 성공하면 같은 제안으로 다시 요청한다.
+      _aiNote(content, data.error || 'AI 리팩토링은 API 키를 등록해야 쓸 수 있습니다.');
+      if (typeof requireLoginFor === 'function') {
+        requireLoginFor(() => showAiRefactor(suggestion));
+      }
+      return;
+    }
     if (!response.ok) {
       _aiNote(content, data.error || 'AI 리팩토링을 가져오지 못했습니다.');
       return;

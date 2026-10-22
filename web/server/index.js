@@ -5,18 +5,17 @@ if (process.env.NODE_ENV !== 'test') {
   require('dotenv').config({ path: __dirname + '/../.env' });
 }
 const express = require('express');
-const cors = require('cors');
 const path = require('path');
 
 const analyzeRouter = require('./routes/analyze');
 const explainRouter = require('./routes/explain');
 const fileRouter = require('./routes/file');
 const refactorRouter = require('./routes/refactor');
+const authRouter = require('./routes/auth');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
@@ -24,6 +23,7 @@ app.use('/api/analyze', analyzeRouter);
 app.use('/api/explain', explainRouter);
 app.use('/api/file', fileRouter);
 app.use('/api/refactor', refactorRouter);
+app.use('/api/auth', authRouter);
 
 //node server/index.js로 직접 실행할 때만 포트를 연다. 테스트는 app만 require해서 supertest로 호출한다.
 if (require.main === module) {

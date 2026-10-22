@@ -10,10 +10,17 @@ const cache = require('../../server/services/cacheService');
 const app = require('../../server/index');
 
 const body = { name: 'add', code: 'def add(a, b):\n    return a + b', filePath: 'math_ops.py' };
+const TEST_KEY = 'sk-ant-test-key-not-real';
 
 beforeEach(() => {
   cache.clear();
   jest.mocked(explainFunction).mockReset();
+  //로그인 대신 예비 키로 requireAiKey를 통과한다 (로그인 경로는 auth.test.js에서 검사)
+  process.env.ANTHROPIC_API_KEY = TEST_KEY;
+});
+
+afterEach(() => {
+  delete process.env.ANTHROPIC_API_KEY;
 });
 
 test('calls the AI once and serves the second request from cache', async () => {
@@ -31,13 +38,22 @@ test('calls the AI once and serves the second request from cache', async () => {
 test('fills optional fields with empty strings', async () => {
   jest.mocked(explainFunction).mockResolvedValue('설명');
   await request(app).post('/api/explain').send(body);
-  expect(explainFunction).toHaveBeenCalledWith({
-    name: 'add',
-    code: body.code,
-    docstring: '',
-    comment: '',
-    filePath: 'math_ops.py',
-  });
+  expect(explainFunction).toHaveBeenCalledWith(
+    {
+      name: 'add',
+      code: body.code,
+      docstring: '',
+      comment: '',
+      filePath: 'math_ops.py',
+    },
+    TEST_KEY,
+  );
+});
+
+test('400 when name or code is missing', async () => {
+  const res = await request(app).post('/api/explain').send({ name: 'x' });
+  expect(res.status).toBe(400);
+  expect(explainFunction).not.toHaveBeenCalled();
 });
 
 test('502 when the AI call fails', async () => {

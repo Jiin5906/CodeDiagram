@@ -6,9 +6,20 @@ const response = require('../fixtures/anthropic/refactor_response.json');
 const schema = require('../../schemas/ai-refactor-schema.json');
 
 const mockCreate = jest.fn();
-jest.mock('@anthropic-ai/sdk', () => ({
-  Anthropic: jest.fn().mockImplementation(() => ({ messages: { create: mockCreate } })),
-}));
+//실제 SDK처럼 에러 클래스를 Anthropic의 정적 속성으로 둔다 (aiService가 instanceof로 검사한다)
+jest.mock('@anthropic-ai/sdk', () => {
+  class APIError extends Error {}
+  const Anthropic = Object.assign(
+    jest.fn().mockImplementation(() => ({ messages: { create: mockCreate } })),
+    {
+      AuthenticationError: class AuthenticationError extends APIError {},
+      PermissionDeniedError: class PermissionDeniedError extends APIError {},
+    },
+  );
+  return { Anthropic };
+});
+
+const KEY = 'test-key-not-real';
 
 //팀이 작성할 SYSTEM_PROMPT는 테스트마다 바꿔 끼운다
 let mockSystemPrompt = '';
@@ -21,7 +32,7 @@ jest.mock('../../server/prompts/refactorPrompt', () => ({
 
 /** @returns {typeof import('../../server/services/aiService')} */
 function loadAiService() {
-  //aiService는 클라이언트와 프롬프트를 모듈 전역에 잡아 두므로 테스트마다 새로 불러온다
+  //aiService는 프롬프트를 모듈 전역에 잡아 두므로 테스트마다 새로 불러온다
   let mod;
   jest.isolateModules(() => {
     mod = require('../../server/services/aiService');
@@ -53,12 +64,7 @@ const context = {
 beforeEach(() => {
   mockCreate.mockReset();
   mockSystemPrompt = '너는 리팩토링 도우미다.';
-  process.env.ANTHROPIC_API_KEY = 'test-key-not-real';
   delete process.env.ANTHROPIC_REFACTOR_MODEL;
-});
-
-afterEach(() => {
-  delete process.env.ANTHROPIC_API_KEY;
 });
 
 describe('refactor request', () => {
@@ -92,7 +98,7 @@ describe('refactor response', () => {
   test('텍스트 블록의 JSON을 객체로 돌려준다', async () => {
     mockCreate.mockResolvedValue(response);
     const ai = loadAiService();
-    const result = await ai.suggestRefactoring(ai.buildRefactorRequest(context));
+    const result = await ai.suggestRefactoring(ai.buildRefactorRequest(context), KEY);
     expect(result).toEqual(JSON.parse(response.content[0].text));
     expect(mockCreate).toHaveBeenCalledTimes(1);
   });
@@ -105,17 +111,16 @@ describe('refactor response', () => {
   ])('%s → %s', async (_, patch, code) => {
     mockCreate.mockResolvedValue({ ...response, ...patch });
     const ai = loadAiService();
-    await expect(ai.suggestRefactoring(ai.buildRefactorRequest(context))).rejects.toMatchObject({
-      code,
-    });
+    await expect(
+      ai.suggestRefactoring(ai.buildRefactorRequest(context), KEY),
+    ).rejects.toMatchObject({ code });
   });
 
-  test('API 키가 없으면 호출하지 않고 API_KEY 에러를 던진다', async () => {
-    delete process.env.ANTHROPIC_API_KEY;
+  test('API 키가 없으면 호출하지 않고 AI_KEY_MISSING을 던진다', async () => {
     const ai = loadAiService();
-    await expect(ai.suggestRefactoring(ai.buildRefactorRequest(context))).rejects.toThrow(
-      'ANTHROPIC_API_KEY',
-    );
+    await expect(ai.suggestRefactoring(ai.buildRefactorRequest(context))).rejects.toMatchObject({
+      code: 'AI_KEY_MISSING',
+    });
     expect(mockCreate).not.toHaveBeenCalled();
   });
 });

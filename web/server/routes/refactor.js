@@ -11,6 +11,7 @@ const { getProjectRoot } = require('../services/projectRegistry');
 const { buildRefactorContext } = require('../services/refactorContext');
 const { buildRefactorRequest, suggestRefactoring } = require('../services/aiService');
 const cache = require('../services/cacheService');
+const requireAiKey = require('../middleware/requireAiKey');
 
 //aiService 에러 code별 응답 (상태 코드, 사용자 메시지)
 const AI_ERRORS = {
@@ -24,9 +25,11 @@ const AI_ERRORS = {
     'AI 응답이 너무 길어 중간에 잘렸습니다. 더 작은 단위의 제안으로 시도해 주세요.',
   ],
   AI_BAD_RESPONSE: [502, 'AI 응답 형식이 올바르지 않습니다.'],
+  AI_KEY_MISSING: [401, 'AI 기능을 쓰려면 API 키를 등록해 주세요.'],
+  AI_KEY_REJECTED: [401, 'API 키가 거부되었습니다. 키를 다시 등록해 주세요.'],
 };
 
-router.post('/', async (req, res) => {
+router.post('/', requireAiKey, async (req, res) => {
   const { analysisId, suggestion } = req.body || {};
 
   if (typeof analysisId !== 'string' || !analysisId) {
@@ -53,7 +56,7 @@ router.post('/', async (req, res) => {
       });
     }
 
-    const result = await suggestRefactoring(request);
+    const result = await suggestRefactoring(request, res.locals.aiApiKey);
     cache.set(cacheKey, result);
     res.json({ result, model: request.model, cached: false, warnings: context.warnings });
   } catch (err) {
@@ -61,14 +64,9 @@ router.post('/', async (req, res) => {
     if (err.status) {
       return res.status(err.status).json({ error: err.message });
     }
-    if (err.message && err.message.includes('API_KEY')) {
-      return res.status(503).json({
-        error: 'API 키가 설정되지 않았습니다. .env 파일에 ANTHROPIC_API_KEY를 설정해주세요.',
-      });
-    }
     if (AI_ERRORS[err.code]) {
       const [status, message] = AI_ERRORS[err.code];
-      return res.status(status).json({ error: message });
+      return res.status(status).json({ error: message, code: err.code });
     }
     console.error('Refactor error:', err);
     res.status(502).json({ error: 'AI 리팩토링 생성에 실패했습니다.' });

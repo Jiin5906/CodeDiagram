@@ -37,6 +37,12 @@ beforeEach(() => {
   jest
     .mocked(buildRefactorRequest)
     .mockImplementation((context) => /** @type {any} */ ({ model: 'test-model', context }));
+  //로그인 대신 예비 키로 requireAiKey를 통과한다 (로그인 경로는 auth.test.js에서 검사)
+  process.env.ANTHROPIC_API_KEY = 'sk-ant-test-key-not-real';
+});
+
+afterEach(() => {
+  delete process.env.ANTHROPIC_API_KEY;
 });
 
 test('서버가 읽은 대상 코드로 AI를 한 번 호출하고 두 번째는 캐시로 응답한다', async () => {
@@ -78,12 +84,13 @@ test('프롬프트가 비어 있으면 503과 작성 안내', async () => {
   expect(res.body.error).toContain('refactorPrompt.js');
 });
 
-test('API 키가 없으면 503', async () => {
+test('키가 거부되면 401', async () => {
   jest
     .mocked(suggestRefactoring)
-    .mockRejectedValue(new Error('ANTHROPIC_API_KEY is not configured'));
+    .mockRejectedValue(Object.assign(new Error('rejected'), { code: 'AI_KEY_REJECTED' }));
   const res = await request(app).post('/api/refactor').send({ analysisId, suggestion });
-  expect(res.status).toBe(503);
+  expect(res.status).toBe(401);
+  expect(res.body.code).toBe('AI_KEY_REJECTED');
 });
 
 test('AI 응답 형식이 깨지면 502이고 캐시하지 않는다', async () => {

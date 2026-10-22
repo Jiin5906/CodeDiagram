@@ -205,6 +205,29 @@
           ></span>
           <span class="ribbon-label">전체 접기</span>
         </button>
+        <!--API 키 등록/해제 (auth.js가 라벨을 바꾼다)-->
+        <button
+          class="ribbon-btn"
+          id="auth-btn"
+          data-tip="Anthropic API 키를 등록하면 AI 해설·리팩토링을 쓸 수 있습니다"
+          aria-label="키 등록"
+        >
+          <span class="ribbon-icon" aria-hidden="true"
+            ><svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.75"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <circle cx="7.5" cy="15.5" r="4.5" />
+              <path d="m10.7 12.3 9.3-9.3" />
+              <path d="m16 7 3 3" />
+              <path d="m18.5 4.5 2 2" /></svg
+          ></span>
+          <span class="ribbon-label">키 등록</span>
+        </button>
       </div>
       <div id="file-tree-panel" class="collapsed">
         <div class="file-tree-header">
@@ -388,6 +411,50 @@
       </div>
     </div>
 
+    <!--API 키 등록 창. 키 입력란에 name을 두지 않아 브라우저가 폼 값으로 저장하지 않게 한다.-->
+    <div
+      id="login-overlay"
+      class="hidden"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="login-title"
+    >
+      <form id="login-form" class="login-box" autocomplete="off">
+        <div class="overlay-header">
+          <span id="login-title">API 키 등록</span>
+          <button type="button" id="login-close" aria-label="닫기">&times;</button>
+        </div>
+        <div class="login-body">
+          <p class="login-desc">
+            AI 해설과 리팩토링은 내 Anthropic API 키로 동작하며, 사용량은 그 키의 계정에 청구됩니다.
+            키는 서버 메모리에만 보관되고 8시간이 지나거나 키를 해제하면 지워집니다.
+          </p>
+          <p id="login-dummy-hint" class="login-hint hidden">
+            개발 모드: 아무 값이나 넣어도 등록됩니다. AI는 서버 web/.env의 예비 키로 동작합니다.
+          </p>
+          <label for="login-key-input" class="login-label">Anthropic API 키</label>
+          <input
+            type="password"
+            id="login-key-input"
+            placeholder="sk-ant-..."
+            autocomplete="off"
+            spellcheck="false"
+            autocapitalize="off"
+          />
+          <div id="login-error" class="hidden" role="alert"></div>
+          <div class="login-actions">
+            <a
+              href="https://console.anthropic.com/settings/keys"
+              target="_blank"
+              rel="noopener noreferrer"
+              >키 발급받기</a
+            >
+            <button type="submit" id="login-submit">등록</button>
+          </div>
+        </div>
+      </form>
+    </div>
+
     <script src="js/graph.js?v=26"></script>
     <script src="js/forceSim.js?v=5"></script>
     <script src="js/codeEffects.js?v=6"></script>
@@ -397,6 +464,7 @@
     <script src="js/interactions.js?v=17"></script>
     <script src="js/diffPreview.js?v=6"></script>
     <script src="js/fileTree.js?v=4"></script>
+    <script src="js/auth.js?v=3"></script>
     <script src="js/app.js?v=16"></script>
   </body>
 </html>

@@ -4,23 +4,43 @@ const { Anthropic } = require('@anthropic-ai/sdk');
 const refactorSchema = require('../../schemas/ai-refactor-schema.json');
 const { SYSTEM_PROMPT, buildUserPrompt } = require('../prompts/refactorPrompt');
 
-/** @type {Anthropic | null} */
-let client = null;
+//요청마다 그 사용자의 키로 클라이언트를 만든다. 사람마다 키가 다르므로 하나를 공유하지 않는다.
+//키가 비어 있으면 SDK가 몰래 환경변수 키를 쓰므로, 그 전에 막는다.
+function createClient(apiKey) {
+  if (!apiKey) throw aiError('AI_KEY_MISSING', 'API key is required');
+  return new Anthropic({ apiKey });
+}
 
-function getClient() {
-  if (!client) {
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) {
-      throw new Error('ANTHROPIC_API_KEY is not configured');
-    }
-    client = new Anthropic({ apiKey });
+//Anthropic이 키를 거부하면(로그인 후 키가 폐기된 경우 등) 라우트가 재로그인을 요구할 수 있게 code를 붙인다
+//항상 던지므로 never로 표시한다 (.catch 뒤의 응답 타입이 void와 섞이지 않게)
+/** @returns {never} */
+function rethrowKeyError(err) {
+  if (
+    err instanceof Anthropic.AuthenticationError ||
+    err instanceof Anthropic.PermissionDeniedError
+  ) {
+    throw aiError('AI_KEY_REJECTED', 'The API key was rejected');
   }
-  return client;
+  throw err;
+}
+
+//사용자가 입력한 키가 진짜인지 확인한다. 모델 목록 조회는 토큰을 쓰지 않아 요금이 들지 않는다.
+//키가 틀리거나(401) 권한이 없으면(403) false, 네트워크·서버 오류는 그대로 던진다.
+async function verifyApiKey(apiKey) {
+  const client = new Anthropic({ apiKey, maxRetries: 0, timeout: 10_000 });
+  try {
+    await client.models.list({ limit: 1 });
+    return true;
+  } catch (err) {
+    if (err instanceof Anthropic.AuthenticationError) return false;
+    if (err instanceof Anthropic.PermissionDeniedError) return false;
+    throw err;
+  }
 }
 
 //Claude API로 함수 설명을 생성하는 함수다.
-async function explainFunction({ name, code, docstring, comment, filePath }) {
-  const anthropic = getClient();
+async function explainFunction({ name, code, docstring, comment, filePath }, apiKey) {
+  const anthropic = createClient(apiKey);
 
   const contextParts = [];
   if (docstring) contextParts.push(`Docstring: ${docstring}`);
@@ -39,11 +59,13 @@ ${code}
 
 이 함수가 무엇을 하는지, 입력과 출력이 무엇인지, 프로젝트에서 어떤 역할을 하는지 설명해주세요.`;
 
-  const message = await anthropic.messages.create({
-    model: 'claude-sonnet-4-20250514',
-    max_tokens: 500,
-    messages: [{ role: 'user', content: prompt }],
-  });
+  const message = await anthropic.messages
+    .create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 500,
+      messages: [{ role: 'user', content: prompt }],
+    })
+    .catch(rethrowKeyError);
 
   //첫 블록이 텍스트가 아니면 기존과 같이 undefined를 돌려준다
   const block = message.content[0];
@@ -78,9 +100,9 @@ function buildRefactorRequest(context) {
 }
 
 //Claude API로 리팩토링안을 받아 스키마 형태의 객체로 돌려준다.
-async function suggestRefactoring(request) {
-  const anthropic = getClient();
-  const message = await anthropic.messages.create(request);
+async function suggestRefactoring(request, apiKey) {
+  const anthropic = createClient(apiKey);
+  const message = await anthropic.messages.create(request).catch(rethrowKeyError);
 
   //거절·토큰 초과는 JSON이 없거나 잘려 있으므로 파싱 전에 걸러낸다
   if (message.stop_reason === 'refusal') {
@@ -101,4 +123,4 @@ async function suggestRefactoring(request) {
   }
 }
 
-module.exports = { explainFunction, buildRefactorRequest, suggestRefactoring };
+module.exports = { explainFunction, buildRefactorRequest, suggestRefactoring, verifyApiKey };
