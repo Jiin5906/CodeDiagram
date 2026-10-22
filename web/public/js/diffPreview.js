@@ -23,24 +23,20 @@ function previewCycleRemoval(cyclePath) {
 
   if (edge.length === 0) return;
 
-  //현재 스타일 백업
-  previewBackup = {
-    edgeId: edgeId,
-    wasVisible: edge.style('display') !== 'none',
-  };
-
   //엣지를 제거 표시 (점선으로 변경)
   edge.addClass('preview-removed');
+  previewBackup = { removedEdgeIds: [edgeId], ghostIds: [] };
 
-  //미리보기 배너 표시
-  const banner = document.getElementById('preview-banner');
-  const bannerText = document.getElementById('preview-banner-text');
   const lastName = lastNode.split('::').pop();
   const firstName = firstNode.split('::').pop();
-  bannerText.textContent = `미리보기: ${lastName} → ${firstName} 엣지 제거 시뮬레이션`;
-  banner.classList.remove('hidden');
+  _showPreviewBanner(`미리보기: ${lastName} → ${firstName} 엣지 제거 시뮬레이션`);
+}
 
-  //원래대로 버튼 연결
+//미리보기 배너를 띄우고 원래대로 버튼을 연결한다
+function _showPreviewBanner(text) {
+  const banner = document.getElementById('preview-banner');
+  document.getElementById('preview-banner-text').textContent = text;
+  banner.classList.remove('hidden');
   document.getElementById('preview-restore-btn').onclick = restoreFromPreview;
 }
 
@@ -48,9 +44,12 @@ function previewCycleRemoval(cyclePath) {
 function restoreFromPreview() {
   if (!previewBackup || !cy) return;
 
-  const edge = cy.getElementById(previewBackup.edgeId);
-  if (edge.length) {
-    edge.removeClass('preview-removed');
+  //제거 표시한 엣지는 스타일만 되돌리고, AI 미리보기로 추가한 임시 요소는 지운다
+  for (const id of previewBackup.removedEdgeIds) {
+    cy.getElementById(id).removeClass('preview-removed');
+  }
+  for (const id of previewBackup.ghostIds) {
+    cy.getElementById(id).remove();
   }
 
   previewBackup = null;
@@ -68,6 +67,7 @@ function showDiffView(suggestion) {
   if (!overlay || !content) return;
 
   content.textContent = '';
+  content.classList.remove('ai-refactor');
   title.textContent = `Diff: ${suggestion.title}`;
 
   const beforeLines = [];
@@ -171,4 +171,219 @@ function showDiffView(suggestion) {
 function hideDiffView() {
   const overlay = document.getElementById('diff-overlay');
   if (overlay) overlay.classList.add('hidden');
+}
+
+//── AI 리팩토링 ──
+//제안 하나를 /api/refactor로 보내고, 받은 리팩토링안을 Diff 오버레이에 보여준다.
+//결과는 미리보기일 뿐이며 사용자 파일은 바꾸지 않는다.
+
+//늦게 도착한 이전 요청의 응답을 무시하기 위한 순번
+let aiRefactorSeq = 0;
+
+async function showAiRefactor(suggestion) {
+  const overlay = document.getElementById('diff-overlay');
+  const content = document.getElementById('diff-content');
+  const title = document.getElementById('diff-title');
+  if (!overlay || !content) return;
+
+  const seq = ++aiRefactorSeq;
+  content.textContent = '';
+  content.classList.add('ai-refactor');
+  title.textContent = `AI 리팩토링: ${suggestion.title}`;
+  _aiNote(content, 'AI가 리팩토링안을 만들고 있습니다...');
+  overlay.classList.remove('hidden');
+
+  if (typeof graphData === 'undefined' || !graphData || !graphData.analysisId) {
+    content.textContent = '';
+    _aiNote(content, '분석 정보가 없습니다. 먼저 프로젝트를 분석해 주세요.');
+    return;
+  }
+
+  try {
+    const response = await fetch('/api/refactor', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ analysisId: graphData.analysisId, suggestion }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (seq !== aiRefactorSeq) return;
+
+    content.textContent = '';
+    if (!response.ok) {
+      _aiNote(content, data.error || 'AI 리팩토링을 가져오지 못했습니다.');
+      return;
+    }
+    _renderAiRefactor(content, data);
+  } catch {
+    if (seq !== aiRefactorSeq) return;
+    content.textContent = '';
+    _aiNote(content, '서버에 연결하지 못했습니다.');
+  }
+}
+
+//안내 문구 한 줄
+function _aiNote(parent, text) {
+  const note = document.createElement('div');
+  note.className = 'ai-refactor-note';
+  note.textContent = text;
+  parent.appendChild(note);
+}
+
+//제목이 있는 구역을 만들어 붙이고 돌려준다
+function _aiSection(parent, heading) {
+  const section = document.createElement('div');
+  section.className = 'ai-refactor-section';
+  const title = document.createElement('div');
+  title.className = 'diff-section-title';
+  title.textContent = heading;
+  section.appendChild(title);
+  parent.appendChild(section);
+  return section;
+}
+
+//문자열 목록을 ul로 그린다
+function _aiList(parent, items) {
+  const ul = document.createElement('ul');
+  ul.className = 'ai-refactor-list';
+  for (const item of items) {
+    const li = document.createElement('li');
+    li.textContent = item;
+    ul.appendChild(li);
+  }
+  parent.appendChild(ul);
+}
+
+//확장자에 맞춰 하이라이팅한 코드 블록
+function _aiCodeBlock(code, file) {
+  const pre = document.createElement('pre');
+  pre.className = 'ai-refactor-code';
+  const codeEl = document.createElement('code');
+  const ext = file ? '.' + file.split('.').pop().toLowerCase() : '';
+  const lang = typeof langMap !== 'undefined' ? langMap[ext] : '';
+  codeEl.textContent = code || '(없음)';
+  if (lang) codeEl.className = `language-${lang}`;
+  if (typeof hljs !== 'undefined' && code) hljs.highlightElement(codeEl);
+  pre.appendChild(codeEl);
+  return pre;
+}
+
+//응답({ result, model, cached, warnings })을 오버레이에 그린다
+function _renderAiRefactor(content, data) {
+  const { result, model, cached, warnings } = data;
+
+  const meta = document.createElement('div');
+  meta.className = 'ai-refactor-meta';
+  meta.textContent = `${model}${cached ? ' · 캐시된 결과' : ''} · 미리보기 전용 (파일은 바뀌지 않습니다)`;
+  content.appendChild(meta);
+
+  for (const w of warnings || []) _aiNote(content, `⚠ ${w}`);
+
+  const summary = _aiSection(content, '요약');
+  const p = document.createElement('div');
+  p.className = 'suggestion-text';
+  p.textContent = result.summary;
+  summary.appendChild(p);
+
+  if (result.steps.length) _aiList(_aiSection(content, '단계'), result.steps);
+
+  for (const change of result.changes) {
+    const section = _aiSection(content, change.file);
+    if (change.explanation) {
+      const exp = document.createElement('div');
+      exp.className = 'suggestion-desc';
+      exp.textContent = change.explanation;
+      section.appendChild(exp);
+    }
+    const cols = document.createElement('div');
+    cols.className = 'ai-refactor-cols';
+    for (const [label, code] of [
+      ['변경 전', change.before],
+      ['변경 후', change.after],
+    ]) {
+      const col = document.createElement('div');
+      col.className = 'diff-section';
+      const colTitle = document.createElement('div');
+      colTitle.className = 'ai-refactor-col-title';
+      colTitle.textContent = label;
+      col.appendChild(colTitle);
+      col.appendChild(_aiCodeBlock(code, change.file));
+      cols.appendChild(col);
+    }
+    section.appendChild(cols);
+  }
+
+  if (result.risks.length) _aiList(_aiSection(content, '주의할 점'), result.risks);
+
+  const delta = result.graphDelta;
+  const deltaCount = delta.addedNodes.length + delta.removedEdges.length + delta.addedEdges.length;
+  if (deltaCount > 0) {
+    const actions = document.createElement('div');
+    actions.className = 'suggestion-actions';
+    const btn = document.createElement('button');
+    btn.className = 'suggestion-preview-btn';
+    btn.textContent = '그래프에서 미리보기';
+    btn.addEventListener('click', () => {
+      hideDiffView();
+      previewAiGraphDelta(delta);
+    });
+    actions.appendChild(btn);
+    content.appendChild(actions);
+  }
+}
+
+//AI가 제안한 구조 변화를 현재 그래프 위에 겹쳐 보여준다.
+//제거될 엣지는 점선, 새 노드·엣지는 초록 점선의 임시 요소로 추가하고, "원래대로"로 모두 되돌린다.
+function previewAiGraphDelta(delta) {
+  if (!cy) return;
+  if (previewBackup) restoreFromPreview();
+
+  const backup = { removedEdgeIds: [], ghostIds: [] };
+
+  for (const { source, target } of delta.removedEdges) {
+    cy.edges()
+      .filter((e) => e.data('source') === source && e.data('target') === target)
+      .forEach((e) => {
+        e.addClass('preview-removed');
+        backup.removedEdgeIds.push(e.id());
+      });
+  }
+
+  //새 노드는 연결될 기존 노드 근처에, 없으면 화면 가운데에 둔다
+  const ghostIdOf = new Map();
+  const ext = cy.extent();
+  delta.addedNodes.forEach(({ id, label }, i) => {
+    if (cy.getElementById(id).length) return;
+    const neighborId = delta.addedEdges
+      .map((e) => (e.source === id ? e.target : e.target === id ? e.source : null))
+      .find((n) => n && cy.getElementById(n).length);
+    const base = neighborId
+      ? cy.getElementById(neighborId).position()
+      : { x: (ext.x1 + ext.x2) / 2, y: (ext.y1 + ext.y2) / 2 };
+    const ghostId = `ai-ghost::${id}`;
+    cy.add({
+      group: 'nodes',
+      data: { id: ghostId, label: label || id.split('::').pop(), type: 'ai-ghost' },
+      position: { x: base.x + 80, y: base.y + 60 * (i + 1) },
+      classes: 'ai-ghost',
+    });
+    ghostIdOf.set(id, ghostId);
+    backup.ghostIds.push(ghostId);
+  });
+
+  //양 끝이 그래프에 있는 엣지만 추가한다
+  const resolve = (id) => ghostIdOf.get(id) || (cy.getElementById(id).length ? id : null);
+  for (const { source, target } of delta.addedEdges) {
+    const s = resolve(source);
+    const t = resolve(target);
+    if (!s || !t) continue;
+    const edgeId = `ai-ghost-edge::${s}->${t}`;
+    if (cy.getElementById(edgeId).length) continue;
+    cy.add({ group: 'edges', data: { id: edgeId, source: s, target: t }, classes: 'ai-ghost' });
+    backup.ghostIds.push(edgeId);
+  }
+
+  previewBackup = backup;
+  _showPreviewBanner(
+    `AI 리팩토링 미리보기: 엣지 ${backup.removedEdgeIds.length}개 제거, 요소 ${backup.ghostIds.length}개 추가`,
+  );
 }
