@@ -2002,6 +2002,131 @@ kbd {
   color: var(--text-2);
 }
 
+/* ── API 키 등록 ── */
+/* 키를 등록한 상태면 리본 아이콘을 초록색으로 표시한다 */
+#auth-btn.logged-in .ribbon-icon {
+  color: var(--ok);
+}
+
+/* Diff 오버레이(200)·단축키 도움말(300) 위에 뜬다 */
+#login-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 400;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.login-box {
+  width: min(420px, 100%);
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: var(--shadow-float);
+}
+
+.login-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px 16px;
+}
+
+.login-desc {
+  margin: 0 0 4px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-2);
+}
+
+.login-hint {
+  margin: 0 0 4px;
+  padding: 6px 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--warn);
+  background: var(--warn-bg);
+  border-radius: 4px;
+}
+
+.login-label {
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+#login-key-input {
+  height: 32px;
+  padding: 0 10px;
+  background: var(--bg-field);
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  color: var(--text);
+  font-family: var(--font-code);
+  font-size: 13px;
+  outline: none;
+}
+
+#login-key-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+#login-key-input:disabled {
+  opacity: 0.6;
+}
+
+#login-error {
+  font-size: 12px;
+  color: var(--error);
+}
+
+.login-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 4px;
+}
+
+.login-actions a {
+  font-size: 12px;
+  color: var(--accent-text);
+}
+
+#login-submit,
+.explain-login-btn {
+  height: 28px;
+  padding: 0 14px;
+  background: var(--accent);
+  color: #ffffff;
+  border: none;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+#login-submit:hover,
+.explain-login-btn:hover {
+  background: var(--accent-hover);
+}
+
+#login-submit:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.explain-login-btn {
+  margin-top: 8px;
+  height: 26px;
+  font-size: 12px;
+}
+
 /* ── 참조 목록 (엣지 클릭 시 코드 뷰어 위쪽) ── */
 .ref-list-title {
   min-width: 0;

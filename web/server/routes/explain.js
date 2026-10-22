@@ -5,8 +5,9 @@ const express = require('express');
 const router = express.Router();
 const { explainFunction } = require('../services/aiService');
 const cache = require('../services/cacheService');
+const requireAiKey = require('../middleware/requireAiKey');
 
-router.post('/', async (req, res) => {
+router.post('/', requireAiKey, async (req, res) => {
   const { name, code, docstring, comment, filePath } = req.body;
 
   if (!code || !name) {
@@ -20,22 +21,26 @@ router.post('/', async (req, res) => {
   }
 
   try {
-    const explanation = await explainFunction({
-      name,
-      code,
-      docstring: docstring || '',
-      comment: comment || '',
-      filePath: filePath || '',
-    });
+    const explanation = await explainFunction(
+      {
+        name,
+        code,
+        docstring: docstring || '',
+        comment: comment || '',
+        filePath: filePath || '',
+      },
+      res.locals.aiApiKey,
+    );
 
     //캐시에 저장
     cache.set(code, explanation);
 
     res.json({ explanation, cached: false });
   } catch (err) {
-    if (err.message.includes('API_KEY')) {
-      return res.status(503).json({
-        error: 'API 키가 설정되지 않았습니다. .env 파일에 ANTHROPIC_API_KEY를 설정해주세요.',
+    if (err.code === 'AI_KEY_MISSING' || err.code === 'AI_KEY_REJECTED') {
+      return res.status(401).json({
+        error: 'API 키가 거부되었습니다. 키를 다시 등록해 주세요.',
+        code: err.code,
       });
     }
     console.error('Explain error:', err);

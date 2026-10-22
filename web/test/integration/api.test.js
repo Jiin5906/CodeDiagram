@@ -85,16 +85,17 @@ describe('GET /api/file', () => {
   });
 });
 
-describe('POST /api/explain without API key', () => {
-  test('400 when name or code is missing', async () => {
+describe('POST /api/explain without login', () => {
+  test('로그인하지 않으면 입력 검사 전에 401', async () => {
     const res = await request(app).post('/api/explain').send({ name: 'x' });
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(401);
   });
 
-  test('503 when ANTHROPIC_API_KEY is not configured', async () => {
+  test('로그인하지 않으면 AI를 호출하지 않고 401 LOGIN_REQUIRED', async () => {
     const res = await request(app)
       .post('/api/explain')
-      .send({ name: 'f', code: 'def f():\n    pass  # 503 test' });
-    expect(res.status).toBe(503);
+      .send({ name: 'f', code: 'def f():\n    pass  # 401 test' });
+    expect(res.status).toBe(401);
+    expect(res.body.code).toBe('LOGIN_REQUIRED');
   });
 });
