@@ -1051,10 +1051,11 @@ body.cv-resizing {
   display: grid;
   grid-template-columns: max-content minmax(0, 1fr);
   grid-template-rows: minmax(100%, max-content);
-  background: var(--bg-editor);
+  background: var(--canvas);
   font-size: var(--code-font);
   line-height: 1.6;
   font-family: var(--font-code);
+  color: var(--ink);
 }
 
 .code-line-numbers {
@@ -1071,7 +1072,7 @@ body.cv-resizing {
   white-space: pre;
   flex-shrink: 0;
   border-right: 1px solid var(--border);
-  background: var(--bg-editor);
+  background: var(--panel);
 }
 
 /* pre에 overflow를 주면 코드만 따로 스크롤되어 줄번호와 어긋난다 — 스크롤은 #code-viewer-content가 맡는다 */
@@ -1090,20 +1091,19 @@ body.cv-resizing {
   min-width: 100%;
   z-index: 0;
   pointer-events: none;
-  background: rgba(250, 204, 21, 0.1);
-  box-shadow:
-    inset 0 1px 0 rgba(250, 204, 21, 0.25),
-    inset 0 -1px 0 rgba(250, 204, 21, 0.25);
+  background: rgba(234, 179, 8, 0.16);
+  border-top: 1px solid rgba(234, 179, 8, 0.45);
+  border-bottom: 1px solid rgba(234, 179, 8, 0.45);
   animation: cv-line-flash 1.2s ease-out;
 }
 
 @keyframes cv-line-flash {
   0%,
   30% {
-    background: rgba(250, 204, 21, 0.28);
+    background: rgba(234, 179, 8, 0.32);
   }
   100% {
-    background: rgba(250, 204, 21, 0.1);
+    background: rgba(234, 179, 8, 0.16);
   }
 }
 
@@ -1113,6 +1113,39 @@ body.cv-resizing {
   background: transparent !important;
   font-size: var(--code-font);
   line-height: 1.6;
+  color: var(--ink);
+}
+
+/* highlight.js 라이트 테마 가독성 보강 (고대비) */
+#code-viewer-content code .hljs-keyword,
+#code-viewer-content code .hljs-selector-tag {
+  color: #cf222e;
+  font-weight: 600;
+}
+
+#code-viewer-content code .hljs-string,
+#code-viewer-content code .hljs-title {
+  color: #0a8754;
+}
+
+#code-viewer-content code .hljs-title.class_,
+#code-viewer-content code .hljs-title.function_ {
+  color: #34558f;
+  font-weight: 600;
+}
+
+#code-viewer-content code .hljs-comment {
+  color: #57606a;
+  font-style: italic;
+}
+
+#code-viewer-content code .hljs-number {
+  color: #0550ae;
+}
+
+#code-viewer-content code .hljs-variable,
+#code-viewer-content code .hljs-params {
+  color: #24292f;
 }
 
 /* ── 그래프 영역 ── */
