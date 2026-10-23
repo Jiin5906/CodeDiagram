@@ -2013,10 +2013,74 @@ body.cv-resizing {
   letter-spacing: -0.01em;
 }
 
+.ai-top-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ai-card-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--ink);
+  cursor: pointer;
+  transition:
+    transform 0.15s ease,
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.ai-card-toggle:hover {
+  background: rgba(92, 128, 188, 0.12);
+  border-color: var(--blue);
+}
+
+.ai-toggle-chevron {
+  font-size: 11px;
+  line-height: 1;
+  transition: transform 0.2s ease;
+  display: inline-block;
+  user-select: none;
+}
+
+.ai-collapsed-preview {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  margin-left: 6px;
+  font-size: 11px;
+  font-family: var(--font-code);
+  color: var(--text-2);
+}
+
+.ai-card.collapsed {
+  padding-bottom: 10px;
+}
+
+.ai-card.collapsed .ai-card-top {
+  cursor: pointer;
+}
+
+.ai-card.collapsed .ai-toggle-chevron {
+  transform: rotate(-90deg);
+}
+
+.ai-card.collapsed .ai-card-body {
+  display: none;
+}
+
+.ai-card.collapsed .ai-collapsed-preview {
+  display: inline-flex;
+}
+
 .severity {
   padding: 2px 7px;
-  background: var(--blue);
-  color: var(--canvas);
   font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
@@ -2025,21 +2089,51 @@ body.cv-resizing {
   align-items: center;
 }
 
-.severity.severity-hazard {
-  background: var(--blue);
+/* Status Warning Colors: HAZARD=Red, WARN=Yellow, SAFE=Green, N/A=Black */
+.severity-hazard {
+  background: #dc2626 !important;
+  color: #ffffff !important;
 }
 
-.severity.severity-warn {
-  background: var(--blue);
+.severity-warn {
+  background: #f59e0b !important;
+  color: #010400 !important;
+}
+
+.severity-safe {
+  background: #0a8754 !important;
+  color: #fffffa !important;
+}
+
+.severity-na,
+.severity-n-a {
+  background: #010400 !important;
+  color: #fffffa !important;
 }
 
 .insight-title {
-  display: block;
-  margin: 10px 0 5px;
-  color: var(--ink);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0 6px;
+  line-height: 1.4;
+}
+
+.insight-filename {
+  font-family: var(--font-code);
   font-size: 13px;
   font-weight: 700;
-  line-height: 1.4;
+  color: var(--ink);
+}
+
+.insight-percent {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  font-family: var(--font-code);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
 }
 
 .ai-card p {

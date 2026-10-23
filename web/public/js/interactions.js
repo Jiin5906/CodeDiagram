@@ -1065,7 +1065,20 @@ function _renderCouplingCard(
   const card = document.createElement('section');
   card.className = 'ai-card';
 
-  // 1. Top bar: 아이콘 + 제목 + 심각도 배지
+  const shortName = filePath.split('/').pop();
+  const status = metrics.status || 'N/A';
+  const statusClass = status.toLowerCase().replace(/[^a-z0-9]/g, '-');
+
+  let percentText = 'N/A';
+  if (
+    metrics.instability !== null &&
+    metrics.instability !== undefined &&
+    !isNaN(metrics.instability)
+  ) {
+    percentText = `${Math.round(metrics.instability * 100)}%`;
+  }
+
+  // 1. Top bar: 아이콘 + 제목 + 접힘 요약 + 심각도 배지 + 접기/펼치기 버튼
   const top = document.createElement('div');
   top.className = 'ai-card-top';
 
@@ -1084,27 +1097,67 @@ function _renderCouplingCard(
   const titleStrong = document.createElement('strong');
   titleStrong.textContent = 'AI code insight';
   heading.appendChild(titleStrong);
+
+  const collapsedPreview = document.createElement('span');
+  collapsedPreview.className = 'ai-collapsed-preview';
+  collapsedPreview.textContent = `${shortName} [${percentText}]`;
+  heading.appendChild(collapsedPreview);
+
   top.appendChild(heading);
 
-  const status = metrics.status || 'HAZARD';
-  const severity = document.createElement('span');
-  severity.className = 'severity severity-' + status.toLowerCase();
-  severity.textContent = status;
-  top.appendChild(severity);
+  const topRight = document.createElement('div');
+  topRight.className = 'ai-top-right';
 
+  const severity = document.createElement('span');
+  severity.className = 'severity severity-' + statusClass;
+  severity.textContent = status;
+  topRight.appendChild(severity);
+
+  const toggleBtn = document.createElement('button');
+  toggleBtn.type = 'button';
+  toggleBtn.className = 'ai-card-toggle';
+  toggleBtn.setAttribute('aria-expanded', 'true');
+  toggleBtn.title = 'AI Code Insight 접기/펼치기';
+  toggleBtn.innerHTML = '<span class="ai-toggle-chevron">▾</span>';
+  topRight.appendChild(toggleBtn);
+
+  top.appendChild(topRight);
   card.appendChild(top);
 
-  // 2. Headline
-  const shortName = filePath.split('/').pop();
-  const headline = document.createElement('strong');
-  headline.className = 'insight-title';
-  headline.textContent =
-    status === 'HAZARD'
-      ? `${shortName} 파일의 결합도가 높습니다`
-      : `${shortName} 파일의 결합도 주의 필요`;
-  card.appendChild(headline);
+  // 접기/펼치기 이벤트
+  toggleBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const isCollapsed = card.classList.toggle('collapsed');
+    toggleBtn.setAttribute('aria-expanded', String(!isCollapsed));
+  });
+  top.addEventListener('click', () => {
+    if (card.classList.contains('collapsed')) {
+      card.classList.remove('collapsed');
+      toggleBtn.setAttribute('aria-expanded', 'true');
+    }
+  });
 
-  // 3. Description paragraph
+  // 2. Card Body: 본문 영역 (접었을 때 숨김)
+  const body = document.createElement('div');
+  body.className = 'ai-card-body';
+
+  // Headline: [현재 파일 이름] [결합도 퍼센티지]
+  const headline = document.createElement('div');
+  headline.className = 'insight-title';
+
+  const fileNameSpan = document.createElement('span');
+  fileNameSpan.className = 'insight-filename';
+  fileNameSpan.textContent = shortName;
+  headline.appendChild(fileNameSpan);
+
+  const percentSpan = document.createElement('span');
+  percentSpan.className = 'insight-percent severity-' + statusClass;
+  percentSpan.textContent = `[ ${percentText} ]`;
+  headline.appendChild(percentSpan);
+
+  body.appendChild(headline);
+
+  // Description paragraph
   const desc = document.createElement('p');
   const outCount = deps.outgoing.length;
   const outList = deps.outgoing
@@ -1114,23 +1167,16 @@ function _renderCouplingCard(
   const outExtra = outCount > 3 ? ` 외 ${outCount - 3}개` : '';
   const outSummary = outCount > 0 ? `${outList}${outExtra}` : '외부 모듈';
 
-  const instStr =
-    metrics.instability !== null && metrics.instability !== undefined
-      ? `I = ${metrics.instability}`
-      : 'I = —';
-  const caStr = `Ca = ${metrics.ca ?? 0}`;
-  const ceStr = `Ce = ${metrics.ce ?? 0}`;
-
   if (outCount > 0) {
     desc.textContent =
-      `해당 파일은 ${outSummary} 등 ${outCount}개 외부 모듈을 직접 참조(${ceStr})하고 있어 변경 파급 위험이 있습니다. ` +
-      `피참조(${caStr}) 대비 외부 의존성이 높아 불안정도(${instStr})가 감지되었습니다.`;
+      `외부 참조(Ce) ${outCount}개(${outSummary}) · 피참조(Ca) ${metrics.ca ?? 0}개로, ` +
+      `외부 의존성이 높아 변경 시 파급 위험이 있습니다.`;
   } else {
-    desc.textContent = `해당 파일의 결합도 지표(${instStr}, ${ceStr}, ${caStr})에 따라 변경 위험이 감지되었습니다.`;
+    desc.textContent = `외부 참조(Ce) ${metrics.ce ?? 0}개 · 피참조(Ca) ${metrics.ca ?? 0}개입니다.`;
   }
-  card.appendChild(desc);
+  body.appendChild(desc);
 
-  // 4. Loading or Steps or Error
+  // Loading or Steps or Error
   if (isLoading) {
     const loadingEl = document.createElement('div');
     loadingEl.className = 'cv-explain-loading';
@@ -1142,19 +1188,19 @@ function _renderCouplingCard(
       'AI가 코드와 결합도 지표를 분석해 리팩토링 제안을 도출하고 있습니다...';
     loadingEl.appendChild(spinner);
     loadingEl.appendChild(loadingText);
-    card.appendChild(loadingEl);
+    body.appendChild(loadingEl);
   } else if (errorMsg) {
     const errEl = document.createElement('div');
     errEl.className = 'cv-explain-note';
     errEl.style.color = '#dc2626';
     errEl.style.marginTop = '10px';
     errEl.textContent = errorMsg;
-    card.appendChild(errEl);
+    body.appendChild(errEl);
   } else if (stepsText) {
-    card.appendChild(_renderCouplingSteps(stepsText));
+    body.appendChild(_renderCouplingSteps(stepsText));
   }
 
-  // 5. Action Buttons
+  // Action Buttons
   if (onGenerateClick && !isLoading) {
     const actions = document.createElement('div');
     actions.className = 'ai-actions';
@@ -1164,9 +1210,10 @@ function _renderCouplingCard(
     btn.title = 'Claude AI를 호출하여 3줄 결합도 리팩토링 제안을 생성합니다';
     btn.addEventListener('click', onGenerateClick);
     actions.appendChild(btn);
-    card.appendChild(actions);
+    body.appendChild(actions);
   }
 
+  card.appendChild(body);
   return card;
 }
 
