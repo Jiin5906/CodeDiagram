@@ -3,7 +3,7 @@
 
 const express = require('express');
 const router = express.Router();
-const { explainFunction } = require('../services/aiService');
+const { explainFunction, explainCoupling } = require('../services/aiService');
 const cache = require('../services/cacheService');
 
 router.post('/', async (req, res) => {
@@ -40,6 +40,41 @@ router.post('/', async (req, res) => {
     }
     console.error('Explain error:', err);
     res.status(502).json({ error: 'AI 설명 생성에 실패했습니다.' });
+  }
+});
+
+//파일 결합도 위험(HAZARD/WARN) 진단 및 3줄 리팩토링 제안 생성
+router.post('/coupling', async (req, res) => {
+  const { filePath, code, metrics, dependencies } = req.body;
+
+  if (!filePath || !code) {
+    return res.status(400).json({ error: 'filePath and code are required' });
+  }
+
+  const cacheKey = `coupling::${filePath}::${JSON.stringify(metrics || {})}::${code}`;
+  const cached = cache.get(cacheKey);
+  if (cached) {
+    return res.json({ explanation: cached, cached: true });
+  }
+
+  try {
+    const explanation = await explainCoupling({
+      filePath,
+      code,
+      metrics: metrics || {},
+      dependencies: dependencies || {},
+    });
+
+    cache.set(cacheKey, explanation);
+    res.json({ explanation, cached: false });
+  } catch (err) {
+    if (err.message.includes('API_KEY')) {
+      return res.status(503).json({
+        error: 'API 키가 설정되지 않았습니다. .env 파일에 ANTHROPIC_API_KEY를 설정해주세요.',
+      });
+    }
+    console.error('Coupling explain error:', err);
+    res.status(502).json({ error: 'AI 결합도 리팩토링 제안 생성에 실패했습니다.' });
   }
 });
 
