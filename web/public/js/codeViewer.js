@@ -290,11 +290,15 @@ function hideCodeViewer() {
 /* ── 코드 뷰어 내 AI 해설 영역 ── */
 
 //해설 영역을 비우고 보여준다. 내용을 채울 본문 요소를 돌려준다.
-function showViewerExplain() {
+function showViewerExplain(titleText = 'AI 해설') {
   const box = document.getElementById('code-viewer-explain');
   const body = document.getElementById('cv-explain-body');
   if (!box || !body) return null;
-  box.classList.remove('hidden');
+  const titleEl = box.querySelector('.cv-explain-title');
+  if (titleEl) titleEl.textContent = titleText;
+  const toggleBtn = document.getElementById('cv-explain-toggle');
+  box.classList.remove('hidden', 'collapsed');
+  if (toggleBtn) toggleBtn.setAttribute('aria-expanded', 'true');
   body.textContent = '';
   return body;
 }

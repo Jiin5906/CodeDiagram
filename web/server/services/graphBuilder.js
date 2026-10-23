@@ -12,7 +12,6 @@
     7. buildNodes로 Cytoscape.js 호환 노드 목록 생성
 */
 
-const fs = require('fs');
 const { parseFile } = require('./parser');
 const { resolveCalls, resolveInheritance, resolveVariableRefs } = require('./resolver');
 const { resolveWebRelations, resolveJsCalls } = require('./webResolver');
@@ -20,6 +19,7 @@ const { findFiles } = require('./gitService');
 const { computeFileMetrics } = require('./metricsService');
 const { runDiagnostics } = require('./diagnosticsService');
 const { generateSuggestions } = require('./refactoringService');
+const { readSourceFile } = require('../utils/fileEncoding');
 
 //청크 단위 파싱 크기
 const CHUNK_SIZE = 20;
@@ -88,8 +88,7 @@ async function buildGraph(projectPath) {
     for (const file of chunk) {
       let code;
       try {
-        // eslint-disable-next-line security/detect-non-literal-fs-filename -- findFiles가 순회해 찾은 파일 경로
-        code = fs.readFileSync(file.path, 'utf-8');
+        code = readSourceFile(file.path);
       } catch (err) {
         warnings.push(`Failed to read ${file.relativePath}: ${err.message}`);
         continue;
