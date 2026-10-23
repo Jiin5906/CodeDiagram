@@ -313,9 +313,12 @@ function setupDomListeners() {
   });
 
   //진단 패널 닫기
-  document.getElementById('diagnostics-close').addEventListener('click', () => {
-    if (typeof hideCodeViewer === 'function') hideCodeViewer();
-  });
+  const diagClose = document.getElementById('diagnostics-close');
+  if (diagClose) {
+    diagClose.addEventListener('click', () => {
+      hideDiagnosticsPanel();
+    });
+  }
 
   //보기 단위 선택 (파일 | 함수)
   document.getElementById('view-file-btn').addEventListener('click', () => {
@@ -720,10 +723,27 @@ function filterDiagnostics(query) {
   if (countEl) countEl.textContent = terms.length ? `${shown}/${total}` : '';
 }
 
+function hideDiagnosticsPanel() {
+  const panel = document.getElementById('diagnostics-panel');
+  if (!panel || panel.classList.contains('collapsed')) return;
+  panel.classList.add('collapsed');
+  setTimeout(() => {
+    if (typeof cy !== 'undefined' && cy) {
+      cy.resize();
+      cy.fit(undefined, 30);
+    }
+  }, 310);
+}
+
 function showDiagnosticsPanel(diagnostics, suggestions) {
   const panel = document.getElementById('diagnostics-panel');
+  const fileTreePanel = document.getElementById('file-tree-panel');
   const content = document.getElementById('diagnostics-content');
   const suggestionsContent = document.getElementById('suggestions-content');
+
+  if (fileTreePanel && !fileTreePanel.classList.contains('collapsed')) {
+    fileTreePanel.classList.add('collapsed');
+  }
 
   content.textContent = '';
   suggestionsContent.textContent = '';
@@ -836,24 +856,13 @@ function showDiagnosticsPanel(diagnostics, suggestions) {
     filterDiagnostics(searchInput.value);
   }
 
-  if (typeof switchSidePanelView === 'function') {
-    switchSidePanelView('diagnostics');
-  } else {
-    const codeBody = document.getElementById('code-viewer-body');
-    if (codeBody) codeBody.classList.add('hidden');
-    panel.classList.remove('hidden');
-  }
-
-  const sidePanel = document.getElementById('code-viewer-panel');
-  if (sidePanel) {
-    const wasClosed = sidePanel.classList.contains('collapsed');
-    sidePanel.classList.remove('collapsed');
-    if (wasClosed && typeof cy !== 'undefined' && cy) {
-      setTimeout(() => {
-        cy.resize();
-        cy.fit(undefined, 30);
-      }, 310);
-    }
+  const wasClosed = panel.classList.contains('collapsed');
+  panel.classList.remove('collapsed');
+  if (wasClosed && typeof cy !== 'undefined' && cy) {
+    setTimeout(() => {
+      cy.resize();
+      cy.fit(undefined, 30);
+    }, 310);
   }
 }
 
@@ -1508,7 +1517,7 @@ function setupKeyboardShortcuts() {
       hideFunctionPreview();
       hideEdgePreview();
       if (typeof hideCodeViewer === 'function') hideCodeViewer();
-      document.getElementById('diagnostics-panel').classList.add('hidden');
+      if (typeof hideDiagnosticsPanel === 'function') hideDiagnosticsPanel();
       const diffOverlay = document.getElementById('diff-overlay');
       if (diffOverlay) diffOverlay.classList.add('hidden');
       if (isInput) document.activeElement.blur();
@@ -1522,7 +1531,7 @@ function setupKeyboardShortcuts() {
       //진단 패널이 열려 있으면 진단 검색창으로
       const diagPanel = document.getElementById('diagnostics-panel');
       const diagSearch = document.getElementById('diag-search-input');
-      if (diagPanel && diagSearch && !diagPanel.classList.contains('hidden')) {
+      if (diagPanel && diagSearch && !diagPanel.classList.contains('collapsed')) {
         diagSearch.focus();
         diagSearch.select();
         return;

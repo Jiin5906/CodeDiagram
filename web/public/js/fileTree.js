@@ -264,9 +264,16 @@ function setupFileTree() {
   if (!toggleBtn || !panel) return;
 
   toggleBtn.addEventListener('click', () => {
+    const willOpen = panel.classList.contains('collapsed');
+    if (willOpen) {
+      if (typeof hideDiagnosticsPanel === 'function') {
+        hideDiagnosticsPanel();
+      } else {
+        const diagPanel = document.getElementById('diagnostics-panel');
+        if (diagPanel) diagPanel.classList.add('collapsed');
+      }
+    }
     panel.classList.toggle('collapsed');
-
-    //파일 탐색기는 좌측, 진단/코드 패널은 우측에 위치하여 충돌 없음
 
     //패널 전환 후 그래프 리사이즈 + 화면 맞춤
     setTimeout(() => {

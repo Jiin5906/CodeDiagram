@@ -1224,77 +1224,31 @@ body.cv-resizing {
   color: var(--text);
 }
 
-/* ── 사이드 패널 내 진단 뷰 ── */
+/* ── 진단 패널 (좌측 사이드 드로어) ── */
 #diagnostics-panel {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  width: 100%;
+  width: var(--overlay-w);
+  min-width: var(--overlay-w);
   background: var(--bg-panel);
-  overflow: hidden;
-  position: static;
-  box-shadow: none;
-  border: none;
-  border-radius: 0;
-  max-height: none;
-  max-width: none;
-}
-
-#diagnostics-panel.hidden {
-  display: none !important;
-}
-
-#code-viewer-body {
+  border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-  height: 100%;
-  width: 100%;
-  overflow: hidden;
-}
-
-#code-viewer-body.hidden {
-  display: none !important;
-}
-
-.code-viewer-nav {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-#code-viewer-back-diag {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  height: 24px;
-  padding: 0 8px;
-  background: var(--canvas);
-  border: 1px solid var(--blue);
-  color: var(--blue);
-  border-radius: 3px;
-  font-family: inherit;
-  font-size: 11px;
-  font-weight: 700;
-  cursor: pointer;
-  flex-shrink: 0;
   transition:
-    background 0.15s ease,
-    color 0.15s ease;
+    width 0.3s,
+    min-width 0.3s,
+    opacity 0.3s;
+  overflow: hidden;
+  height: 100%;
 }
 
-#code-viewer-back-diag:hover {
-  background: var(--blue);
-  color: var(--canvas);
+#diagnostics-panel.collapsed {
+  width: 0 !important;
+  min-width: 0 !important;
+  opacity: 0;
+  border-right: none;
+  pointer-events: none;
 }
 
-#code-viewer-back-diag.hidden {
-  display: none !important;
-}
-
-#diagnostics-panel > .code-viewer-header,
+#diagnostics-panel > .file-tree-header,
 #diagnostics-panel > .overlay-header {
   flex-shrink: 0;
   background: var(--bg-panel);
@@ -3084,12 +3038,22 @@ kbd {
     max-width: none;
   }
 
+  /* 진단 패널: 모바일에서 전체 너비 오버레이 */
   #diagnostics-panel {
-    width: 100%;
-    left: auto;
-    top: auto;
-    bottom: auto;
-    max-height: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100% !important;
+    min-width: 100% !important;
+    height: 100vh;
+    z-index: 150;
+    border-right: none;
+  }
+
+  #diagnostics-panel.collapsed {
+    width: 0 !important;
+    min-width: 0 !important;
+    opacity: 0;
   }
 
   #diag-search-input {
