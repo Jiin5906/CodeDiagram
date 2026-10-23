@@ -8,29 +8,39 @@
 
 /* 화면 크기에 맞춰 변하는 크기 토큰 — 패널 너비·글자 크기는 여기서 조절한다 */
 :root {
-  /* 에디터 톤 팔레트 — 중립 회색 + 강조색 하나 */
-  --bg-editor: #1e1f22;
-  --bg-panel: #2b2d30;
-  --bg-field: #1e1f22;
-  --bg-hover: #35373b;
-  --bg-hover-strong: #43454a;
-  --bg-selected: #2e436e;
-  --border: #393b40;
-  --border-strong: #4e5157;
-  --text: #dfe1e5;
-  --text-2: #a8abb2;
-  --text-3: #6f737a;
-  --accent: #3574f0;
-  --accent-hover: #2f66d6;
-  --accent-text: #548af7;
-  --accent-tint: rgba(53, 116, 240, 0.16);
-  --warn: #d6a547;
-  --warn-bg: #3d3322;
-  --error: #e06666;
-  --ok: #5fb865;
-  --shadow-float: 0 4px 14px rgba(0, 0, 0, 0.35);
-  --font-ui: 'Pretendard Variable', 'Pretendard', -apple-system, 'Segoe UI', sans-serif;
-  --font-code: 'D2Coding', 'JetBrains Mono', Consolas, monospace;
+  /* 4대 핵심 베이스 컬러 체계 (#fffffa, #010400, #0a8754, #5c80bc) */
+  --canvas: #fffffa;
+  --ink: #010400;
+  --green: #0a8754;
+  --green-hover: #086d44;
+  --blue: #5c80bc;
+  --blue-ink: #34558f;
+  --panel: #f1f2ea;
+  --panel-2: #e4e6dc;
+
+  /* 시맨틱 UI 변수 매핑 */
+  --bg-editor: var(--canvas);
+  --bg-panel: var(--panel);
+  --bg-field: var(--canvas);
+  --bg-hover: var(--panel-2);
+  --bg-hover-strong: #d5d8cc;
+  --bg-selected: rgba(92, 128, 188, 0.18);
+  --border: rgba(92, 128, 188, 0.35);
+  --border-strong: rgba(92, 128, 188, 0.75);
+  --text: var(--ink);
+  --text-2: #38403a;
+  --text-3: #6b736d;
+  --accent: var(--green);
+  --accent-hover: var(--green-hover);
+  --accent-text: var(--blue-ink);
+  --accent-tint: rgba(10, 135, 84, 0.12);
+  --warn: #c27d10;
+  --warn-bg: #fdf5e6;
+  --error: #d9383a;
+  --ok: var(--green);
+  --shadow-float: 0 4px 16px rgba(1, 4, 0, 0.12);
+  --font-ui: 'Inter', 'Pretendard Variable', 'Pretendard', -apple-system, 'Segoe UI', sans-serif;
+  --font-code: 'JetBrains Mono', 'D2Coding', Consolas, monospace;
 
   --panel-tree-w: clamp(200px, 18vw, 300px);
   /* 코드 뷰어는 화면 너비의 비율(기본 26%)을 따르고, 사용자가 끌어서 바꾼 비율은 JS가 --panel-code-ratio로 덮어쓴다 */
@@ -67,19 +77,19 @@ body {
 #top-bar {
   display: flex;
   align-items: center;
-  gap: 12px;
-  height: 44px;
+  gap: 16px;
+  height: 52px;
   padding: 0 var(--topbar-pad-x);
-  background: var(--bg-panel);
+  background: var(--panel);
   border-bottom: 1px solid var(--border);
   min-width: 0;
 }
 
 #top-bar .logo {
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 700;
-  color: var(--text);
-  letter-spacing: -0.2px;
+  color: var(--ink);
+  letter-spacing: -0.3px;
   white-space: nowrap;
   margin-right: 4px;
 }
@@ -88,20 +98,19 @@ body {
   display: flex;
   flex: 1;
   gap: 8px;
-  max-width: 720px;
+  max-width: 680px;
   align-items: center;
-  flex-wrap: wrap;
 }
 
 #source-input {
   flex: 1;
-  height: 28px;
-  padding: 0 10px;
-  background: var(--bg-field);
+  height: 36px;
+  padding: 0 12px;
+  background: var(--canvas);
   border: 1px solid var(--border-strong);
   border-radius: 4px;
-  color: var(--text);
-  font-size: 13px;
+  color: var(--ink);
+  font-size: 13.5px;
   outline: none;
   transition:
     border-color 0.15s,
@@ -113,30 +122,36 @@ body {
 }
 
 #source-input:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent);
+  border-color: var(--ink);
+  box-shadow: 0 0 0 1px var(--ink);
 }
 
 #analyze-btn {
-  height: 28px;
-  padding: 0 14px;
-  background: var(--accent);
-  color: #ffffff;
+  height: 36px;
+  padding: 0 16px;
+  background: var(--green);
+  color: var(--canvas);
   border: none;
   border-radius: 4px;
-  font-size: 13px;
+  font-size: 13.5px;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.15s;
+  transition:
+    background 0.15s,
+    transform 0.1s;
   white-space: nowrap;
 }
 
 #analyze-btn:hover {
-  background: var(--accent-hover);
+  background: var(--green-hover);
+}
+
+#analyze-btn:active {
+  transform: scale(0.98);
 }
 
 #analyze-btn:disabled {
-  opacity: 0.4;
+  opacity: 0.5;
   cursor: not-allowed;
 }
 
@@ -596,15 +611,15 @@ body {
 
 /* ── 좌측 리본 (아이콘 + 라벨) ── */
 #ribbon {
-  width: 64px;
-  min-width: 64px;
-  background: var(--bg-panel);
+  width: 60px;
+  min-width: 60px;
+  background: var(--panel);
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 8px 0;
-  gap: 2px;
+  padding: 10px 0;
+  gap: 4px;
   flex-shrink: 0;
   position: relative;
   z-index: 40;
@@ -612,8 +627,8 @@ body {
 
 .ribbon-btn {
   position: relative;
-  width: 52px;
-  min-height: 54px;
+  width: 48px;
+  min-height: 50px;
   padding: 6px 2px 5px;
   background: transparent;
   border: none;
@@ -626,8 +641,8 @@ body {
   justify-content: center;
   gap: 4px;
   transition:
-    background 0.18s,
-    color 0.18s;
+    background 0.15s,
+    color 0.15s;
 }
 
 .ribbon-btn.hidden {
@@ -636,7 +651,7 @@ body {
 
 /* 아이콘은 SVG 라인 아이콘(currentColor)으로 통일 — 이모지는 OS마다 모양이 달라 쓰지 않는다 */
 .ribbon-icon {
-  width: 32px;
+  width: 30px;
   height: 26px;
   display: flex;
   align-items: center;
@@ -646,8 +661,8 @@ body {
 }
 
 .ribbon-icon svg {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   display: block;
 }
 
@@ -660,25 +675,26 @@ body {
 }
 
 .ribbon-btn:hover {
-  color: var(--text);
+  color: var(--ink);
 }
 
 .ribbon-btn:hover .ribbon-icon {
-  background: var(--bg-hover);
+  background: var(--panel-2);
 }
 
 .ribbon-btn:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--ink);
   outline-offset: -2px;
 }
 
 /* 활성 상태: 아이콘 뒤 회색 사각형 + 밝은 글자 (IDE 도구 창 버튼과 같은 방식) */
 .ribbon-btn.active {
-  color: var(--text);
+  color: var(--ink);
 }
 
 .ribbon-btn.active .ribbon-icon {
   background: var(--bg-hover-strong);
+  color: var(--ink);
 }
 
 /* 설명 말풍선 — 기본 title 툴팁은 늦게 떠서 data-tip으로 바로 보여준다 */
@@ -1104,7 +1120,7 @@ body.cv-resizing {
   flex: 1;
   position: relative;
   overflow: hidden;
-  background-color: var(--bg-editor);
+  background-color: var(--canvas);
 }
 
 #cy {
@@ -1923,13 +1939,13 @@ body.cv-resizing {
 
 .cv-coupling-ai-btn {
   margin-left: auto;
-  padding: 2px 9px;
-  font-size: 11px;
+  padding: 3px 10px;
+  font-size: 11.5px;
   font-weight: 600;
-  color: var(--accent-text);
-  background: var(--bg-hover);
-  border: 1px solid var(--accent);
-  border-radius: 3px;
+  color: var(--canvas);
+  background: var(--green);
+  border: 1px solid var(--green);
+  border-radius: 4px;
   cursor: pointer;
   transition:
     background 0.15s,
@@ -1937,8 +1953,7 @@ body.cv-resizing {
 }
 
 .cv-coupling-ai-btn:hover {
-  background: var(--accent);
-  color: #fff;
+  background: var(--green-hover);
 }
 
 .cv-coupling-ai-btn:active {
@@ -1978,17 +1993,17 @@ body.cv-resizing {
   display: flex;
   align-items: flex-start;
   gap: 8px;
-  padding: 6px 8px;
+  padding: 8px 10px;
   border-radius: 4px;
-  background: var(--bg-panel);
+  background: var(--panel);
   border: 1px solid var(--border);
   line-height: 1.5;
 }
 
 .cv-step-tag {
   flex-shrink: 0;
-  margin-top: 2px;
-  padding: 1px 6px;
+  margin-top: 1px;
+  padding: 2px 7px;
   border-radius: 3px;
   font-size: 11px;
   font-weight: 600;
@@ -1996,23 +2011,26 @@ body.cv-resizing {
 }
 
 .cv-step-tag.step-diag {
-  color: #f87171;
-  background: rgba(239, 68, 68, 0.14);
+  color: #c92a2a;
+  background: rgba(217, 56, 58, 0.12);
+  border: 1px solid rgba(217, 56, 58, 0.25);
 }
 
 .cv-step-tag.step-target {
-  color: #60a5fa;
-  background: rgba(96, 165, 250, 0.14);
+  color: var(--blue-ink);
+  background: rgba(92, 128, 188, 0.15);
+  border: 1px solid rgba(92, 128, 188, 0.3);
 }
 
 .cv-step-tag.step-action {
-  color: #4ade80;
-  background: rgba(74, 222, 128, 0.14);
+  color: var(--green);
+  background: rgba(10, 135, 84, 0.12);
+  border: 1px solid rgba(10, 135, 84, 0.25);
 }
 
 .cv-step-text {
   font-size: 12.5px;
-  color: var(--text);
+  color: var(--ink);
 }
 
 /* ── 범례 하단: 단축키 안내 ── */

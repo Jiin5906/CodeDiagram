@@ -98,13 +98,13 @@ function initGraph(container) {
           'text-valign': 'bottom',
           'text-halign': 'center',
           'text-margin-y': 6,
-          'font-family': 'Pretendard Variable, Pretendard, sans-serif',
+          'font-family': 'Inter, Pretendard Variable, Pretendard, sans-serif',
           'font-size': 11,
-          'font-weight': 500,
-          color: '#A8ABB2',
-          'text-outline-color': '#1E1F22',
-          'text-outline-width': 2,
-          'text-outline-opacity': 1,
+          'font-weight': 600,
+          color: '#010400',
+          'text-outline-color': '#FFFFFA',
+          'text-outline-width': 2.5,
+          'text-outline-opacity': 0.95,
           'text-wrap': 'ellipsis',
           'text-max-width': '140px',
           'min-zoomed-font-size': 7,
@@ -118,10 +118,10 @@ function initGraph(container) {
       {
         selector: 'node[type="file-node"][couplingStatus = "HAZARD"]',
         style: {
-          'outline-width': 2,
+          'outline-width': 2.5,
           'outline-offset': 2,
           'outline-color': COUPLING_HAZARD_COLOR,
-          'outline-opacity': 0.9,
+          'outline-opacity': 0.95,
         },
       },
       //클릭 시 기본 회색 사각 오버레이 제거
@@ -143,11 +143,11 @@ function initGraph(container) {
       //진단 표시 (codeEffects.js가 클래스를 붙인다) — 깜빡임 없이 바깥 테두리 색으로 고정 표시
       {
         selector: 'node[type="file-node"].diag-warning',
-        style: { 'border-color': '#D6A547', 'border-width': 2.5 },
+        style: { 'border-color': '#c27d10', 'border-width': 2.5 },
       },
       {
         selector: 'node[type="file-node"].diag-error',
-        style: { 'border-color': '#E06666', 'border-width': 2.5 },
+        style: { 'border-color': '#D9383A', 'border-width': 2.5 },
       },
 
       /* ── 파일 노드 인터랙션 상태 ── */
@@ -156,10 +156,10 @@ function initGraph(container) {
       {
         selector: 'node[type="file-node"].hover-focus',
         style: {
-          color: '#DFE1E5',
+          color: '#010400',
           'text-opacity': 1,
           'font-size': 13,
-          'font-weight': 600,
+          'font-weight': 700,
           'z-index': 999,
         },
       },
@@ -168,9 +168,9 @@ function initGraph(container) {
         selector: 'node[type="file-node"]:selected',
         style: {
           'border-width': 2.5,
-          'border-color': '#548AF7',
+          'border-color': '#5C80BC',
           'border-opacity': 1,
-          color: '#DFE1E5',
+          color: '#010400',
           'text-opacity': 1,
           'overlay-opacity': 0,
         },
@@ -180,7 +180,7 @@ function initGraph(container) {
         selector: 'node[type="file-node"].neighbor-highlight',
         style: {
           opacity: 1.0,
-          color: '#C9CCD1',
+          color: '#34558F',
           'text-opacity': 1,
         },
       },
