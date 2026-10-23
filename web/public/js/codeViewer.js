@@ -306,6 +306,9 @@ function showViewerExplain(titleText = 'AI 해설') {
   if (titleEl) titleEl.textContent = titleText;
   const toggleBtn = document.getElementById('cv-explain-toggle');
   box.classList.remove('hidden', 'collapsed');
+  if (titleText !== 'AI 결합도 리팩토링 제안') {
+    box.classList.remove('is-ai-card');
+  }
   if (toggleBtn) toggleBtn.setAttribute('aria-expanded', 'true');
   body.textContent = '';
   return body;
@@ -313,7 +316,10 @@ function showViewerExplain(titleText = 'AI 해설') {
 
 function hideViewerExplain() {
   const box = document.getElementById('code-viewer-explain');
-  if (box) box.classList.add('hidden');
+  if (box) {
+    box.classList.add('hidden');
+    box.classList.remove('is-ai-card');
+  }
 }
 
 /* ── 코드 뷰어 너비 조절 ──

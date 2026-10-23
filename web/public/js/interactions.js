@@ -1052,79 +1052,128 @@ function _buildFallbackCouplingText(filePath, metrics, deps) {
   ].join('\n');
 }
 
-//결합도 요약 배지 바(등급, I·Ca·Ce 지표, 참조 대상)를 생성한다
-function _renderCouplingMeta(filePath, metrics, deps, onGenerateClick) {
-  const meta = document.createElement('div');
-  meta.className = 'cv-coupling-meta';
+//결합도 요약 카드(Figma .ai-card 포맷)를 생성한다
+function _renderCouplingCard(
+  filePath,
+  metrics,
+  deps,
+  onGenerateClick,
+  stepsText = null,
+  isLoading = false,
+  errorMsg = null,
+) {
+  const card = document.createElement('section');
+  card.className = 'ai-card';
 
-  const row = document.createElement('div');
-  row.className = 'cv-coupling-badges';
+  // 1. Top bar: 아이콘 + 제목 + 심각도 배지
+  const top = document.createElement('div');
+  top.className = 'ai-card-top';
+
+  const heading = document.createElement('div');
+  heading.className = 'ai-heading';
+
+  const iconSpan = document.createElement('span');
+  iconSpan.innerHTML =
+    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
+    '<path d="m12 3 1.2 3.3L16.5 7.5l-3.3 1.2L12 12l-1.2-3.3-3.3-1.2 3.3-1.2z" />' +
+    '<path d="m18 14 .8 2.2L21 17l-2.2.8L18 20l-.8-2.2L15 17l2.2-.8z" />' +
+    '<path d="m5 14 .6 1.4L7 16l-1.4.6L5 18l-.6-1.4L3 16l1.4-.6z" />' +
+    '</svg>';
+  heading.appendChild(iconSpan);
+
+  const titleStrong = document.createElement('strong');
+  titleStrong.textContent = 'AI code insight';
+  heading.appendChild(titleStrong);
+  top.appendChild(heading);
 
   const status = metrics.status || 'HAZARD';
-  const badge = document.createElement('span');
-  badge.className = 'cv-coupling-badge status-' + status.toLowerCase();
-  badge.textContent = status;
-  row.appendChild(badge);
+  const severity = document.createElement('span');
+  severity.className = 'severity severity-' + status.toLowerCase();
+  severity.textContent = status;
+  top.appendChild(severity);
 
-  const chipItems = [
-    `I = ${metrics.instability ?? '—'}`,
-    `Ca = ${metrics.ca ?? 0} (피참조)`,
-    `Ce = ${metrics.ce ?? 0} (외부참조)`,
-  ];
-  for (const label of chipItems) {
-    const chip = document.createElement('span');
-    chip.className = 'cv-coupling-chip';
-    chip.textContent = label;
-    row.appendChild(chip);
+  card.appendChild(top);
+
+  // 2. Headline
+  const shortName = filePath.split('/').pop();
+  const headline = document.createElement('strong');
+  headline.className = 'insight-title';
+  headline.textContent =
+    status === 'HAZARD'
+      ? `${shortName} 파일의 결합도가 높습니다`
+      : `${shortName} 파일의 결합도 주의 필요`;
+  card.appendChild(headline);
+
+  // 3. Description paragraph
+  const desc = document.createElement('p');
+  const outCount = deps.outgoing.length;
+  const outList = deps.outgoing
+    .slice(0, 3)
+    .map((f) => f.split('/').pop())
+    .join(', ');
+  const outExtra = outCount > 3 ? ` 외 ${outCount - 3}개` : '';
+  const outSummary = outCount > 0 ? `${outList}${outExtra}` : '외부 모듈';
+
+  const instStr =
+    metrics.instability !== null && metrics.instability !== undefined
+      ? `I = ${metrics.instability}`
+      : 'I = —';
+  const caStr = `Ca = ${metrics.ca ?? 0}`;
+  const ceStr = `Ce = ${metrics.ce ?? 0}`;
+
+  if (outCount > 0) {
+    desc.textContent =
+      `해당 파일은 ${outSummary} 등 ${outCount}개 외부 모듈을 직접 참조(${ceStr})하고 있어 변경 파급 위험이 있습니다. ` +
+      `피참조(${caStr}) 대비 외부 의존성이 높아 불안정도(${instStr})가 감지되었습니다.`;
+  } else {
+    desc.textContent = `해당 파일의 결합도 지표(${instStr}, ${ceStr}, ${caStr})에 따라 변경 위험이 감지되었습니다.`;
+  }
+  card.appendChild(desc);
+
+  // 4. Loading or Steps or Error
+  if (isLoading) {
+    const loadingEl = document.createElement('div');
+    loadingEl.className = 'cv-explain-loading';
+    loadingEl.style.marginTop = '12px';
+    const spinner = document.createElement('span');
+    spinner.className = 'loading-spinner';
+    const loadingText = document.createElement('span');
+    loadingText.textContent =
+      'AI가 코드와 결합도 지표를 분석해 리팩토링 제안을 도출하고 있습니다...';
+    loadingEl.appendChild(spinner);
+    loadingEl.appendChild(loadingText);
+    card.appendChild(loadingEl);
+  } else if (errorMsg) {
+    const errEl = document.createElement('div');
+    errEl.className = 'cv-explain-note';
+    errEl.style.color = '#dc2626';
+    errEl.style.marginTop = '10px';
+    errEl.textContent = errorMsg;
+    card.appendChild(errEl);
+  } else if (stepsText) {
+    card.appendChild(_renderCouplingSteps(stepsText));
   }
 
-  if (onGenerateClick) {
+  // 5. Action Buttons
+  if (onGenerateClick && !isLoading) {
+    const actions = document.createElement('div');
+    actions.className = 'ai-actions';
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.className = 'cv-coupling-ai-btn';
-    btn.textContent = 'AI 리팩토링 제안 받기';
+    btn.textContent = stepsText ? '다시 진단하기' : '진단하기';
     btn.title = 'Claude AI를 호출하여 3줄 결합도 리팩토링 제안을 생성합니다';
     btn.addEventListener('click', onGenerateClick);
-    row.appendChild(btn);
+    actions.appendChild(btn);
+    card.appendChild(actions);
   }
 
-  meta.appendChild(row);
-
-  if (deps.outgoing.length > 0 || deps.incoming.length > 0) {
-    const depLine = document.createElement('div');
-    depLine.className = 'cv-coupling-deps';
-    const parts = [];
-    if (deps.outgoing.length > 0) {
-      parts.push(
-        '외부 참조(Ce): ' +
-          deps.outgoing
-            .slice(0, 4)
-            .map((f) => f.split('/').pop())
-            .join(', ') +
-          (deps.outgoing.length > 4 ? ` 외 ${deps.outgoing.length - 4}개` : ''),
-      );
-    }
-    if (deps.incoming.length > 0) {
-      parts.push(
-        '피참조(Ca): ' +
-          deps.incoming
-            .slice(0, 3)
-            .map((f) => f.split('/').pop())
-            .join(', ') +
-          (deps.incoming.length > 3 ? ` 외 ${deps.incoming.length - 3}개` : ''),
-      );
-    }
-    depLine.textContent = parts.join('  ·  ');
-    meta.appendChild(depLine);
-  }
-
-  return meta;
+  return card;
 }
 
 //AI가 반환한 3줄 리팩토링 제안을 단계별 카드 리스트로 변환한다
 function _renderCouplingSteps(text) {
   const container = document.createElement('div');
-  container.className = 'cv-coupling-steps';
+  container.className = 'ai-steps';
 
   const raw = String(text || '').trim();
   const defaultLabels = ['진단', '분리 대상', '리팩토링'];
@@ -1167,14 +1216,14 @@ function _renderCouplingSteps(text) {
 
   items.slice(0, 3).forEach((item, idx) => {
     const row = document.createElement('div');
-    row.className = 'cv-coupling-step';
+    row.className = 'ai-step';
 
     const tag = document.createElement('span');
-    tag.className = 'cv-step-tag ' + (tagClasses[idx] || 'step-action');
+    tag.className = 'ai-step-tag ' + (tagClasses[idx] || 'step-action');
     tag.textContent = defaultLabels[idx] || `단계 ${idx + 1}`;
 
     const content = document.createElement('span');
-    content.className = 'cv-step-text';
+    content.className = 'ai-step-text';
     content.textContent = item.text;
 
     row.appendChild(tag);
@@ -1185,13 +1234,16 @@ function _renderCouplingSteps(text) {
   return container;
 }
 
-//결합도 위험(HAZARD/WARN) 파일 선택 시 코드 뷰어 상단에 결합도 요약 및 수동 AI 제안 버튼을 표시한다
+//결합도 위험(HAZARD/WARN) 파일 선택 시 코드 뷰어 상단에 Figma .ai-card 포맷으로 표시한다
 async function showCouplingExplanation(entry, autoFetch = false) {
   if (!entry || !entry.file || !entry.metrics) return;
   if (typeof showViewerExplain !== 'function') return;
 
   const body = showViewerExplain('AI 결합도 리팩토링 제안');
   if (!body) return;
+
+  const box = document.getElementById('code-viewer-explain');
+  if (box) box.classList.add('is-ai-card');
 
   const seq = ++explainSeq;
   const filePath = entry.file;
@@ -1201,6 +1253,7 @@ async function showCouplingExplanation(entry, autoFetch = false) {
 
   //이미 캐시된 결과가 있다면 바로 카드 표시
   if (explainCache[cacheKey]) {
+    body.textContent = '';
     body.appendChild(explainCache[cacheKey].cloneNode(true));
     return;
   }
@@ -1208,19 +1261,7 @@ async function showCouplingExplanation(entry, autoFetch = false) {
   //AI 호출 실행 함수 (버튼 클릭 시 또는 autoFetch=true일 때 호출)
   const fetchAndRenderAI = async () => {
     body.textContent = '';
-    //로딩 중에도 지표 배지 바는 계속 보여준다
-    body.appendChild(_renderCouplingMeta(filePath, metrics, deps));
-
-    const loadingEl = document.createElement('div');
-    loadingEl.className = 'cv-explain-loading';
-    const spinner = document.createElement('span');
-    spinner.className = 'loading-spinner';
-    const loadingText = document.createElement('span');
-    loadingText.textContent =
-      'AI가 코드와 결합도 지표를 분석해 리팩토링 방향을 도출하고 있습니다...';
-    loadingEl.appendChild(spinner);
-    loadingEl.appendChild(loadingText);
-    body.appendChild(loadingEl);
+    body.appendChild(_renderCouplingCard(filePath, metrics, deps, null, null, true));
 
     try {
       let code = '';
@@ -1259,11 +1300,18 @@ async function showCouplingExplanation(entry, autoFetch = false) {
         } else {
           const err = await response.json().catch(() => ({}));
           if (seq !== explainSeq) return;
-          loadingEl.remove();
-          const errNote = document.createElement('div');
-          errNote.className = 'cv-explain-note';
-          errNote.textContent = `리팩토링 제안을 가져올 수 없습니다: ${err.error || '서버 오류'}`;
-          body.appendChild(errNote);
+          body.textContent = '';
+          body.appendChild(
+            _renderCouplingCard(
+              filePath,
+              metrics,
+              deps,
+              fetchAndRenderAI,
+              null,
+              false,
+              `리팩토링 제안을 가져올 수 없습니다: ${err.error || '서버 오류'}`,
+            ),
+          );
           return;
         }
       } else {
@@ -1272,35 +1320,41 @@ async function showCouplingExplanation(entry, autoFetch = false) {
         explanationText = data.explanation || _buildFallbackCouplingText(filePath, metrics, deps);
       }
 
-      const fragment = document.createDocumentFragment();
-      fragment.appendChild(_renderCouplingMeta(filePath, metrics, deps));
-      fragment.appendChild(_renderCouplingSteps(explanationText));
-      explainCache[cacheKey] = fragment;
+      const card = _renderCouplingCard(
+        filePath,
+        metrics,
+        deps,
+        fetchAndRenderAI,
+        explanationText,
+        false,
+      );
+      explainCache[cacheKey] = card;
 
       body.textContent = '';
-      body.appendChild(fragment.cloneNode(true));
+      body.appendChild(card.cloneNode(true));
     } catch (err) {
       if (seq !== explainSeq) return;
-      loadingEl.remove();
-      const errNote = document.createElement('div');
-      errNote.className = 'cv-explain-note';
-      errNote.textContent = `네트워크 오류: ${err.message}`;
-      body.appendChild(errNote);
+      body.textContent = '';
+      body.appendChild(
+        _renderCouplingCard(
+          filePath,
+          metrics,
+          deps,
+          fetchAndRenderAI,
+          null,
+          false,
+          `네트워크 오류: ${err.message}`,
+        ),
+      );
     }
   };
 
   if (autoFetch) {
     fetchAndRenderAI();
   } else {
-    //토큰 낭비 방지: 지표 바만 먼저 띄우고 AI 호출 버튼을 제공
-    const metaEl = _renderCouplingMeta(filePath, metrics, deps, fetchAndRenderAI);
-    body.appendChild(metaEl);
-
-    const hintEl = document.createElement('div');
-    hintEl.className = 'cv-coupling-hint';
-    hintEl.textContent =
-      '상단 버튼을 누르면 AI가 소스코드와 외부 참조를 분석해 3줄 리팩토링 제안을 생성합니다.';
-    body.appendChild(hintEl);
+    //토큰 낭비 방지: 카드 지표와 설명만 먼저 띄우고 [진단하기] 버튼을 제공
+    body.textContent = '';
+    body.appendChild(_renderCouplingCard(filePath, metrics, deps, fetchAndRenderAI, null, false));
   }
 }
 

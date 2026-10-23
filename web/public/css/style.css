@@ -1960,6 +1960,185 @@ body.cv-resizing {
   font-size: 12px;
 }
 
+/* ── Figma UI: AI Code Insight Card (.ai-card) ── */
+#code-viewer-explain.is-ai-card {
+  background: var(--canvas);
+  border-bottom: 1px solid var(--border);
+  max-height: 60%;
+}
+
+#code-viewer-explain.is-ai-card .cv-explain-head {
+  display: none;
+}
+
+#code-viewer-explain.is-ai-card #cv-explain-body {
+  padding: 0;
+}
+
+.ai-card {
+  margin: 12px;
+  padding: 12px;
+  border: 2px solid var(--blue);
+  background: var(--canvas);
+  color: var(--ink);
+  box-sizing: border-box;
+}
+
+.ai-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.ai-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ai-heading > span {
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  background: var(--blue);
+  color: var(--canvas);
+  flex-shrink: 0;
+}
+
+.ai-heading strong {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+}
+
+.severity {
+  padding: 2px 7px;
+  background: var(--blue);
+  color: var(--canvas);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  display: inline-flex;
+  align-items: center;
+}
+
+.severity.severity-hazard {
+  background: var(--blue);
+}
+
+.severity.severity-warn {
+  background: var(--blue);
+}
+
+.insight-title {
+  display: block;
+  margin: 10px 0 5px;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.ai-card p {
+  color: var(--ink);
+  font-size: 12px;
+  line-height: 1.55;
+  margin: 4px 0 0;
+  word-break: keep-all;
+}
+
+.ai-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.ai-actions button {
+  height: 28px;
+  padding: 0 14px;
+  background: var(--blue);
+  color: var(--canvas);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  border: 1px solid var(--blue);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    opacity 0.15s ease,
+    background 0.15s ease;
+}
+
+.ai-actions button:hover {
+  opacity: 0.9;
+}
+
+.ai-actions button:active {
+  transform: translateY(1px);
+}
+
+.ai-actions button.ai-btn-secondary {
+  background: transparent;
+  border: 1px solid var(--blue);
+  color: var(--ink);
+}
+
+/* AI Steps inside ai-card */
+.ai-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--blue);
+}
+
+.ai-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 7px 10px;
+  background: rgba(92, 128, 188, 0.06);
+  border: 1px solid rgba(92, 128, 188, 0.25);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink);
+}
+
+.ai-step-tag {
+  flex-shrink: 0;
+  padding: 2px 6px;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.ai-step-tag.step-diag {
+  background: var(--blue);
+  color: var(--canvas);
+}
+
+.ai-step-tag.step-target {
+  background: transparent;
+  border: 1px solid var(--blue);
+  color: var(--blue);
+}
+
+.ai-step-tag.step-action {
+  background: var(--green);
+  color: var(--canvas);
+}
+
+.ai-step-text {
+  flex: 1;
+  word-break: break-word;
+}
+
 /* 결합도 리팩토링 제안 상단 배지 및 3줄 단계 카드 */
 .cv-coupling-meta {
   display: flex;
