@@ -1790,6 +1790,16 @@ body.cv-resizing {
   overflow-y: auto;
   border-bottom: 1px solid var(--border);
   background: var(--bg-field);
+  transition: max-height 0.2s ease;
+}
+
+#code-viewer-fnlist.collapsed {
+  max-height: 36px;
+  overflow: hidden;
+}
+
+#code-viewer-fnlist.collapsed .fn-list-body {
+  display: none;
 }
 
 .fn-list-head {
@@ -1800,12 +1810,38 @@ body.cv-resizing {
   justify-content: space-between;
   align-items: center;
   gap: 8px;
-  padding: 7px 14px;
+  padding: 8px 14px;
   font-size: 12px;
   font-weight: 600;
   color: var(--text-2);
-  background: var(--bg-field);
+  background: var(--panel);
   border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.12s;
+}
+
+.fn-list-head:hover {
+  background: var(--panel-2);
+  color: var(--ink);
+}
+
+.fn-list-head-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.fn-list-chevron {
+  font-size: 11px;
+  color: var(--text-3);
+  display: inline-block;
+  width: 12px;
+}
+
+.fn-list-title {
+  font-weight: 600;
+  color: var(--ink);
 }
 
 .fn-list-hint {

@@ -1680,15 +1680,26 @@ function showFunctionList(node) {
   fnListEl.textContent = '';
   fnListEl.classList.remove('hidden');
 
-  //목록 머리: 개수 + 숫자↑ 설명 (범례와 같은 내용)
+  //목록 머리: 접기/펼치기 토글 + 개수 + 설명
   const head = document.createElement('div');
   head.className = 'fn-list-head';
+
+  const left = document.createElement('div');
+  left.className = 'fn-list-head-left';
+  const chevron = document.createElement('span');
+  chevron.className = 'fn-list-chevron';
+  chevron.textContent = '▾';
   const count = document.createElement('span');
+  count.className = 'fn-list-title';
   count.textContent = '함수 ' + functions.length + '개';
+  left.appendChild(chevron);
+  left.appendChild(count);
+
   const hint = document.createElement('span');
   hint.className = 'fn-list-hint';
   hint.textContent = '↓ 불린 횟수   ↑ 부른 횟수';
-  head.appendChild(count);
+
+  head.appendChild(left);
   head.appendChild(hint);
   fnListEl.appendChild(head);
 
@@ -1704,7 +1715,13 @@ function showFunctionList(node) {
   }
 
   const list = document.createElement('div');
-  list.className = 'fn-list';
+  list.className = 'fn-list-body';
+
+  //접기/펼치기 클릭 이벤트
+  head.addEventListener('click', () => {
+    const isCollapsed = fnListEl.classList.toggle('collapsed');
+    chevron.textContent = isCollapsed ? '▸' : '▾';
+  });
 
   const openFn = (fn, index) => {
     if (fn.code && typeof showCodeViewer === 'function') {

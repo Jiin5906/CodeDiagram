@@ -91,14 +91,22 @@ async function _loadViewerLocation(filePath, startLine, endLine, name, fallback)
 
   const setTitle = () => {
     if (!filename) return;
-    //에디터처럼 '파일:줄' 형식으로 표시하고 이름은 뒤에 붙인다
-    const where = startLine
+    const baseName = (filePath || '').split('/').pop() || filePath || '';
+    const cleanFnName = name ? String(name).replace(/\s*\([\d↓↑ ]+\)$/, '') : '';
+    const lineInfo = startLine
       ? startLine === endLine || !endLine
         ? `:${startLine}`
         : `:${startLine}-${endLine}`
       : '';
-    filename.textContent = (filePath || '') + where + (name ? '  ' + name : '');
-    filename.title = filename.textContent;
+
+    //긴 전체 경로 대신 "파일명 > 함수명 :줄번호" 형식으로 표시하여 가독성 개선
+    if (cleanFnName && cleanFnName !== baseName && cleanFnName !== '전체 코드') {
+      filename.textContent = `${baseName} > ${cleanFnName}${lineInfo}`;
+    } else {
+      filename.textContent = `${baseName}${lineInfo}`;
+    }
+    //호버 툴팁에는 전체 경로 보존
+    filename.title = (filePath || '') + lineInfo + (name ? '  ' + name : '');
   };
 
   const canFetch = !!(
