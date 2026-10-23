@@ -17,7 +17,7 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
     />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/d2coding@1.3.2/d2coding-subset.css" />
-    <link rel="stylesheet" href="css/style.css?v=26" />
+    <link rel="stylesheet" href="css/style.css?v=27" />
     <link
       rel="stylesheet"
       href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css"
@@ -247,12 +247,10 @@
           />
           <span id="diag-search-count" aria-live="polite"></span>
         </div>
+        <!--가변 플렉스 블록 탭 바 (DIAG_CATEGORIES 레지스트리에서 자동 생성)-->
+        <div id="diag-cat-bar" class="diag-cat-bar" role="tablist" aria-label="진단 항목 분류"></div>
         <div class="diag-scroll">
           <div id="diagnostics-content"></div>
-          <div id="suggestions-section">
-            <div class="suggestions-header">리팩토링 제안</div>
-            <div id="suggestions-content"></div>
-          </div>
         </div>
       </div>
       <div id="graph-container">
@@ -402,7 +400,7 @@
     <script src="js/canvasCard.js?v=3"></script>
     <script src="js/localGraph.js?v=3"></script>
     <script src="js/minimap.js?v=3"></script>
-    <script src="js/interactions.js?v=21"></script>
+    <script src="js/interactions.js?v=22"></script>
     <script src="js/diffPreview.js?v=2"></script>
     <script src="js/fileTree.js?v=6"></script>
     <script src="js/app.js?v=17"></script>

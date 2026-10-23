@@ -1262,7 +1262,251 @@ body.cv-resizing {
   flex-shrink: 0;
 }
 
-/* 헤더·검색창은 고정, 목록만 스크롤 */
+/* 가변 플렉스 블록 탭 바 (DIAG_CATEGORIES 레지스트리 기반) */
+.diag-cat-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-panel);
+  flex-shrink: 0;
+}
+
+.diag-cat-block {
+  flex: 1 1 auto;
+  min-width: 96px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 7px 10px;
+  background: var(--canvas);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-2);
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.diag-cat-block:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+
+.diag-cat-block.active {
+  background: var(--bg-selected);
+  color: var(--text);
+  border-color: var(--blue);
+  box-shadow: inset 0 -2px 0 var(--blue);
+}
+
+.diag-cat-label {
+  white-space: nowrap;
+}
+
+.diag-cat-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  background: var(--bg-hover);
+  color: var(--text);
+  border: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.diag-cat-badge.badge-hazard {
+  background: #dc2626;
+  color: #fffffa;
+  border-color: #dc2626;
+}
+
+.diag-cat-badge.badge-warn {
+  background: #f59e0b;
+  color: #010400;
+  border-color: #f59e0b;
+}
+
+.diag-cat-badge.badge-safe {
+  background: #0a8754;
+  color: #fffffa;
+  border-color: #0a8754;
+}
+
+.diag-cat-pane.hidden {
+  display: none !important;
+}
+
+/* 접이식 서브 그룹 (순환 참조 유형별 / 결합도 등급별 공통) */
+.diag-group {
+  margin-bottom: 10px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--canvas);
+  overflow: hidden;
+}
+
+.diag-group.status-filtered-out {
+  display: none !important;
+}
+
+.diag-group-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--bg-hover);
+  border: none;
+  border-bottom: 1px solid var(--border);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s ease;
+}
+
+.diag-group-header:hover {
+  background: var(--bg-hover-strong);
+}
+
+.diag-group.collapsed .diag-group-header {
+  border-bottom: none;
+}
+
+.diag-group.collapsed .diag-group-body {
+  display: none;
+}
+
+.diag-group-head-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.diag-group-chevron {
+  font-size: 12px;
+  color: var(--text-2);
+  width: 12px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.diag-group-body {
+  padding: 4px 0;
+}
+
+/* 결합도 등급 그룹 배지 (HAZARD 빨강, WARN 노랑, SAFE 초록, N/A 검정) */
+.coupling-group-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.coupling-group-badge.status-hazard {
+  background: #dc2626;
+  color: #fffffa;
+}
+
+.coupling-group-badge.status-warn {
+  background: #f59e0b;
+  color: #010400;
+}
+
+.coupling-group-badge.status-safe {
+  background: #0a8754;
+  color: #fffffa;
+}
+
+.coupling-group-badge.status-na {
+  background: #010400;
+  color: #fffffa;
+}
+
+/* 결합도 등급 필터 칩 바 */
+.coupling-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-bottom: 10px;
+}
+
+.coupling-filter-chip {
+  padding: 4px 8px;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+  background: var(--canvas);
+  color: var(--text-2);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease,
+    opacity 0.15s ease;
+}
+
+.coupling-filter-chip:hover {
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+.coupling-filter-chip.chip-all.active {
+  background: var(--blue);
+  color: #fffffa;
+  border-color: var(--blue);
+}
+
+.coupling-filter-chip.chip-hazard.active {
+  background: #dc2626;
+  color: #fffffa;
+  border-color: #dc2626;
+}
+
+.coupling-filter-chip.chip-warn.active {
+  background: #f59e0b;
+  color: #010400;
+  border-color: #f59e0b;
+}
+
+.coupling-filter-chip.chip-safe.active {
+  background: #0a8754;
+  color: #fffffa;
+  border-color: #0a8754;
+}
+
+.coupling-filter-chip.chip-na.active {
+  background: #010400;
+  color: #fffffa;
+  border-color: #010400;
+}
+
+/* 헤더·검색창·블록바는 고정, 목록만 스크롤 */
 #diagnostics-panel .diag-scroll {
   flex: 1;
   overflow-y: auto;
@@ -1270,7 +1514,7 @@ body.cv-resizing {
 }
 
 #diagnostics-content {
-  padding: 12px 16px;
+  padding: 12px 14px;
   font-size: var(--ui-font);
   color: var(--text);
 }

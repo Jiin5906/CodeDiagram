@@ -618,169 +618,252 @@ function _makeCouplingRow(entry, criteria) {
   return item;
 }
 
-//파일 결합도 섹션 — 서버가 HAZARD → WARN → SAFE → N/A 순으로 정렬해 보낸 목록을 그대로 표로 그린다
-function _makeCouplingSection(coupling) {
-  const files = (coupling && coupling.files) || [];
-  const criteria = coupling && coupling.criteria;
-  const hazardCount = files.filter((e) => e.metrics.status === 'HAZARD').length;
-  const rows = files.map((entry) => _makeCouplingRow(entry, criteria));
-  const section = _makeDiagSection(
-    `파일 결합도 (HAZARD ${hazardCount})`,
-    rows,
-    '분석된 파일이 없습니다',
-  );
-  if (rows.length) {
-    //판정 기준 한 줄과 머리줄을 첫 행 앞에 끼워 넣는다
-    const note = document.createElement('div');
-    note.className = 'coupling-criteria';
-    note.textContent =
-      `판정 기준 ${criteria.name} · I = Ce/(Ca+Ce) · ` +
-      `SAFE ≤ ${criteria.safeMax} < WARN ≤ ${criteria.warnMax} < HAZARD, ` +
-      `또는 Ce ≥ ${criteria.ceHazard}이면 HAZARD`;
-    section.insertBefore(note, rows[0]);
-    section.insertBefore(_makeCouplingHeader(), rows[0]);
-  }
-  return section;
-}
+//접이식 서브 그룹 생성 (순환 참조의 파일/함수 그룹, 결합도의 등급별 그룹 공통 빌더)
+function _makeCollapsibleGroup(title, items, options = {}) {
+  const collapsed = Boolean(options.collapsedByDefault);
+  const group = document.createElement('div');
+  group.className = 'diag-group' + (collapsed ? ' collapsed' : '');
+  if (options.statusKey) group.dataset.status = options.statusKey;
 
-function _makeDiagSection(title, items, emptyText) {
-  const section = document.createElement('div');
-  section.className = 'diag-section';
-  const heading = document.createElement('div');
-  heading.className = 'diag-section-title';
+  const header = document.createElement('button');
+  header.type = 'button';
+  header.className = 'diag-group-header';
+  header.setAttribute('aria-expanded', String(!collapsed));
+
+  const left = document.createElement('span');
+  left.className = 'diag-group-head-left';
+
+  const chevron = document.createElement('span');
+  chevron.className = 'diag-group-chevron';
+  chevron.setAttribute('aria-hidden', 'true');
+  chevron.textContent = collapsed ? '▸' : '▾';
+
   const label = document.createElement('span');
+  label.className = 'diag-group-title' + (options.badgeClass ? ' ' + options.badgeClass : '');
   label.textContent = title;
+
+  left.appendChild(chevron);
+  left.appendChild(label);
+
   const count = document.createElement('span');
   count.className = 'diag-section-count';
   count.dataset.total = String(items.length);
-  count.textContent = items.length;
-  heading.appendChild(label);
-  heading.appendChild(count);
-  section.appendChild(heading);
+  count.textContent = String(items.length);
 
-  if (items.length === 0) {
+  header.appendChild(left);
+  header.appendChild(count);
+
+  header.addEventListener('click', () => {
+    const isCollapsed = group.classList.toggle('collapsed');
+    header.setAttribute('aria-expanded', String(!isCollapsed));
+    chevron.textContent = isCollapsed ? '▸' : '▾';
+  });
+
+  const body = document.createElement('div');
+  body.className = 'diag-group-body';
+  if (options.subHeaderEl) {
+    body.appendChild(options.subHeaderEl);
+  }
+  items.forEach((item) => body.appendChild(item));
+
+  group.appendChild(header);
+  group.appendChild(body);
+  return group;
+}
+
+//1. 순환 참조 카테고리 뷰 생성
+function _buildCyclesPane(cycles) {
+  const pane = document.createElement('div');
+  pane.className = 'diag-cat-pane';
+  pane.dataset.cat = 'cycles';
+
+  const fileCycles = (cycles && cycles.files) || [];
+  const funcCycles = (cycles && cycles.functions) || [];
+  const fileItems = fileCycles.map((cycle) =>
+    _makeDiagItem(
+      'error',
+      `파일 순환: ${cycle.map((f) => f.split('/').pop()).join(' → ')}`,
+      cycle,
+    ),
+  );
+  const funcItems = funcCycles.map((cycle) =>
+    _makeDiagItem(
+      'warning',
+      `함수 순환: ${cycle.map((n) => n.split('::').pop()).join(' → ')}`,
+      cycle,
+    ),
+  );
+  const total = fileItems.length + funcItems.length;
+
+  if (total === 0) {
     const empty = document.createElement('div');
     empty.className = 'diag-empty';
-    empty.textContent = emptyText;
-    section.appendChild(empty);
+    empty.textContent = '순환 참조가 없습니다';
+    pane.appendChild(empty);
   } else {
-    items.forEach((item) => section.appendChild(item));
-    //검색 결과가 없을 때 보여줄 안내
+    if (fileItems.length > 0) {
+      pane.appendChild(
+        _makeCollapsibleGroup('파일 순환', fileItems, {
+          collapsedByDefault: false,
+          badgeClass: 'cycle-type-file',
+        }),
+      );
+    }
+    if (funcItems.length > 0) {
+      pane.appendChild(
+        _makeCollapsibleGroup('함수 순환', funcItems, {
+          collapsedByDefault: false,
+          badgeClass: 'cycle-type-func',
+        }),
+      );
+    }
     const noMatch = document.createElement('div');
     noMatch.className = 'diag-empty diag-no-match hidden';
     noMatch.textContent = '일치하는 항목이 없습니다';
-    section.appendChild(noMatch);
+    pane.appendChild(noMatch);
   }
-  return section;
+
+  return {
+    pane,
+    badgeText: String(total),
+    totalCount: total,
+    badgeVariant: fileItems.length > 0 ? 'hazard' : funcItems.length > 0 ? 'warn' : '',
+  };
 }
 
-//검색어로 진단 항목·리팩토링 제안을 거른다 (공백으로 나눈 단어가 모두 들어있어야 일치)
-function filterDiagnostics(query) {
-  const panel = document.getElementById('diagnostics-panel');
-  if (!panel) return;
-  const terms = String(query || '')
-    .toLowerCase()
-    .split(/\s+/)
-    .filter(Boolean);
-  let shown = 0;
-  let total = 0;
+//2. 파일 결합도 카테고리 뷰 생성 — 등급 필터 칩 + 등급별 접이식 그룹
+function _buildCouplingPane(coupling) {
+  const pane = document.createElement('div');
+  pane.className = 'diag-cat-pane';
+  pane.dataset.cat = 'coupling';
 
-  panel.querySelectorAll('.diag-item, .suggestion-item').forEach((item) => {
-    const text = item.dataset.search || item.textContent.toLowerCase();
-    const match = terms.every((t) => text.includes(t));
-    item.classList.toggle('hidden', !match);
-    total++;
-    if (match) shown++;
-  });
+  const files = (coupling && coupling.files) || [];
+  const criteria = coupling && coupling.criteria;
+  const statuses = ['HAZARD', 'WARN', 'SAFE', 'N/A'];
+  const byStatus = { HAZARD: [], WARN: [], SAFE: [], 'N/A': [] };
 
-  panel.querySelectorAll('.diag-section').forEach((section) => {
-    const items = section.querySelectorAll('.diag-item');
-    const visible = section.querySelectorAll('.diag-item:not(.hidden)').length;
-    const count = section.querySelector('.diag-section-count');
-    const total = count ? Number(count.dataset.total) : 0;
-    if (count)
-      count.textContent = terms.length && total > 0 ? `${visible}/${total}` : String(total);
-    const noMatch = section.querySelector('.diag-no-match');
-    if (noMatch) noMatch.classList.toggle('hidden', !(items.length && visible === 0));
-  });
-
-  //리팩토링 제안이 모두 걸러졌을 때 안내
-  const sugContent = document.getElementById('suggestions-content');
-  if (sugContent) {
-    let sugNoMatch = sugContent.querySelector('.diag-no-match');
-    const sugItems = sugContent.querySelectorAll('.suggestion-item');
-    const sugVisible = sugContent.querySelectorAll('.suggestion-item:not(.hidden)').length;
-    if (!sugNoMatch && sugItems.length) {
-      sugNoMatch = document.createElement('div');
-      sugNoMatch.className = 'diag-empty diag-no-match';
-      sugNoMatch.textContent = '일치하는 제안이 없습니다';
-      sugContent.appendChild(sugNoMatch);
+  for (const entry of files) {
+    const st = (entry.metrics && entry.metrics.status) || 'N/A';
+    if (byStatus[st]) {
+      byStatus[st].push(_makeCouplingRow(entry, criteria));
     }
-    if (sugNoMatch) sugNoMatch.classList.toggle('hidden', !(sugItems.length && sugVisible === 0));
   }
 
-  const countEl = document.getElementById('diag-search-count');
-  if (countEl) countEl.textContent = terms.length ? `${shown}/${total}` : '';
-}
+  const hazardCount = byStatus.HAZARD.length;
+  const warnCount = byStatus.WARN.length;
 
-function hideDiagnosticsPanel() {
-  const panel = document.getElementById('diagnostics-panel');
-  if (!panel || panel.classList.contains('collapsed')) return;
-  panel.classList.add('collapsed');
-  setTimeout(() => {
-    if (typeof cy !== 'undefined' && cy) {
-      cy.resize();
-      cy.fit(undefined, 30);
+  if (files.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'diag-empty';
+    empty.textContent = '분석된 파일이 없습니다';
+    pane.appendChild(empty);
+  } else {
+    if (criteria) {
+      const note = document.createElement('div');
+      note.className = 'coupling-criteria';
+      note.textContent =
+        `판정 기준 ${criteria.name} · I = Ce/(Ca+Ce) · ` +
+        `SAFE ≤ ${criteria.safeMax} < WARN ≤ ${criteria.warnMax} < HAZARD, ` +
+        `또는 Ce ≥ ${criteria.ceHazard}이면 HAZARD`;
+      pane.appendChild(note);
     }
-  }, 310);
-}
 
-function showDiagnosticsPanel(diagnostics, suggestions) {
-  const panel = document.getElementById('diagnostics-panel');
-  const fileTreePanel = document.getElementById('file-tree-panel');
-  const content = document.getElementById('diagnostics-content');
-  const suggestionsContent = document.getElementById('suggestions-content');
+    //등급 필터 칩 바 (전체 | HAZARD | WARN | SAFE | N/A)
+    const filterBar = document.createElement('div');
+    filterBar.className = 'coupling-filter-bar';
+    let activeStatusFilter = 'ALL';
 
-  if (fileTreePanel && !fileTreePanel.classList.contains('collapsed')) {
-    fileTreePanel.classList.add('collapsed');
+    const applyStatusFilter = (targetStatus) => {
+      activeStatusFilter = targetStatus;
+      filterBar.querySelectorAll('.coupling-filter-chip').forEach((btn) => {
+        const isSelected = btn.dataset.filter === activeStatusFilter;
+        btn.classList.toggle('active', isSelected);
+        btn.setAttribute('aria-pressed', String(isSelected));
+      });
+      pane.querySelectorAll('.diag-group[data-status]').forEach((grp) => {
+        const match =
+          activeStatusFilter === 'ALL' || grp.dataset.status === activeStatusFilter;
+        grp.classList.toggle('status-filtered-out', !match);
+        //특정 등급을 직접 선택했을 때는 해당 그룹을 자동으로 펼쳐준다
+        if (match && activeStatusFilter !== 'ALL') {
+          grp.classList.remove('collapsed');
+          const hdr = grp.querySelector('.diag-group-header');
+          const chv = grp.querySelector('.diag-group-chevron');
+          if (hdr) hdr.setAttribute('aria-expanded', 'true');
+          if (chv) chv.textContent = '▾';
+        }
+      });
+    };
+
+    const filterDefs = [
+      { key: 'ALL', label: `전체 ${files.length}`, cls: 'chip-all' },
+      ...statuses
+        .filter((st) => byStatus[st].length > 0)
+        .map((st) => ({
+          key: st,
+          label: `${st} ${byStatus[st].length}`,
+          cls: 'chip-' + (st === 'N/A' ? 'na' : st.toLowerCase()),
+        })),
+    ];
+
+    for (const def of filterDefs) {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = `coupling-filter-chip ${def.cls}${def.key === 'ALL' ? ' active' : ''}`;
+      chip.dataset.filter = def.key;
+      chip.setAttribute('aria-pressed', String(def.key === 'ALL'));
+      chip.textContent = def.label;
+      chip.addEventListener('click', () => {
+        const next = activeStatusFilter === def.key && def.key !== 'ALL' ? 'ALL' : def.key;
+        applyStatusFilter(next);
+      });
+      filterBar.appendChild(chip);
+    }
+    pane.appendChild(filterBar);
+
+    //등급별 접이식 그룹 (HAZARD·WARN은 기본 펼침, SAFE·N/A는 기본 접힘)
+    for (const st of statuses) {
+      const rows = byStatus[st];
+      if (!rows.length) continue;
+      const isDefaultCollapsed = st === 'SAFE' || st === 'N/A';
+      const statusSlug = st === 'N/A' ? 'na' : st.toLowerCase();
+      const group = _makeCollapsibleGroup(st, rows, {
+        collapsedByDefault: isDefaultCollapsed,
+        badgeClass: `coupling-group-badge status-${statusSlug}`,
+        subHeaderEl: _makeCouplingHeader(),
+        statusKey: st,
+      });
+      pane.appendChild(group);
+    }
+
+    const noMatch = document.createElement('div');
+    noMatch.className = 'diag-empty diag-no-match hidden';
+    noMatch.textContent = '일치하는 항목이 없습니다';
+    pane.appendChild(noMatch);
   }
 
-  content.textContent = '';
-  suggestionsContent.textContent = '';
+  return {
+    pane,
+    badgeText: hazardCount > 0 ? `HAZARD ${hazardCount}` : String(files.length),
+    totalCount: files.length,
+    badgeVariant: hazardCount > 0 ? 'hazard' : warnCount > 0 ? 'warn' : 'safe',
+  };
+}
 
-  //순환 참조 섹션
-  const fileCycles = diagnostics.cycles.files || [];
-  const funcCycles = diagnostics.cycles.functions || [];
-  const cycleItems = [
-    ...fileCycles.map((cycle) =>
-      _makeDiagItem(
-        'error',
-        `파일 순환: ${cycle.map((f) => f.split('/').pop()).join(' → ')}`,
-        cycle,
-      ),
-    ),
-    ...funcCycles.map((cycle) =>
-      _makeDiagItem(
-        'warning',
-        `함수 순환: ${cycle.map((n) => n.split('::').pop()).join(' → ')}`,
-        cycle,
-      ),
-    ),
-  ];
-  content.appendChild(_makeDiagSection('순환 참조', cycleItems, '순환 참조가 없습니다'));
+//3. 리팩토링 제안 카테고리 뷰 생성
+function _buildSuggestionsPane(suggestions) {
+  const pane = document.createElement('div');
+  pane.className = 'diag-cat-pane';
+  pane.dataset.cat = 'suggestions';
 
-  //파일 결합도 섹션 (CR-RFC-2026-002) — 파일별 판정과 원값 표
-  content.appendChild(_makeCouplingSection(diagnostics.coupling));
-
-  //안티패턴 섹션
-  const antiItems = (diagnostics.antiPatterns || []).map((issue) =>
-    _makeDiagItem('info', issue.message, [issue.nodeId]),
-  );
-  content.appendChild(_makeDiagSection('안티패턴', antiItems, '안티패턴이 없습니다'));
-
-  //리팩토링 제안 표시
-  if (suggestions && suggestions.length > 0) {
-    for (const sug of suggestions) {
+  const list = suggestions || [];
+  if (list.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'diag-empty';
+    empty.textContent = '리팩토링 제안이 없습니다';
+    pane.appendChild(empty);
+  } else {
+    for (const sug of list) {
       const item = document.createElement('div');
       item.className = 'suggestion-item';
       item.dataset.search = [
@@ -829,14 +912,188 @@ function showDiagnosticsPanel(diagnostics, suggestions) {
       actions.appendChild(diffBtn);
       item.appendChild(actions);
 
-      suggestionsContent.appendChild(item);
+      pane.appendChild(item);
     }
-  } else {
-    const empty = document.createElement('div');
-    empty.className = 'diag-empty';
-    empty.textContent = '리팩토링 제안이 없습니다';
-    suggestionsContent.appendChild(empty);
+
+    const noMatch = document.createElement('div');
+    noMatch.className = 'diag-empty diag-no-match hidden';
+    noMatch.textContent = '일치하는 제안이 없습니다';
+    pane.appendChild(noMatch);
   }
+
+  return {
+    pane,
+    badgeText: String(list.length),
+    totalCount: list.length,
+    badgeVariant: '',
+  };
+}
+
+//확장형 진단 카테고리 레지스트리 — 새 진단 항목 추가 시 이 배열에 객체만 등록하면 상단 블록과 뷰가 자동 생성된다
+const DIAG_CATEGORIES = [
+  {
+    id: 'cycles',
+    label: '순환 참조',
+    build: (diagnostics) => _buildCyclesPane(diagnostics && diagnostics.cycles),
+  },
+  {
+    id: 'coupling',
+    label: '파일 결합도',
+    build: (diagnostics) => _buildCouplingPane(diagnostics && diagnostics.coupling),
+  },
+  {
+    id: 'suggestions',
+    label: '리팩토링 제안',
+    build: (_diagnostics, suggestions) => _buildSuggestionsPane(suggestions),
+  },
+];
+
+let _activeDiagCategory = null;
+
+function _switchDiagCategory(catId) {
+  _activeDiagCategory = catId;
+  const bar = document.getElementById('diag-cat-bar');
+  const content = document.getElementById('diagnostics-content');
+  if (bar) {
+    bar.querySelectorAll('.diag-cat-block').forEach((btn) => {
+      const isSelected = btn.dataset.cat === catId;
+      btn.classList.toggle('active', isSelected);
+      btn.setAttribute('aria-selected', String(isSelected));
+    });
+  }
+  if (content) {
+    content.querySelectorAll('.diag-cat-pane').forEach((pane) => {
+      pane.classList.toggle('hidden', pane.dataset.cat !== catId);
+    });
+  }
+}
+
+//검색어로 진단 항목·리팩토링 제안을 거른다 (공백으로 나눈 단어가 모두 들어있어야 일치)
+function filterDiagnostics(query) {
+  const panel = document.getElementById('diagnostics-panel');
+  if (!panel) return;
+  const terms = String(query || '')
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean);
+  let shown = 0;
+  let total = 0;
+
+  panel.querySelectorAll('.diag-item, .suggestion-item').forEach((item) => {
+    const text = item.dataset.search || item.textContent.toLowerCase();
+    const match = terms.every((t) => text.includes(t));
+    item.classList.toggle('hidden', !match);
+    total++;
+    if (match) shown++;
+  });
+
+  //접이식 서브 그룹별 카운트 갱신 및 검색 매칭 시 자동 펼침
+  panel.querySelectorAll('.diag-group').forEach((group) => {
+    const items = group.querySelectorAll('.diag-item');
+    const visible = group.querySelectorAll('.diag-item:not(.hidden)').length;
+    const count = group.querySelector('.diag-section-count');
+    const groupTotal = count ? Number(count.dataset.total) : items.length;
+    if (count) {
+      count.textContent =
+        terms.length && groupTotal > 0 ? `${visible}/${groupTotal}` : String(groupTotal);
+    }
+    if (terms.length > 0 && visible > 0 && group.classList.contains('collapsed')) {
+      group.classList.remove('collapsed');
+      const hdr = group.querySelector('.diag-group-header');
+      const chv = group.querySelector('.diag-group-chevron');
+      if (hdr) hdr.setAttribute('aria-expanded', 'true');
+      if (chv) chv.textContent = '▾';
+    }
+  });
+
+  //카테고리 블록 탭 배지 및 빈 결과 안내 갱신
+  const bar = document.getElementById('diag-cat-bar');
+  panel.querySelectorAll('.diag-cat-pane').forEach((pane) => {
+    const catId = pane.dataset.cat;
+    const items = pane.querySelectorAll('.diag-item, .suggestion-item');
+    const visible = pane.querySelectorAll('.diag-item:not(.hidden), .suggestion-item:not(.hidden)')
+      .length;
+    const noMatch = pane.querySelector('.diag-no-match');
+    if (noMatch) noMatch.classList.toggle('hidden', !(items.length && visible === 0));
+
+    if (bar) {
+      const badge = bar.querySelector(`.diag-cat-block[data-cat="${catId}"] .diag-cat-badge`);
+      if (badge) {
+        badge.textContent = terms.length
+          ? `${visible}/${items.length}`
+          : badge.dataset.defaultBadge || String(items.length);
+      }
+    }
+  });
+
+  const countEl = document.getElementById('diag-search-count');
+  if (countEl) countEl.textContent = terms.length ? `${shown}/${total}` : '';
+}
+
+function hideDiagnosticsPanel() {
+  const panel = document.getElementById('diagnostics-panel');
+  if (!panel || panel.classList.contains('collapsed')) return;
+  panel.classList.add('collapsed');
+  setTimeout(() => {
+    if (typeof cy !== 'undefined' && cy) {
+      cy.resize();
+      cy.fit(undefined, 30);
+    }
+  }, 310);
+}
+
+function showDiagnosticsPanel(diagnostics, suggestions) {
+  const panel = document.getElementById('diagnostics-panel');
+  const fileTreePanel = document.getElementById('file-tree-panel');
+  const catBar = document.getElementById('diag-cat-bar');
+  const content = document.getElementById('diagnostics-content');
+
+  if (fileTreePanel && !fileTreePanel.classList.contains('collapsed')) {
+    fileTreePanel.classList.add('collapsed');
+  }
+
+  if (catBar) catBar.textContent = '';
+  content.textContent = '';
+
+  const builtCategories = [];
+
+  for (const catDef of DIAG_CATEGORIES) {
+    const result = catDef.build(diagnostics || {}, suggestions || []);
+    builtCategories.push({ def: catDef, result });
+
+    if (catBar) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'diag-cat-block';
+      btn.dataset.cat = catDef.id;
+      btn.setAttribute('role', 'tab');
+      btn.setAttribute('aria-selected', 'false');
+
+      const labelEl = document.createElement('span');
+      labelEl.className = 'diag-cat-label';
+      labelEl.textContent = catDef.label;
+
+      const badgeEl = document.createElement('span');
+      badgeEl.className =
+        'diag-cat-badge' + (result.badgeVariant ? ` badge-${result.badgeVariant}` : '');
+      badgeEl.dataset.defaultBadge = result.badgeText;
+      badgeEl.textContent = result.badgeText;
+
+      btn.appendChild(labelEl);
+      btn.appendChild(badgeEl);
+      btn.addEventListener('click', () => _switchDiagCategory(catDef.id));
+      catBar.appendChild(btn);
+    }
+
+    content.appendChild(result.pane);
+  }
+
+  //초기 활성 카테고리 선택: 이전에 선택한 탭이 유효하면 유지, 아니면 첫 번째 카테고리 선택
+  const validPrev = builtCategories.some((c) => c.def.id === _activeDiagCategory);
+  const initialCat = validPrev
+    ? _activeDiagCategory
+    : (builtCategories[0] && builtCategories[0].def.id) || 'cycles';
+  _switchDiagCategory(initialCat);
 
   //다시 열어도 이전 검색어를 유지한다
   const searchInput = document.getElementById('diag-search-input');
