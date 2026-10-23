@@ -40,7 +40,7 @@
   --ok: var(--green);
   --shadow-float: 0 4px 16px rgba(1, 4, 0, 0.12);
   --font-ui: 'Inter', 'Pretendard Variable', 'Pretendard', -apple-system, 'Segoe UI', sans-serif;
-  --font-code: 'JetBrains Mono', 'D2Coding', Consolas, monospace;
+  --font-code: 'D2Coding', 'JetBrains Mono', Consolas, monospace;
 
   --panel-tree-w: clamp(200px, 18vw, 300px);
   /* 코드 뷰어는 화면 너비의 비율(기본 26%)을 따르고, 사용자가 끌어서 바꾼 비율은 JS가 --panel-code-ratio로 덮어쓴다 */
@@ -1112,8 +1112,11 @@ body.cv-resizing {
   display: block;
   background: transparent !important;
   font-size: var(--code-font);
-  line-height: 1.6;
-  color: var(--ink);
+  font-weight: 500;
+  line-height: 1.65;
+  color: #111411;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 /* highlight.js 라이트 테마 가독성 보강 (고대비) */
