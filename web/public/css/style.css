@@ -1224,18 +1224,83 @@ body.cv-resizing {
   color: var(--text);
 }
 
-/* ── 진단 패널 ── */
+/* ── 사이드 패널 내 진단 뷰 ── */
 #diagnostics-panel {
-  left: calc(64px + 16px);
-  right: auto;
-  width: var(--overlay-w);
   display: flex;
   flex-direction: column;
+  height: 100%;
+  width: 100%;
+  background: var(--bg-panel);
+  overflow: hidden;
+  position: static;
+  box-shadow: none;
+  border: none;
+  border-radius: 0;
+  max-height: none;
+  max-width: none;
+}
+
+#diagnostics-panel.hidden {
+  display: none !important;
+}
+
+#code-viewer-body {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
   overflow: hidden;
 }
 
+#code-viewer-body.hidden {
+  display: none !important;
+}
+
+.code-viewer-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#code-viewer-back-diag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 8px;
+  background: var(--canvas);
+  border: 1px solid var(--blue);
+  color: var(--blue);
+  border-radius: 3px;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+#code-viewer-back-diag:hover {
+  background: var(--blue);
+  color: var(--canvas);
+}
+
+#code-viewer-back-diag.hidden {
+  display: none !important;
+}
+
+#diagnostics-panel > .code-viewer-header,
 #diagnostics-panel > .overlay-header {
   flex-shrink: 0;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  padding: 10px 14px;
 }
 
 #diagnostics-panel #diagnostics-content,
@@ -3020,10 +3085,10 @@ kbd {
   }
 
   #diagnostics-panel {
-    width: calc(100vw - 20px);
-    left: 10px;
-    top: 10px;
-    bottom: 66px;
+    width: 100%;
+    left: auto;
+    top: auto;
+    bottom: auto;
     max-height: none;
   }
 

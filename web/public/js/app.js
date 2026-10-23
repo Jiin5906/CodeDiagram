@@ -157,9 +157,15 @@ document.addEventListener('DOMContentLoaded', () => {
   //진단 버튼 클릭 (열려 있으면 닫고, 닫혀 있으면 열기 - 토글)
   document.getElementById('diagnostics-btn').addEventListener('click', () => {
     if (!lastAnalysisData) return;
-    const panel = document.getElementById('diagnostics-panel');
-    if (panel && !panel.classList.contains('hidden')) {
-      panel.classList.add('hidden');
+    const sidePanel = document.getElementById('code-viewer-panel');
+    const diagPanel = document.getElementById('diagnostics-panel');
+    const isDiagOpen =
+      sidePanel &&
+      !sidePanel.classList.contains('collapsed') &&
+      diagPanel &&
+      !diagPanel.classList.contains('hidden');
+    if (isDiagOpen) {
+      if (typeof hideCodeViewer === 'function') hideCodeViewer();
       return;
     }
     showDiagnosticsPanel(lastAnalysisData.diagnostics, lastAnalysisData.suggestions);

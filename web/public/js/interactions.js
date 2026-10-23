@@ -314,7 +314,7 @@ function setupDomListeners() {
 
   //진단 패널 닫기
   document.getElementById('diagnostics-close').addEventListener('click', () => {
-    document.getElementById('diagnostics-panel').classList.add('hidden');
+    if (typeof hideCodeViewer === 'function') hideCodeViewer();
   });
 
   //보기 단위 선택 (파일 | 함수)
@@ -471,7 +471,10 @@ function _openDiagLocation(nodeId, message, itemEl) {
   const wasClosed = panel && panel.classList.contains('collapsed');
   const loc = _diagLocation(nodeId, message);
   if (loc.filePath && typeof showCodeAtLocation === 'function') {
-    showCodeAtLocation(loc.filePath, loc.startLine, loc.endLine, loc.name);
+    showCodeAtLocation(loc.filePath, loc.startLine, loc.endLine, loc.name, {
+      fromDiag: true,
+      skipFit: true,
+    });
   }
   //코드 뷰어가 새로 열리면 그래프가 다시 맞춰지므로(0.31초 뒤) 그 다음에 대상 노드로 이동한다
   if (wasClosed) {
@@ -833,12 +836,25 @@ function showDiagnosticsPanel(diagnostics, suggestions) {
     filterDiagnostics(searchInput.value);
   }
 
-  const fileTreePanel = document.getElementById('file-tree-panel');
-  if (fileTreePanel && !fileTreePanel.classList.contains('collapsed')) {
-    fileTreePanel.classList.add('collapsed');
+  if (typeof switchSidePanelView === 'function') {
+    switchSidePanelView('diagnostics');
+  } else {
+    const codeBody = document.getElementById('code-viewer-body');
+    if (codeBody) codeBody.classList.add('hidden');
+    panel.classList.remove('hidden');
   }
 
-  panel.classList.remove('hidden');
+  const sidePanel = document.getElementById('code-viewer-panel');
+  if (sidePanel) {
+    const wasClosed = sidePanel.classList.contains('collapsed');
+    sidePanel.classList.remove('collapsed');
+    if (wasClosed && typeof cy !== 'undefined' && cy) {
+      setTimeout(() => {
+        cy.resize();
+        cy.fit(undefined, 30);
+      }, 310);
+    }
+  }
 }
 
 /* ── 참조 팝업 ── */

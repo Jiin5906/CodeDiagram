@@ -51,6 +51,19 @@ let _cvSeq = 0;
 let _cvRenderedFile = null;
 let _cvRenderedCode = null;
 
+//사이드 패널 뷰 모드 전환 ('diagnostics' | 'code')
+function switchSidePanelView(mode) {
+  const diagPanel = document.getElementById('diagnostics-panel');
+  const codeBody = document.getElementById('code-viewer-body');
+  if (mode === 'diagnostics') {
+    if (codeBody) codeBody.classList.add('hidden');
+    if (diagPanel) diagPanel.classList.remove('hidden');
+  } else if (mode === 'code') {
+    if (diagPanel) diagPanel.classList.add('hidden');
+    if (codeBody) codeBody.classList.remove('hidden');
+  }
+}
+
 //함수/노드 코드를 보여준다. 파일 원본을 받을 수 있으면 파일 전체를 띄우고 해당 범위를 강조해 스크롤한다.
 //(함수 코드만 따로 보여주던 방식 → 앞뒤 코드도 함께 보이도록 통일)
 //options.keepFnList: 파일 클릭으로 연 함수 목록을 그대로 둔다
@@ -61,6 +74,10 @@ function showCodeViewer(nodeData, options) {
 
   const code = nodeData.code;
   if (!code) return;
+
+  switchSidePanelView('code');
+  const backBtn = document.getElementById('code-viewer-back-diag');
+  if (backBtn && (!options || !options.fromDiag)) backBtn.classList.add('hidden');
 
   const fnList = document.getElementById('code-viewer-fnlist');
   if (fnList) {
@@ -225,16 +242,23 @@ function showCodeAtLocation(filePath, startLine, endLine, name, options) {
   const panel = document.getElementById('code-viewer-panel');
   if (!panel || !filePath) return;
 
+  switchSidePanelView('code');
+  const backBtn = document.getElementById('code-viewer-back-diag');
+  if (backBtn) {
+    backBtn.classList.toggle('hidden', !(options && options.fromDiag));
+  }
+
   if (!options || !options.keepList) {
     const fnList = document.getElementById('code-viewer-fnlist');
     if (fnList) fnList.classList.add('hidden');
   }
   hideViewerExplain();
-  _openCodeViewerPanel(panel);
+  _openCodeViewerPanel(panel, options);
   _loadViewerLocation(filePath, startLine, endLine || startLine, name, null);
 }
 
-function _openCodeViewerPanel(panel) {
+function _openCodeViewerPanel(panel, options) {
+  switchSidePanelView('code');
   //파일 노드 위에 떠 있던 함수 미리보기가 코드 창을 가리지 않게 먼저 닫는다
   if (typeof hideFunctionPreview === 'function') hideFunctionPreview();
   if (typeof hideEdgePreview === 'function') hideEdgePreview();
@@ -245,7 +269,9 @@ function _openCodeViewerPanel(panel) {
   setTimeout(() => {
     if (typeof cy !== 'undefined' && cy) {
       cy.resize();
-      cy.fit(undefined, 30);
+      if (!options || !options.skipFit) {
+        cy.fit(undefined, 30);
+      }
     }
   }, 310);
 }
@@ -492,6 +518,16 @@ document.addEventListener('DOMContentLoaded', () => {
   const closeBtn = document.getElementById('code-viewer-close');
   if (closeBtn) {
     closeBtn.addEventListener('click', hideCodeViewer);
+  }
+  const diagCloseBtn = document.getElementById('diagnostics-close');
+  if (diagCloseBtn) {
+    diagCloseBtn.addEventListener('click', hideCodeViewer);
+  }
+  const backBtn = document.getElementById('code-viewer-back-diag');
+  if (backBtn) {
+    backBtn.addEventListener('click', () => {
+      switchSidePanelView('diagnostics');
+    });
   }
   //AI 해설 접기/펼치기
   const explainToggle = document.getElementById('cv-explain-toggle');

@@ -17,7 +17,7 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
     />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/d2coding@1.3.2/d2coding-subset.css" />
-    <link rel="stylesheet" href="css/style.css?v=24" />
+    <link rel="stylesheet" href="css/style.css?v=25" />
     <link
       rel="stylesheet"
       href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css"
@@ -275,27 +275,75 @@
         </div>
       </div>
       <div id="code-viewer-panel" class="collapsed">
-        <!--왼쪽 가장자리를 끌어서 코드 뷰어 너비를 조절한다-->
+        <!--왼쪽 가장자리를 끌어서 너비를 조절한다-->
         <div id="code-viewer-resizer" title="끌어서 너비 조절 (더블클릭: 기본 크기)"></div>
-        <div class="code-viewer-header">
-          <span id="code-viewer-filename">소스코드</span>
-          <div class="code-viewer-actions">
-            <button id="code-viewer-close" aria-label="닫기">&times;</button>
+
+        <!-- 1. 진단 패널 뷰 -->
+        <div id="diagnostics-panel" class="hidden">
+          <div class="code-viewer-header">
+            <span id="diagnostics-title">코드 진단 결과</span>
+            <div class="code-viewer-actions">
+              <button id="diagnostics-close" aria-label="닫기">&times;</button>
+            </div>
+          </div>
+          <!--진단 검색: 파일명·함수명·메시지로 필터링-->
+          <div class="diag-search">
+            <svg
+              class="diag-search-icon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <circle cx="11" cy="11" r="7" />
+              <path d="m20 20-3.5-3.5" />
+            </svg>
+            <input
+              type="search"
+              id="diag-search-input"
+              placeholder="파일명·함수명으로 검색"
+              autocomplete="off"
+              aria-label="진단 결과 검색"
+            />
+            <span id="diag-search-count" aria-live="polite"></span>
+          </div>
+          <div class="diag-scroll">
+            <div id="diagnostics-content"></div>
+            <div id="suggestions-section">
+              <div class="suggestions-header">리팩토링 제안</div>
+              <div id="suggestions-content"></div>
+            </div>
           </div>
         </div>
-        <!--파일 클릭 시 함수 목록 (코드 영역 위에 표시)-->
-        <div id="code-viewer-fnlist" class="hidden"></div>
-        <div id="code-viewer-status" class="hidden"></div>
-        <!--함수 뷰에서 함수를 클릭하면 코드 위에 AI 해설을 함께 보여준다-->
-        <div id="code-viewer-explain" class="hidden">
-          <button id="cv-explain-toggle" class="cv-explain-head" aria-expanded="true">
-            <span class="cv-explain-title">AI 해설</span>
-            <span class="cv-explain-chevron" aria-hidden="true">▾</span>
-          </button>
-          <div id="cv-explain-body"></div>
-        </div>
-        <div id="code-viewer-content">
-          <pre><code id="code-viewer-code"></code></pre>
+
+        <!-- 2. 소스코드 뷰 -->
+        <div id="code-viewer-body">
+          <div class="code-viewer-header">
+            <div class="code-viewer-nav">
+              <button id="code-viewer-back-diag" class="hidden" title="진단 결과 목록으로 돌아가기">&larr; 진단 목록</button>
+              <span id="code-viewer-filename">소스코드</span>
+            </div>
+            <div class="code-viewer-actions">
+              <button id="code-viewer-close" aria-label="닫기">&times;</button>
+            </div>
+          </div>
+          <!--파일 클릭 시 함수 목록 (코드 영역 위에 표시)-->
+          <div id="code-viewer-fnlist" class="hidden"></div>
+          <div id="code-viewer-status" class="hidden"></div>
+          <!--함수 뷰에서 함수를 클릭하면 코드 위에 AI 해설을 함께 보여준다-->
+          <div id="code-viewer-explain" class="hidden">
+            <button id="cv-explain-toggle" class="cv-explain-head" aria-expanded="true">
+              <span class="cv-explain-title">AI 해설</span>
+              <span class="cv-explain-chevron" aria-hidden="true">▾</span>
+            </button>
+            <div id="cv-explain-body"></div>
+          </div>
+          <div id="code-viewer-content">
+            <pre><code id="code-viewer-code"></code></pre>
+          </div>
         </div>
       </div>
     </div>
@@ -346,45 +394,6 @@
       </div>
     </div>
 
-    <!--진단 패널-->
-    <div id="diagnostics-panel" class="overlay hidden">
-      <div class="overlay-header">
-        <span id="diagnostics-title">코드 진단 결과</span>
-        <button id="diagnostics-close">&times;</button>
-      </div>
-      <!--진단 검색: 파일명·함수명·메시지로 필터링-->
-      <div class="diag-search">
-        <svg
-          class="diag-search-icon"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          aria-hidden="true"
-        >
-          <circle cx="11" cy="11" r="7" />
-          <path d="m20 20-3.5-3.5" />
-        </svg>
-        <input
-          type="search"
-          id="diag-search-input"
-          placeholder="파일명·함수명으로 검색"
-          autocomplete="off"
-          aria-label="진단 결과 검색"
-        />
-        <span id="diag-search-count" aria-live="polite"></span>
-      </div>
-      <div class="diag-scroll">
-        <div id="diagnostics-content"></div>
-        <div id="suggestions-section">
-          <div class="suggestions-header">리팩토링 제안</div>
-          <div id="suggestions-content"></div>
-        </div>
-      </div>
-    </div>
-
     <!--Diff 비교 오버레이-->
     <div id="diff-overlay" class="hidden">
       <div class="diff-overlay-inner">
@@ -399,13 +408,13 @@
     <script src="js/graph.js?v=23"></script>
     <script src="js/forceSim.js?v=4"></script>
     <script src="js/codeEffects.js?v=5"></script>
-    <script src="js/codeViewer.js?v=13"></script>
+    <script src="js/codeViewer.js?v=14"></script>
     <script src="js/canvasCard.js?v=3"></script>
     <script src="js/localGraph.js?v=3"></script>
     <script src="js/minimap.js?v=3"></script>
-    <script src="js/interactions.js?v=19"></script>
+    <script src="js/interactions.js?v=20"></script>
     <script src="js/diffPreview.js?v=2"></script>
-    <script src="js/fileTree.js?v=4"></script>
-    <script src="js/app.js?v=15"></script>
+    <script src="js/fileTree.js?v=5"></script>
+    <script src="js/app.js?v=16"></script>
   </body>
 </html>
