@@ -1086,6 +1086,7 @@ function _renderCouplingCard(
   heading.className = 'ai-heading';
 
   const iconSpan = document.createElement('span');
+  iconSpan.className = 'ai-heading-icon';
   iconSpan.innerHTML =
     '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
     '<path d="m12 3 1.2 3.3L16.5 7.5l-3.3 1.2L12 12l-1.2-3.3-3.3-1.2 3.3-1.2z" />' +
@@ -1097,11 +1098,6 @@ function _renderCouplingCard(
   const titleStrong = document.createElement('strong');
   titleStrong.textContent = 'AI code insight';
   heading.appendChild(titleStrong);
-
-  const collapsedPreview = document.createElement('span');
-  collapsedPreview.className = 'ai-collapsed-preview';
-  collapsedPreview.textContent = `${shortName} [${percentText}]`;
-  heading.appendChild(collapsedPreview);
 
   top.appendChild(heading);
 

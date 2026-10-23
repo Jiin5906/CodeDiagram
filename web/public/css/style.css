@@ -1996,7 +1996,7 @@ body.cv-resizing {
   gap: 8px;
 }
 
-.ai-heading > span {
+.ai-heading-icon {
   width: 26px;
   height: 26px;
   display: grid;
@@ -2049,16 +2049,6 @@ body.cv-resizing {
   user-select: none;
 }
 
-.ai-collapsed-preview {
-  display: none;
-  align-items: center;
-  gap: 6px;
-  margin-left: 6px;
-  font-size: 11px;
-  font-family: var(--font-code);
-  color: var(--text-2);
-}
-
 .ai-card.collapsed {
   padding-bottom: 10px;
 }
@@ -2073,10 +2063,6 @@ body.cv-resizing {
 
 .ai-card.collapsed .ai-card-body {
   display: none;
-}
-
-.ai-card.collapsed .ai-collapsed-preview {
-  display: inline-flex;
 }
 
 .severity {
