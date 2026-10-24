@@ -26,7 +26,7 @@ function enterLocalGraph(nodeId, depth) {
   applyLocalGraphFilter(nodeId, depth);
 }
 
-function exitLocalGraph() {
+function exitLocalGraph(restoreViewport = true) {
   if (!cy || !_localGraphActive) return;
 
   _localGraphActive = false;
@@ -36,14 +36,13 @@ function exitLocalGraph() {
   });
 
   //뷰포트 복구
-  if (_localGraphSavedViewport) {
+  if (restoreViewport && _localGraphSavedViewport) {
     cy.viewport({
       zoom: _localGraphSavedViewport.zoom,
       pan: _localGraphSavedViewport.pan,
     });
-    _localGraphSavedViewport = null;
   }
-
+  _localGraphSavedViewport = null;
   _localGraphCenterId = null;
 }
 

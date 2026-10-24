@@ -154,9 +154,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  //진단 버튼 클릭
+  //진단 버튼 클릭 (열려 있으면 닫고, 닫혀 있으면 열기 - 토글)
   document.getElementById('diagnostics-btn').addEventListener('click', () => {
     if (!lastAnalysisData) return;
+    const diagPanel = document.getElementById('diagnostics-panel');
+    const isDiagOpen = diagPanel && !diagPanel.classList.contains('collapsed');
+    if (isDiagOpen) {
+      if (typeof hideDiagnosticsPanel === 'function') hideDiagnosticsPanel();
+      return;
+    }
     showDiagnosticsPanel(lastAnalysisData.diagnostics, lastAnalysisData.suggestions);
   });
 });
