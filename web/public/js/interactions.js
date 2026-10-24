@@ -680,11 +680,7 @@ function _buildCyclesPane(cycles) {
   const fileCycles = (cycles && cycles.files) || [];
   const funcCycles = (cycles && cycles.functions) || [];
   const fileItems = fileCycles.map((cycle) =>
-    _makeDiagItem(
-      'error',
-      `파일 순환: ${cycle.map((f) => f.split('/').pop()).join(' → ')}`,
-      cycle,
-    ),
+    _makeDiagItem('error', `파일 순환: ${cycle.map((f) => f.split('/').pop()).join(' → ')}`, cycle),
   );
   const funcItems = funcCycles.map((cycle) =>
     _makeDiagItem(
@@ -781,8 +777,7 @@ function _buildCouplingPane(coupling) {
         btn.setAttribute('aria-pressed', String(isSelected));
       });
       pane.querySelectorAll('.diag-group[data-status]').forEach((grp) => {
-        const match =
-          activeStatusFilter === 'ALL' || grp.dataset.status === activeStatusFilter;
+        const match = activeStatusFilter === 'ALL' || grp.dataset.status === activeStatusFilter;
         grp.classList.toggle('status-filtered-out', !match);
         //특정 등급을 직접 선택했을 때는 해당 그룹을 자동으로 펼쳐준다
         if (match && activeStatusFilter !== 'ALL') {
@@ -1011,8 +1006,9 @@ function filterDiagnostics(query) {
   panel.querySelectorAll('.diag-cat-pane').forEach((pane) => {
     const catId = pane.dataset.cat;
     const items = pane.querySelectorAll('.diag-item, .suggestion-item');
-    const visible = pane.querySelectorAll('.diag-item:not(.hidden), .suggestion-item:not(.hidden)')
-      .length;
+    const visible = pane.querySelectorAll(
+      '.diag-item:not(.hidden), .suggestion-item:not(.hidden)',
+    ).length;
     const noMatch = pane.querySelector('.diag-no-match');
     if (noMatch) noMatch.classList.toggle('hidden', !(items.length && visible === 0));
 
