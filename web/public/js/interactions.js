@@ -757,9 +757,13 @@ function _buildCouplingPane(coupling) {
     if (criteria) {
       const note = document.createElement('div');
       note.className = 'coupling-criteria';
+      const cboWarnCond = criteria.minCboWarn ? ` (CBO ≥ ${criteria.minCboWarn})` : '';
+      const cboHazardCond = criteria.minCboHazard
+        ? ` (CBO ≥ ${criteria.minCboHazard} 시 HAZARD)`
+        : ' < HAZARD';
       note.textContent =
         `판정 기준 ${criteria.name} · I = Ce/(Ca+Ce) · ` +
-        `SAFE ≤ ${criteria.safeMax} < WARN ≤ ${criteria.warnMax} < HAZARD, ` +
+        `SAFE ≤ ${criteria.safeMax}${criteria.minCboWarn ? ` (또는 CBO < ${criteria.minCboWarn})` : ''} < WARN${cboWarnCond} ≤ ${criteria.warnMax}${cboHazardCond}, ` +
         `또는 Ce ≥ ${criteria.ceHazard}이면 HAZARD`;
       pane.appendChild(note);
     }
@@ -1434,6 +1438,7 @@ function _renderCouplingCard(
   // Description paragraph
   const desc = document.createElement('p');
   const outCount = deps.outgoing.length;
+  const inCount = metrics.ca !== undefined ? metrics.ca : deps.incoming ? deps.incoming.length : 0;
   const outList = deps.outgoing
     .slice(0, 3)
     .map((f) => f.split('/').pop())
@@ -1441,13 +1446,36 @@ function _renderCouplingCard(
   const outExtra = outCount > 3 ? ` 외 ${outCount - 3}개` : '';
   const outSummary = outCount > 0 ? `${outList}${outExtra}` : '외부 모듈';
 
-  if (outCount > 0) {
-    desc.textContent =
-      `외부 참조(Ce) ${outCount}개(${outSummary}) · 피참조(Ca) ${metrics.ca ?? 0}개로, ` +
-      `외부 의존성이 높아 변경 시 파급 위험이 있습니다.`;
+  const cbo = metrics.cbo !== undefined ? metrics.cbo : outCount + inCount;
+  const currentStatus = status || metrics.status || 'SAFE';
+
+  let descText = `외부 참조(Ce) ${outCount}개${outCount > 0 ? `(${outSummary})` : ''} · 피참조(Ca) ${inCount}개`;
+
+  if (currentStatus === 'HAZARD') {
+    if (outCount >= (window.criteria?.ceHazard ?? 10)) {
+      descText +=
+        '로, 과도하게 많은 외부 모듈을 직접 참조하여 높은 결합도 위험(HAZARD)이 있습니다.';
+    } else {
+      descText +=
+        '로, 높은 외부 의존성과 결합도로 인해 외부 변경에 매우 취약한 위험(HAZARD) 상태입니다.';
+    }
+  } else if (currentStatus === 'WARN') {
+    if (inCount >= 3) {
+      descText +=
+        '로, 여러 모듈이 참조하고 있어 본 파일 변경 시 다른 모듈로의 파급 영향(WARN)에 유의해야 합니다.';
+    } else {
+      descText +=
+        '로, 외부 모듈 의존도가 높아 의존 대상 변경 시 영향을 받을 가능성(WARN)이 있습니다.';
+    }
   } else {
-    desc.textContent = `외부 참조(Ce) ${metrics.ce ?? 0}개 · 피참조(Ca) ${metrics.ca ?? 0}개입니다.`;
+    // SAFE or N/A
+    if (cbo < (window.criteria?.minCboWarn ?? 5)) {
+      descText += '로, 결합도 규모가 작아 구조적으로 안정적인(SAFE) 상태입니다.';
+    } else {
+      descText += '로, 안정적인 의존 관계와 결합도 균형(SAFE)을 유지하고 있습니다.';
+    }
   }
+  desc.textContent = descText;
   body.appendChild(desc);
 
   // Loading or Steps or Error
@@ -1575,7 +1603,9 @@ async function showCouplingExplanation(entry, autoFetch = false) {
   //이미 캐시된 결과가 있다면 바로 카드 표시
   if (explainCache[cacheKey]) {
     body.textContent = '';
-    body.appendChild(explainCache[cacheKey].cloneNode(true));
+    body.appendChild(
+      _renderCouplingCard(filePath, metrics, deps, fetchAndRenderAI, explainCache[cacheKey], false),
+    );
     return;
   }
 
@@ -1641,18 +1671,12 @@ async function showCouplingExplanation(entry, autoFetch = false) {
         explanationText = data.explanation || _buildFallbackCouplingText(filePath, metrics, deps);
       }
 
-      const card = _renderCouplingCard(
-        filePath,
-        metrics,
-        deps,
-        fetchAndRenderAI,
-        explanationText,
-        false,
-      );
-      explainCache[cacheKey] = card;
+      explainCache[cacheKey] = explanationText;
 
       body.textContent = '';
-      body.appendChild(card.cloneNode(true));
+      body.appendChild(
+        _renderCouplingCard(filePath, metrics, deps, fetchAndRenderAI, explanationText, false),
+      );
     } catch (err) {
       if (seq !== explainSeq) return;
       body.textContent = '';

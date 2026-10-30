@@ -78,14 +78,17 @@ async function explainCoupling({ filePath, code, metrics, dependencies }) {
 ${snippet}
 \`\`\`
 
-반드시 마크다운 기호(**나 # 등) 없이 아래 3줄 형식으로만 답변해주세요:
-1. 결합도 진단: (현재 파일이 왜 결합도 위험 상태인지 실제 참조 관계와 역할을 바탕으로 1문장 요약)
-2. 분리 대상: (외부 의존성 Ce 또는 피참조 Ca를 줄이기 위해 분리하거나 인터페이스로 추상화할 구체적인 함수/역할 1문장)
-3. 리팩토링 방향: (결합도를 낮추는 구체적인 구조 개선 방법 1문장)`;
+[출력 규칙]
+1. 인사말, 서두, 맺음말 없이 오직 아래 3개 번호 항목만 출력
+2. 각 항목은 핵심만 3문장 이내로 명확하게 작성
+
+1. 결합도 진단: 
+2. 분리 대상: 
+3. 리팩토링 방향: `;
 
   const message = await anthropic.messages.create({
     model: DEFAULT_MODEL,
-    max_tokens: 1024,
+    max_tokens: 2048,
     messages: [{ role: 'user', content: prompt }],
   });
 
