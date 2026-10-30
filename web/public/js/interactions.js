@@ -313,9 +313,12 @@ function setupDomListeners() {
   });
 
   //진단 패널 닫기
-  document.getElementById('diagnostics-close').addEventListener('click', () => {
-    document.getElementById('diagnostics-panel').classList.add('hidden');
-  });
+  const diagClose = document.getElementById('diagnostics-close');
+  if (diagClose) {
+    diagClose.addEventListener('click', () => {
+      hideDiagnosticsPanel();
+    });
+  }
 
   //보기 단위 선택 (파일 | 함수)
   document.getElementById('view-file-btn').addEventListener('click', () => {
@@ -402,6 +405,7 @@ function _diagFilePath(nodeId) {
 //진단 항목 클릭 → 그래프에서 해당 노드(파일 뷰면 파일 노드)로 이동
 function _focusDiagTarget(nodeId) {
   if (!cy || !nodeId) return;
+  if (typeof isLocalGraphActive === 'function' && isLocalGraphActive()) exitLocalGraph(false);
   let target = cy.getElementById(nodeId);
   if (!target.length) {
     //노드가 없으면(파일 뷰 등) 같은 경로의 파일 노드로 이동
@@ -413,7 +417,10 @@ function _focusDiagTarget(nodeId) {
   }
   if (!target.length) return;
   highlightNode(target.id());
-  cy.animate({ center: { eles: target } }, { duration: 350, easing: 'ease-out-cubic' });
+  cy.animate(
+    { fit: { eles: target.closedNeighborhood().nodes(), padding: 60 } },
+    { duration: 350, easing: 'ease-out-cubic' },
+  );
 }
 
 //진단 대상의 코드 위치를 찾는다 → { filePath, startLine, endLine, name }
@@ -467,7 +474,10 @@ function _openDiagLocation(nodeId, message, itemEl) {
   const wasClosed = panel && panel.classList.contains('collapsed');
   const loc = _diagLocation(nodeId, message);
   if (loc.filePath && typeof showCodeAtLocation === 'function') {
-    showCodeAtLocation(loc.filePath, loc.startLine, loc.endLine, loc.name);
+    showCodeAtLocation(loc.filePath, loc.startLine, loc.endLine, loc.name, {
+      fromDiag: true,
+      skipFit: true,
+    });
   }
   //코드 뷰어가 새로 열리면 그래프가 다시 맞춰지므로(0.31초 뒤) 그 다음에 대상 노드로 이동한다
   if (wasClosed) {
@@ -573,7 +583,10 @@ function _makeCouplingRow(entry, criteria) {
   item.className = `diag-item coupling-row severity-${COUPLING_SEVERITY[status]}`;
   item.tabIndex = 0;
   item.setAttribute('role', 'button');
-  item.title = `${entry.file} — 클릭하면 코드로 이동합니다`;
+  const isRisky = status === 'HAZARD' || status === 'WARN';
+  item.title = isRisky
+    ? `${entry.file} — 클릭하면 코드와 AI 결합도 리팩토링 제안을 봅니다`
+    : `${entry.file} — 클릭하면 코드로 이동합니다`;
 
   const statusClass = 'status-' + (status === 'N/A' ? 'na' : status.toLowerCase());
   item.appendChild(_couplingCell(status, 'coupling-status ' + statusClass));
@@ -591,7 +604,10 @@ function _makeCouplingRow(entry, criteria) {
   }
 
   item.dataset.search = [status, entry.file, reason].join(' ').toLowerCase();
-  const open = () => _openDiagLocation(entry.file, '', item);
+  const open = () => {
+    _openDiagLocation(entry.file, '', item);
+    if (isRisky) showCouplingExplanation(entry);
+  };
   item.addEventListener('click', open);
   item.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' || e.key === ' ') {
@@ -602,152 +618,251 @@ function _makeCouplingRow(entry, criteria) {
   return item;
 }
 
-//파일 결합도 섹션 — 서버가 HAZARD → WARN → SAFE → N/A 순으로 정렬해 보낸 목록을 그대로 표로 그린다
-function _makeCouplingSection(coupling) {
-  const files = (coupling && coupling.files) || [];
-  const criteria = coupling && coupling.criteria;
-  const hazardCount = files.filter((e) => e.metrics.status === 'HAZARD').length;
-  const rows = files.map((entry) => _makeCouplingRow(entry, criteria));
-  const section = _makeDiagSection(
-    `파일 결합도 (HAZARD ${hazardCount})`,
-    rows,
-    '분석된 파일이 없습니다',
-  );
-  if (rows.length) {
-    //판정 기준 한 줄과 머리줄을 첫 행 앞에 끼워 넣는다
-    const note = document.createElement('div');
-    note.className = 'coupling-criteria';
-    note.textContent =
-      `판정 기준 ${criteria.name} · I = Ce/(Ca+Ce) · ` +
-      `SAFE ≤ ${criteria.safeMax} < WARN ≤ ${criteria.warnMax} < HAZARD, ` +
-      `또는 Ce ≥ ${criteria.ceHazard}이면 HAZARD`;
-    section.insertBefore(note, rows[0]);
-    section.insertBefore(_makeCouplingHeader(), rows[0]);
-  }
-  return section;
-}
+//접이식 서브 그룹 생성 (순환 참조의 파일/함수 그룹, 결합도의 등급별 그룹 공통 빌더)
+function _makeCollapsibleGroup(title, items, options = {}) {
+  const collapsed = Boolean(options.collapsedByDefault);
+  const group = document.createElement('div');
+  group.className = 'diag-group' + (collapsed ? ' collapsed' : '');
+  if (options.statusKey) group.dataset.status = options.statusKey;
 
-function _makeDiagSection(title, items, emptyText) {
-  const section = document.createElement('div');
-  section.className = 'diag-section';
-  const heading = document.createElement('div');
-  heading.className = 'diag-section-title';
+  const header = document.createElement('button');
+  header.type = 'button';
+  header.className = 'diag-group-header';
+  header.setAttribute('aria-expanded', String(!collapsed));
+
+  const left = document.createElement('span');
+  left.className = 'diag-group-head-left';
+
+  const chevron = document.createElement('span');
+  chevron.className = 'diag-group-chevron';
+  chevron.setAttribute('aria-hidden', 'true');
+  chevron.textContent = collapsed ? '▸' : '▾';
+
   const label = document.createElement('span');
+  label.className = 'diag-group-title' + (options.badgeClass ? ' ' + options.badgeClass : '');
   label.textContent = title;
+
+  left.appendChild(chevron);
+  left.appendChild(label);
+
   const count = document.createElement('span');
   count.className = 'diag-section-count';
   count.dataset.total = String(items.length);
-  count.textContent = items.length;
-  heading.appendChild(label);
-  heading.appendChild(count);
-  section.appendChild(heading);
+  count.textContent = String(items.length);
 
-  if (items.length === 0) {
+  header.appendChild(left);
+  header.appendChild(count);
+
+  header.addEventListener('click', () => {
+    const isCollapsed = group.classList.toggle('collapsed');
+    header.setAttribute('aria-expanded', String(!isCollapsed));
+    chevron.textContent = isCollapsed ? '▸' : '▾';
+  });
+
+  const body = document.createElement('div');
+  body.className = 'diag-group-body';
+  if (options.subHeaderEl) {
+    body.appendChild(options.subHeaderEl);
+  }
+  items.forEach((item) => body.appendChild(item));
+
+  group.appendChild(header);
+  group.appendChild(body);
+  return group;
+}
+
+//1. 순환 참조 카테고리 뷰 생성
+function _buildCyclesPane(cycles) {
+  const pane = document.createElement('div');
+  pane.className = 'diag-cat-pane';
+  pane.dataset.cat = 'cycles';
+
+  const fileCycles = (cycles && cycles.files) || [];
+  const funcCycles = (cycles && cycles.functions) || [];
+  const fileItems = fileCycles.map((cycle) =>
+    _makeDiagItem('error', `파일 순환: ${cycle.map((f) => f.split('/').pop()).join(' → ')}`, cycle),
+  );
+  const funcItems = funcCycles.map((cycle) =>
+    _makeDiagItem(
+      'warning',
+      `함수 순환: ${cycle.map((n) => n.split('::').pop()).join(' → ')}`,
+      cycle,
+    ),
+  );
+  const total = fileItems.length + funcItems.length;
+
+  if (total === 0) {
     const empty = document.createElement('div');
     empty.className = 'diag-empty';
-    empty.textContent = emptyText;
-    section.appendChild(empty);
+    empty.textContent = '순환 참조가 없습니다';
+    pane.appendChild(empty);
   } else {
-    items.forEach((item) => section.appendChild(item));
-    //검색 결과가 없을 때 보여줄 안내
+    if (fileItems.length > 0) {
+      pane.appendChild(
+        _makeCollapsibleGroup('파일 순환', fileItems, {
+          collapsedByDefault: false,
+          badgeClass: 'cycle-type-file',
+        }),
+      );
+    }
+    if (funcItems.length > 0) {
+      pane.appendChild(
+        _makeCollapsibleGroup('함수 순환', funcItems, {
+          collapsedByDefault: false,
+          badgeClass: 'cycle-type-func',
+        }),
+      );
+    }
     const noMatch = document.createElement('div');
     noMatch.className = 'diag-empty diag-no-match hidden';
     noMatch.textContent = '일치하는 항목이 없습니다';
-    section.appendChild(noMatch);
+    pane.appendChild(noMatch);
   }
-  return section;
+
+  return {
+    pane,
+    badgeText: String(total),
+    totalCount: total,
+    badgeVariant: fileItems.length > 0 ? 'hazard' : funcItems.length > 0 ? 'warn' : '',
+  };
 }
 
-//검색어로 진단 항목·리팩토링 제안을 거른다 (공백으로 나눈 단어가 모두 들어있어야 일치)
-function filterDiagnostics(query) {
-  const panel = document.getElementById('diagnostics-panel');
-  if (!panel) return;
-  const terms = String(query || '')
-    .toLowerCase()
-    .split(/\s+/)
-    .filter(Boolean);
-  let shown = 0;
-  let total = 0;
+//2. 파일 결합도 카테고리 뷰 생성 — 등급 필터 칩 + 등급별 접이식 그룹
+function _buildCouplingPane(coupling) {
+  const pane = document.createElement('div');
+  pane.className = 'diag-cat-pane';
+  pane.dataset.cat = 'coupling';
 
-  panel.querySelectorAll('.diag-item, .suggestion-item').forEach((item) => {
-    const text = item.dataset.search || item.textContent.toLowerCase();
-    const match = terms.every((t) => text.includes(t));
-    item.classList.toggle('hidden', !match);
-    total++;
-    if (match) shown++;
-  });
+  const files = (coupling && coupling.files) || [];
+  const criteria = coupling && coupling.criteria;
+  const statuses = ['HAZARD', 'WARN', 'SAFE', 'N/A'];
+  const byStatus = { HAZARD: [], WARN: [], SAFE: [], 'N/A': [] };
 
-  panel.querySelectorAll('.diag-section').forEach((section) => {
-    const items = section.querySelectorAll('.diag-item');
-    const visible = section.querySelectorAll('.diag-item:not(.hidden)').length;
-    const count = section.querySelector('.diag-section-count');
-    const total = count ? Number(count.dataset.total) : 0;
-    if (count)
-      count.textContent = terms.length && total > 0 ? `${visible}/${total}` : String(total);
-    const noMatch = section.querySelector('.diag-no-match');
-    if (noMatch) noMatch.classList.toggle('hidden', !(items.length && visible === 0));
-  });
-
-  //리팩토링 제안이 모두 걸러졌을 때 안내
-  const sugContent = document.getElementById('suggestions-content');
-  if (sugContent) {
-    let sugNoMatch = sugContent.querySelector('.diag-no-match');
-    const sugItems = sugContent.querySelectorAll('.suggestion-item');
-    const sugVisible = sugContent.querySelectorAll('.suggestion-item:not(.hidden)').length;
-    if (!sugNoMatch && sugItems.length) {
-      sugNoMatch = document.createElement('div');
-      sugNoMatch.className = 'diag-empty diag-no-match';
-      sugNoMatch.textContent = '일치하는 제안이 없습니다';
-      sugContent.appendChild(sugNoMatch);
+  for (const entry of files) {
+    const st = (entry.metrics && entry.metrics.status) || 'N/A';
+    if (byStatus[st]) {
+      byStatus[st].push(_makeCouplingRow(entry, criteria));
     }
-    if (sugNoMatch) sugNoMatch.classList.toggle('hidden', !(sugItems.length && sugVisible === 0));
   }
 
-  const countEl = document.getElementById('diag-search-count');
-  if (countEl) countEl.textContent = terms.length ? `${shown}/${total}` : '';
+  const hazardCount = byStatus.HAZARD.length;
+  const warnCount = byStatus.WARN.length;
+
+  if (files.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'diag-empty';
+    empty.textContent = '분석된 파일이 없습니다';
+    pane.appendChild(empty);
+  } else {
+    if (criteria) {
+      const note = document.createElement('div');
+      note.className = 'coupling-criteria';
+      const cboWarnCond = criteria.minCboWarn ? ` (CBO ≥ ${criteria.minCboWarn})` : '';
+      const cboHazardCond = criteria.minCboHazard
+        ? ` (CBO ≥ ${criteria.minCboHazard} 시 HAZARD)`
+        : ' < HAZARD';
+      note.textContent =
+        `판정 기준 ${criteria.name} · I = Ce/(Ca+Ce) · ` +
+        `SAFE ≤ ${criteria.safeMax}${criteria.minCboWarn ? ` (또는 CBO < ${criteria.minCboWarn})` : ''} < WARN${cboWarnCond} ≤ ${criteria.warnMax}${cboHazardCond}, ` +
+        `또는 Ce ≥ ${criteria.ceHazard}이면 HAZARD`;
+      pane.appendChild(note);
+    }
+
+    //등급 필터 칩 바 (전체 | HAZARD | WARN | SAFE | N/A)
+    const filterBar = document.createElement('div');
+    filterBar.className = 'coupling-filter-bar';
+    let activeStatusFilter = 'ALL';
+
+    const applyStatusFilter = (targetStatus) => {
+      activeStatusFilter = targetStatus;
+      filterBar.querySelectorAll('.coupling-filter-chip').forEach((btn) => {
+        const isSelected = btn.dataset.filter === activeStatusFilter;
+        btn.classList.toggle('active', isSelected);
+        btn.setAttribute('aria-pressed', String(isSelected));
+      });
+      pane.querySelectorAll('.diag-group[data-status]').forEach((grp) => {
+        const match = activeStatusFilter === 'ALL' || grp.dataset.status === activeStatusFilter;
+        grp.classList.toggle('status-filtered-out', !match);
+        //특정 등급을 직접 선택했을 때는 해당 그룹을 자동으로 펼쳐준다
+        if (match && activeStatusFilter !== 'ALL') {
+          grp.classList.remove('collapsed');
+          const hdr = grp.querySelector('.diag-group-header');
+          const chv = grp.querySelector('.diag-group-chevron');
+          if (hdr) hdr.setAttribute('aria-expanded', 'true');
+          if (chv) chv.textContent = '▾';
+        }
+      });
+    };
+
+    const filterDefs = [
+      { key: 'ALL', label: `전체 ${files.length}`, cls: 'chip-all' },
+      ...statuses
+        .filter((st) => byStatus[st].length > 0)
+        .map((st) => ({
+          key: st,
+          label: `${st} ${byStatus[st].length}`,
+          cls: 'chip-' + (st === 'N/A' ? 'na' : st.toLowerCase()),
+        })),
+    ];
+
+    for (const def of filterDefs) {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = `coupling-filter-chip ${def.cls}${def.key === 'ALL' ? ' active' : ''}`;
+      chip.dataset.filter = def.key;
+      chip.setAttribute('aria-pressed', String(def.key === 'ALL'));
+      chip.textContent = def.label;
+      chip.addEventListener('click', () => {
+        const next = activeStatusFilter === def.key && def.key !== 'ALL' ? 'ALL' : def.key;
+        applyStatusFilter(next);
+      });
+      filterBar.appendChild(chip);
+    }
+    pane.appendChild(filterBar);
+
+    //등급별 접이식 그룹 (HAZARD·WARN은 기본 펼침, SAFE·N/A는 기본 접힘)
+    for (const st of statuses) {
+      const rows = byStatus[st];
+      if (!rows.length) continue;
+      const isDefaultCollapsed = st === 'SAFE' || st === 'N/A';
+      const statusSlug = st === 'N/A' ? 'na' : st.toLowerCase();
+      const group = _makeCollapsibleGroup(st, rows, {
+        collapsedByDefault: isDefaultCollapsed,
+        badgeClass: `coupling-group-badge status-${statusSlug}`,
+        subHeaderEl: _makeCouplingHeader(),
+        statusKey: st,
+      });
+      pane.appendChild(group);
+    }
+
+    const noMatch = document.createElement('div');
+    noMatch.className = 'diag-empty diag-no-match hidden';
+    noMatch.textContent = '일치하는 항목이 없습니다';
+    pane.appendChild(noMatch);
+  }
+
+  return {
+    pane,
+    badgeText: hazardCount > 0 ? `HAZARD ${hazardCount}` : String(files.length),
+    totalCount: files.length,
+    badgeVariant: hazardCount > 0 ? 'hazard' : warnCount > 0 ? 'warn' : 'safe',
+  };
 }
 
-function showDiagnosticsPanel(diagnostics, suggestions) {
-  const panel = document.getElementById('diagnostics-panel');
-  const content = document.getElementById('diagnostics-content');
-  const suggestionsContent = document.getElementById('suggestions-content');
+//3. 리팩토링 제안 카테고리 뷰 생성
+function _buildSuggestionsPane(suggestions) {
+  const pane = document.createElement('div');
+  pane.className = 'diag-cat-pane';
+  pane.dataset.cat = 'suggestions';
 
-  content.textContent = '';
-  suggestionsContent.textContent = '';
-
-  //순환 참조 섹션
-  const fileCycles = diagnostics.cycles.files || [];
-  const funcCycles = diagnostics.cycles.functions || [];
-  const cycleItems = [
-    ...fileCycles.map((cycle) =>
-      _makeDiagItem(
-        'error',
-        `파일 순환: ${cycle.map((f) => f.split('/').pop()).join(' → ')}`,
-        cycle,
-      ),
-    ),
-    ...funcCycles.map((cycle) =>
-      _makeDiagItem(
-        'warning',
-        `함수 순환: ${cycle.map((n) => n.split('::').pop()).join(' → ')}`,
-        cycle,
-      ),
-    ),
-  ];
-  content.appendChild(_makeDiagSection('순환 참조', cycleItems, '순환 참조가 없습니다'));
-
-  //파일 결합도 섹션 (CR-RFC-2026-002) — 파일별 판정과 원값 표
-  content.appendChild(_makeCouplingSection(diagnostics.coupling));
-
-  //안티패턴 섹션
-  const antiItems = (diagnostics.antiPatterns || []).map((issue) =>
-    _makeDiagItem('info', issue.message, [issue.nodeId]),
-  );
-  content.appendChild(_makeDiagSection('안티패턴', antiItems, '안티패턴이 없습니다'));
-
-  //리팩토링 제안 표시
-  if (suggestions && suggestions.length > 0) {
-    for (const sug of suggestions) {
+  const list = suggestions || [];
+  if (list.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'diag-empty';
+    empty.textContent = '리팩토링 제안이 없습니다';
+    pane.appendChild(empty);
+  } else {
+    for (const sug of list) {
       const item = document.createElement('div');
       item.className = 'suggestion-item';
       item.dataset.search = [
@@ -796,14 +911,189 @@ function showDiagnosticsPanel(diagnostics, suggestions) {
       actions.appendChild(diffBtn);
       item.appendChild(actions);
 
-      suggestionsContent.appendChild(item);
+      pane.appendChild(item);
     }
-  } else {
-    const empty = document.createElement('div');
-    empty.className = 'diag-empty';
-    empty.textContent = '리팩토링 제안이 없습니다';
-    suggestionsContent.appendChild(empty);
+
+    const noMatch = document.createElement('div');
+    noMatch.className = 'diag-empty diag-no-match hidden';
+    noMatch.textContent = '일치하는 제안이 없습니다';
+    pane.appendChild(noMatch);
   }
+
+  return {
+    pane,
+    badgeText: String(list.length),
+    totalCount: list.length,
+    badgeVariant: '',
+  };
+}
+
+//확장형 진단 카테고리 레지스트리 — 새 진단 항목 추가 시 이 배열에 객체만 등록하면 상단 블록과 뷰가 자동 생성된다
+const DIAG_CATEGORIES = [
+  {
+    id: 'cycles',
+    label: '순환 참조',
+    build: (diagnostics) => _buildCyclesPane(diagnostics && diagnostics.cycles),
+  },
+  {
+    id: 'coupling',
+    label: '파일 결합도',
+    build: (diagnostics) => _buildCouplingPane(diagnostics && diagnostics.coupling),
+  },
+  {
+    id: 'suggestions',
+    label: '리팩토링 제안',
+    build: (_diagnostics, suggestions) => _buildSuggestionsPane(suggestions),
+  },
+];
+
+let _activeDiagCategory = null;
+
+function _switchDiagCategory(catId) {
+  _activeDiagCategory = catId;
+  const bar = document.getElementById('diag-cat-bar');
+  const content = document.getElementById('diagnostics-content');
+  if (bar) {
+    bar.querySelectorAll('.diag-cat-block').forEach((btn) => {
+      const isSelected = btn.dataset.cat === catId;
+      btn.classList.toggle('active', isSelected);
+      btn.setAttribute('aria-selected', String(isSelected));
+    });
+  }
+  if (content) {
+    content.querySelectorAll('.diag-cat-pane').forEach((pane) => {
+      pane.classList.toggle('hidden', pane.dataset.cat !== catId);
+    });
+  }
+}
+
+//검색어로 진단 항목·리팩토링 제안을 거른다 (공백으로 나눈 단어가 모두 들어있어야 일치)
+function filterDiagnostics(query) {
+  const panel = document.getElementById('diagnostics-panel');
+  if (!panel) return;
+  const terms = String(query || '')
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean);
+  let shown = 0;
+  let total = 0;
+
+  panel.querySelectorAll('.diag-item, .suggestion-item').forEach((item) => {
+    const text = item.dataset.search || item.textContent.toLowerCase();
+    const match = terms.every((t) => text.includes(t));
+    item.classList.toggle('hidden', !match);
+    total++;
+    if (match) shown++;
+  });
+
+  //접이식 서브 그룹별 카운트 갱신 및 검색 매칭 시 자동 펼침
+  panel.querySelectorAll('.diag-group').forEach((group) => {
+    const items = group.querySelectorAll('.diag-item');
+    const visible = group.querySelectorAll('.diag-item:not(.hidden)').length;
+    const count = group.querySelector('.diag-section-count');
+    const groupTotal = count ? Number(count.dataset.total) : items.length;
+    if (count) {
+      count.textContent =
+        terms.length && groupTotal > 0 ? `${visible}/${groupTotal}` : String(groupTotal);
+    }
+    if (terms.length > 0 && visible > 0 && group.classList.contains('collapsed')) {
+      group.classList.remove('collapsed');
+      const hdr = group.querySelector('.diag-group-header');
+      const chv = group.querySelector('.diag-group-chevron');
+      if (hdr) hdr.setAttribute('aria-expanded', 'true');
+      if (chv) chv.textContent = '▾';
+    }
+  });
+
+  //카테고리 블록 탭 배지 및 빈 결과 안내 갱신
+  const bar = document.getElementById('diag-cat-bar');
+  panel.querySelectorAll('.diag-cat-pane').forEach((pane) => {
+    const catId = pane.dataset.cat;
+    const items = pane.querySelectorAll('.diag-item, .suggestion-item');
+    const visible = pane.querySelectorAll(
+      '.diag-item:not(.hidden), .suggestion-item:not(.hidden)',
+    ).length;
+    const noMatch = pane.querySelector('.diag-no-match');
+    if (noMatch) noMatch.classList.toggle('hidden', !(items.length && visible === 0));
+
+    if (bar) {
+      const badge = bar.querySelector(`.diag-cat-block[data-cat="${catId}"] .diag-cat-badge`);
+      if (badge) {
+        badge.textContent = terms.length
+          ? `${visible}/${items.length}`
+          : badge.dataset.defaultBadge || String(items.length);
+      }
+    }
+  });
+
+  const countEl = document.getElementById('diag-search-count');
+  if (countEl) countEl.textContent = terms.length ? `${shown}/${total}` : '';
+}
+
+function hideDiagnosticsPanel() {
+  const panel = document.getElementById('diagnostics-panel');
+  if (!panel || panel.classList.contains('collapsed')) return;
+  panel.classList.add('collapsed');
+  setTimeout(() => {
+    if (typeof cy !== 'undefined' && cy) {
+      cy.resize();
+      cy.fit(undefined, 30);
+    }
+  }, 310);
+}
+
+function showDiagnosticsPanel(diagnostics, suggestions) {
+  const panel = document.getElementById('diagnostics-panel');
+  const fileTreePanel = document.getElementById('file-tree-panel');
+  const catBar = document.getElementById('diag-cat-bar');
+  const content = document.getElementById('diagnostics-content');
+
+  if (fileTreePanel && !fileTreePanel.classList.contains('collapsed')) {
+    fileTreePanel.classList.add('collapsed');
+  }
+
+  if (catBar) catBar.textContent = '';
+  content.textContent = '';
+
+  const builtCategories = [];
+
+  for (const catDef of DIAG_CATEGORIES) {
+    const result = catDef.build(diagnostics || {}, suggestions || []);
+    builtCategories.push({ def: catDef, result });
+
+    if (catBar) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'diag-cat-block';
+      btn.dataset.cat = catDef.id;
+      btn.setAttribute('role', 'tab');
+      btn.setAttribute('aria-selected', 'false');
+
+      const labelEl = document.createElement('span');
+      labelEl.className = 'diag-cat-label';
+      labelEl.textContent = catDef.label;
+
+      const badgeEl = document.createElement('span');
+      badgeEl.className =
+        'diag-cat-badge' + (result.badgeVariant ? ` badge-${result.badgeVariant}` : '');
+      badgeEl.dataset.defaultBadge = result.badgeText;
+      badgeEl.textContent = result.badgeText;
+
+      btn.appendChild(labelEl);
+      btn.appendChild(badgeEl);
+      btn.addEventListener('click', () => _switchDiagCategory(catDef.id));
+      catBar.appendChild(btn);
+    }
+
+    content.appendChild(result.pane);
+  }
+
+  //초기 활성 카테고리 선택: 이전에 선택한 탭이 유효하면 유지, 아니면 첫 번째 카테고리 선택
+  const validPrev = builtCategories.some((c) => c.def.id === _activeDiagCategory);
+  const initialCat = validPrev
+    ? _activeDiagCategory
+    : (builtCategories[0] && builtCategories[0].def.id) || 'cycles';
+  _switchDiagCategory(initialCat);
 
   //다시 열어도 이전 검색어를 유지한다
   const searchInput = document.getElementById('diag-search-input');
@@ -823,7 +1113,14 @@ function showDiagnosticsPanel(diagnostics, suggestions) {
     filterDiagnostics(searchInput.value);
   }
 
-  panel.classList.remove('hidden');
+  const wasClosed = panel.classList.contains('collapsed');
+  panel.classList.remove('collapsed');
+  if (wasClosed && typeof cy !== 'undefined' && cy) {
+    setTimeout(() => {
+      cy.resize();
+      cy.fit(undefined, 30);
+    }, 310);
+  }
 }
 
 /* ── 참조 팝업 ── */
@@ -996,6 +1293,416 @@ function formatExplanation(text) {
   return fragment;
 }
 
+//파일의 입·출력 참조 파일 목록(Ca, Ce)을 그래프 데이터에서 수집한다
+function _collectFileDependencies(filePath) {
+  const incoming = new Set();
+  const outgoing = new Set();
+  const data = (typeof lastAnalysisData !== 'undefined' && lastAnalysisData) || graphData;
+  if (!data) return { incoming: [], outgoing: [] };
+
+  const edgeGroups = [data.edges, data.inheritanceEdges, data.variableEdges, data.webEdges];
+  for (const edges of edgeGroups) {
+    for (const edge of edges || []) {
+      const src = _diagFilePath(edge.source);
+      const tgt = _diagFilePath(edge.target);
+      if (!src || !tgt || src === tgt) continue;
+      if (src === filePath) outgoing.add(tgt);
+      if (tgt === filePath) incoming.add(src);
+    }
+  }
+  return { incoming: Array.from(incoming), outgoing: Array.from(outgoing) };
+}
+
+//API 키 미설정(503) 시 결합도 지표와 참조 목록으로 3줄 리팩토링 가이드를 생성한다
+function _buildFallbackCouplingText(filePath, metrics, deps) {
+  const shortName = filePath.split('/').pop();
+  const status = metrics.status || 'HAZARD';
+  const inst = metrics.instability ?? '-';
+  const ca = metrics.ca ?? 0;
+  const ce = metrics.ce ?? 0;
+  const outNames =
+    deps.outgoing.length > 0
+      ? deps.outgoing
+          .slice(0, 3)
+          .map((f) => f.split('/').pop())
+          .join(', ')
+      : '외부 모듈';
+  return [
+    `1. 결합도 진단: ${shortName} 파일은 불안정성(I=${inst})과 외부 참조(Ce=${ce}, 피참조 Ca=${ca})로 인해 ${status} 등급으로 판정되었습니다.`,
+    `2. 분리 대상: ${outNames} 등 외부 모듈을 직접 호출하는 로직과 핵심 도메인 로직을 분리해야 합니다.`,
+    `3. 리팩토링 방향: 공통 인터페이스나 어댑터 계층을 도입해 직접 참조(Ce)를 줄이고 단일 책임 원칙에 맞게 모듈을 분할하세요.`,
+  ].join('\n');
+}
+
+//결합도 요약 카드(Figma .ai-card 포맷)를 생성한다
+function _renderCouplingCard(
+  filePath,
+  metrics,
+  deps,
+  onGenerateClick,
+  stepsText = null,
+  isLoading = false,
+  errorMsg = null,
+) {
+  const card = document.createElement('section');
+  card.className = 'ai-card';
+
+  const shortName = filePath.split('/').pop();
+  const status = metrics.status || 'N/A';
+  const statusClass = status.toLowerCase().replace(/[^a-z0-9]/g, '-');
+
+  let percentText = 'N/A';
+  if (
+    metrics.instability !== null &&
+    metrics.instability !== undefined &&
+    !isNaN(metrics.instability)
+  ) {
+    percentText = `${Math.round(metrics.instability * 100)}%`;
+  }
+
+  // 1. Top bar: 아이콘 + 제목 + 접힘 요약 + 심각도 배지 + 접기/펼치기 버튼
+  const top = document.createElement('div');
+  top.className = 'ai-card-top';
+
+  const heading = document.createElement('div');
+  heading.className = 'ai-heading';
+
+  const iconSpan = document.createElement('span');
+  iconSpan.className = 'ai-heading-icon';
+  iconSpan.innerHTML =
+    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
+    '<path d="m12 3 1.2 3.3L16.5 7.5l-3.3 1.2L12 12l-1.2-3.3-3.3-1.2 3.3-1.2z" />' +
+    '<path d="m18 14 .8 2.2L21 17l-2.2.8L18 20l-.8-2.2L15 17l2.2-.8z" />' +
+    '<path d="m5 14 .6 1.4L7 16l-1.4.6L5 18l-.6-1.4L3 16l1.4-.6z" />' +
+    '</svg>';
+  heading.appendChild(iconSpan);
+
+  const titleStrong = document.createElement('strong');
+  titleStrong.textContent = 'AI code insight';
+  heading.appendChild(titleStrong);
+
+  top.appendChild(heading);
+
+  const topRight = document.createElement('div');
+  topRight.className = 'ai-top-right';
+
+  const severity = document.createElement('span');
+  severity.className = 'severity severity-' + statusClass;
+  severity.textContent = status;
+  topRight.appendChild(severity);
+
+  const toggleBtn = document.createElement('button');
+  toggleBtn.type = 'button';
+  toggleBtn.className = 'ai-card-toggle';
+  toggleBtn.setAttribute('aria-expanded', 'true');
+  toggleBtn.title = 'AI Code Insight 접기/펼치기';
+  toggleBtn.innerHTML = '<span class="ai-toggle-chevron">▾</span>';
+  topRight.appendChild(toggleBtn);
+
+  top.appendChild(topRight);
+  card.appendChild(top);
+
+  // 접기/펼치기 이벤트
+  toggleBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const isCollapsed = card.classList.toggle('collapsed');
+    toggleBtn.setAttribute('aria-expanded', String(!isCollapsed));
+  });
+  top.addEventListener('click', () => {
+    if (card.classList.contains('collapsed')) {
+      card.classList.remove('collapsed');
+      toggleBtn.setAttribute('aria-expanded', 'true');
+    }
+  });
+
+  // 2. Card Body: 본문 영역 (접었을 때 숨김)
+  const body = document.createElement('div');
+  body.className = 'ai-card-body';
+
+  // Headline: [현재 파일 이름] [결합도 퍼센티지]
+  const headline = document.createElement('div');
+  headline.className = 'insight-title';
+
+  const fileNameSpan = document.createElement('span');
+  fileNameSpan.className = 'insight-filename';
+  fileNameSpan.textContent = shortName;
+  headline.appendChild(fileNameSpan);
+
+  const percentSpan = document.createElement('span');
+  percentSpan.className = 'insight-percent severity-' + statusClass;
+  percentSpan.textContent = `[ ${percentText} ]`;
+  headline.appendChild(percentSpan);
+
+  body.appendChild(headline);
+
+  // Description paragraph
+  const desc = document.createElement('p');
+  const outCount = deps.outgoing.length;
+  const inCount = metrics.ca !== undefined ? metrics.ca : deps.incoming ? deps.incoming.length : 0;
+  const outList = deps.outgoing
+    .slice(0, 3)
+    .map((f) => f.split('/').pop())
+    .join(', ');
+  const outExtra = outCount > 3 ? ` 외 ${outCount - 3}개` : '';
+  const outSummary = outCount > 0 ? `${outList}${outExtra}` : '외부 모듈';
+
+  const cbo = metrics.cbo !== undefined ? metrics.cbo : outCount + inCount;
+  const currentStatus = status || metrics.status || 'SAFE';
+
+  let descText = `외부 참조(Ce) ${outCount}개${outCount > 0 ? `(${outSummary})` : ''} · 피참조(Ca) ${inCount}개`;
+
+  if (currentStatus === 'HAZARD') {
+    if (outCount >= (window.criteria?.ceHazard ?? 10)) {
+      descText +=
+        '로, 과도하게 많은 외부 모듈을 직접 참조하여 높은 결합도 위험(HAZARD)이 있습니다.';
+    } else {
+      descText +=
+        '로, 높은 외부 의존성과 결합도로 인해 외부 변경에 매우 취약한 위험(HAZARD) 상태입니다.';
+    }
+  } else if (currentStatus === 'WARN') {
+    if (inCount >= 3) {
+      descText +=
+        '로, 여러 모듈이 참조하고 있어 본 파일 변경 시 다른 모듈로의 파급 영향(WARN)에 유의해야 합니다.';
+    } else {
+      descText +=
+        '로, 외부 모듈 의존도가 높아 의존 대상 변경 시 영향을 받을 가능성(WARN)이 있습니다.';
+    }
+  } else {
+    // SAFE or N/A
+    if (cbo < (window.criteria?.minCboWarn ?? 5)) {
+      descText += '로, 결합도 규모가 작아 구조적으로 안정적인(SAFE) 상태입니다.';
+    } else {
+      descText += '로, 안정적인 의존 관계와 결합도 균형(SAFE)을 유지하고 있습니다.';
+    }
+  }
+  desc.textContent = descText;
+  body.appendChild(desc);
+
+  // Loading or Steps or Error
+  if (isLoading) {
+    const loadingEl = document.createElement('div');
+    loadingEl.className = 'cv-explain-loading';
+    loadingEl.style.marginTop = '12px';
+    const spinner = document.createElement('span');
+    spinner.className = 'loading-spinner';
+    const loadingText = document.createElement('span');
+    loadingText.textContent =
+      'AI가 코드와 결합도 지표를 분석해 리팩토링 제안을 도출하고 있습니다...';
+    loadingEl.appendChild(spinner);
+    loadingEl.appendChild(loadingText);
+    body.appendChild(loadingEl);
+  } else if (errorMsg) {
+    const errEl = document.createElement('div');
+    errEl.className = 'cv-explain-note';
+    errEl.style.color = '#dc2626';
+    errEl.style.marginTop = '10px';
+    errEl.textContent = errorMsg;
+    body.appendChild(errEl);
+  } else if (stepsText) {
+    body.appendChild(_renderCouplingSteps(stepsText));
+  }
+
+  // Action Buttons
+  if (onGenerateClick && !isLoading) {
+    const actions = document.createElement('div');
+    actions.className = 'ai-actions';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = stepsText ? '다시 진단하기' : '진단하기';
+    btn.title = 'Claude AI를 호출하여 3줄 결합도 리팩토링 제안을 생성합니다';
+    btn.addEventListener('click', onGenerateClick);
+    actions.appendChild(btn);
+    body.appendChild(actions);
+  }
+
+  card.appendChild(body);
+  return card;
+}
+
+//AI가 반환한 3줄 리팩토링 제안을 단계별 카드 리스트로 변환한다
+function _renderCouplingSteps(text) {
+  const container = document.createElement('div');
+  container.className = 'ai-steps';
+
+  const raw = String(text || '').trim();
+  const defaultLabels = ['진단', '분리 대상', '리팩토링'];
+  const tagClasses = ['step-diag', 'step-target', 'step-action'];
+
+  //1차 시도: "1. 결합도 진단: ...", "2. 분리 대상: ...", "3. 리팩토링 방향: ..." 등 섹션 단위 파싱
+  const secRegex =
+    /(?:^|\n)\s*(?:[1-3][.)]\s*)?(결합도\s*진단|분리\s*대상|리팩토링\s*방향|진단|해결)\s*[:：]\s*([\s\S]*?)(?=(?:\n\s*(?:[1-3][.)]\s*)?(?:결합도\s*진단|분리\s*대상|리팩토링\s*방향|진단|해결)\s*[:：])|$)/g;
+  const sections = [];
+  let sm;
+  while ((sm = secRegex.exec(raw)) !== null) {
+    const content = sm[2].trim();
+    if (content) sections.push({ text: content });
+  }
+
+  //2차 시도: 번호 매기기 기준 파싱 ("1. ...", "2. ...", "3. ...")
+  let items = sections;
+  if (items.length < 2) {
+    const numRegex = /(?:^|\n)\s*([1-3])[.)]\s*([\s\S]*?)(?=(?:\n\s*[1-3][.)])|$)/g;
+    const numItems = [];
+    let nm;
+    while ((nm = numRegex.exec(raw)) !== null) {
+      const clean = nm[2]
+        .replace(/^(결합도\s*진단|분리\s*대상|리팩토링\s*방향|진단|해결)\s*[:：]\s*/, '')
+        .trim();
+      if (clean) numItems.push({ text: clean });
+    }
+    if (numItems.length >= 2) items = numItems;
+  }
+
+  //3차 fallback: 단순 줄바꿈 분리
+  if (items.length === 0) {
+    items = raw
+      .split('\n')
+      .map((l) => l.trim())
+      .filter(Boolean)
+      .slice(0, 3)
+      .map((l) => ({ text: l.replace(/^\d+[.)]\s*/, '') }));
+  }
+
+  items.slice(0, 3).forEach((item, idx) => {
+    const row = document.createElement('div');
+    row.className = 'ai-step';
+
+    const tag = document.createElement('span');
+    tag.className = 'ai-step-tag ' + (tagClasses[idx] || 'step-action');
+    tag.textContent = defaultLabels[idx] || `단계 ${idx + 1}`;
+
+    const content = document.createElement('span');
+    content.className = 'ai-step-text';
+    content.textContent = item.text;
+
+    row.appendChild(tag);
+    row.appendChild(content);
+    container.appendChild(row);
+  });
+
+  return container;
+}
+
+//결합도 위험(HAZARD/WARN) 파일 선택 시 코드 뷰어 상단에 Figma .ai-card 포맷으로 표시한다
+async function showCouplingExplanation(entry, autoFetch = false) {
+  if (!entry || !entry.file || !entry.metrics) return;
+  if (typeof showViewerExplain !== 'function') return;
+
+  const body = showViewerExplain('AI 결합도 리팩토링 제안');
+  if (!body) return;
+
+  const box = document.getElementById('code-viewer-explain');
+  if (box) box.classList.add('is-ai-card');
+
+  const seq = ++explainSeq;
+  const filePath = entry.file;
+  const metrics = entry.metrics;
+  const deps = _collectFileDependencies(filePath);
+  const cacheKey = `coupling::${filePath}`;
+
+  //이미 캐시된 결과가 있다면 바로 카드 표시
+  if (explainCache[cacheKey]) {
+    body.textContent = '';
+    body.appendChild(
+      _renderCouplingCard(filePath, metrics, deps, fetchAndRenderAI, explainCache[cacheKey], false),
+    );
+    return;
+  }
+
+  //AI 호출 실행 함수 (버튼 클릭 시 또는 autoFetch=true일 때 호출)
+  const fetchAndRenderAI = async () => {
+    body.textContent = '';
+    body.appendChild(_renderCouplingCard(filePath, metrics, deps, null, null, true));
+
+    try {
+      let code = '';
+      if (typeof fetchFileCode === 'function') {
+        try {
+          code = await fetchFileCode(filePath);
+        } catch (_e) {
+          /* fallback below */
+        }
+      }
+      if (!code) {
+        const data = (typeof lastAnalysisData !== 'undefined' && lastAnalysisData) || graphData;
+        const snippets = ((data && data.nodes) || [])
+          .filter((n) => n.data && n.data.filePath === filePath && n.data.code)
+          .map((n) => n.data.code);
+        code = snippets.join('\n\n') || `// ${filePath}`;
+      }
+      if (seq !== explainSeq) return;
+
+      const response = await fetch('/api/explain/coupling', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          filePath,
+          code,
+          metrics,
+          dependencies: deps,
+        }),
+      });
+      if (seq !== explainSeq) return;
+
+      let explanationText = '';
+      if (!response.ok) {
+        if (response.status === 503) {
+          explanationText = _buildFallbackCouplingText(filePath, metrics, deps);
+        } else {
+          const err = await response.json().catch(() => ({}));
+          if (seq !== explainSeq) return;
+          body.textContent = '';
+          body.appendChild(
+            _renderCouplingCard(
+              filePath,
+              metrics,
+              deps,
+              fetchAndRenderAI,
+              null,
+              false,
+              `리팩토링 제안을 가져올 수 없습니다: ${err.error || '서버 오류'}`,
+            ),
+          );
+          return;
+        }
+      } else {
+        const data = await response.json();
+        if (seq !== explainSeq) return;
+        explanationText = data.explanation || _buildFallbackCouplingText(filePath, metrics, deps);
+      }
+
+      explainCache[cacheKey] = explanationText;
+
+      body.textContent = '';
+      body.appendChild(
+        _renderCouplingCard(filePath, metrics, deps, fetchAndRenderAI, explanationText, false),
+      );
+    } catch (err) {
+      if (seq !== explainSeq) return;
+      body.textContent = '';
+      body.appendChild(
+        _renderCouplingCard(
+          filePath,
+          metrics,
+          deps,
+          fetchAndRenderAI,
+          null,
+          false,
+          `네트워크 오류: ${err.message}`,
+        ),
+      );
+    }
+  };
+
+  if (autoFetch) {
+    fetchAndRenderAI();
+  } else {
+    //토큰 낭비 방지: 카드 지표와 설명만 먼저 띄우고 [진단하기] 버튼을 제공
+    body.textContent = '';
+    body.appendChild(_renderCouplingCard(filePath, metrics, deps, fetchAndRenderAI, null, false));
+  }
+}
+
 /* ── 검색/필터 기능 ── */
 
 //검색어에 매칭되는 노드를 찾는다 (입력·Enter·다시 렌더링에서 함께 쓴다)
@@ -1087,7 +1794,7 @@ function setupKeyboardShortcuts() {
       hideFunctionPreview();
       hideEdgePreview();
       if (typeof hideCodeViewer === 'function') hideCodeViewer();
-      document.getElementById('diagnostics-panel').classList.add('hidden');
+      if (typeof hideDiagnosticsPanel === 'function') hideDiagnosticsPanel();
       const diffOverlay = document.getElementById('diff-overlay');
       if (diffOverlay) diffOverlay.classList.add('hidden');
       if (isInput) document.activeElement.blur();
@@ -1101,7 +1808,7 @@ function setupKeyboardShortcuts() {
       //진단 패널이 열려 있으면 진단 검색창으로
       const diagPanel = document.getElementById('diagnostics-panel');
       const diagSearch = document.getElementById('diag-search-input');
-      if (diagPanel && diagSearch && !diagPanel.classList.contains('hidden')) {
+      if (diagPanel && diagSearch && !diagPanel.classList.contains('collapsed')) {
         diagSearch.focus();
         diagSearch.select();
         return;
@@ -1363,6 +2070,8 @@ function showFunctionList(node) {
   const fileName = node.data('label') || '';
   const filePath = node.data('fullPath') || '';
   const functions = node.data('functions') || [];
+  const metrics = node.data('metrics');
+  const isRiskyFile = metrics && (metrics.status === 'HAZARD' || metrics.status === 'WARN');
 
   header.textContent = fileName;
   header.title = filePath || fileName;
@@ -1370,15 +2079,26 @@ function showFunctionList(node) {
   fnListEl.textContent = '';
   fnListEl.classList.remove('hidden');
 
-  //목록 머리: 개수 + 숫자↑ 설명 (범례와 같은 내용)
+  //목록 머리: 접기/펼치기 토글 + 개수 + 설명
   const head = document.createElement('div');
   head.className = 'fn-list-head';
+
+  const left = document.createElement('div');
+  left.className = 'fn-list-head-left';
+  const chevron = document.createElement('span');
+  chevron.className = 'fn-list-chevron';
+  chevron.textContent = '▾';
   const count = document.createElement('span');
+  count.className = 'fn-list-title';
   count.textContent = '함수 ' + functions.length + '개';
+  left.appendChild(chevron);
+  left.appendChild(count);
+
   const hint = document.createElement('span');
   hint.className = 'fn-list-hint';
   hint.textContent = '↓ 불린 횟수   ↑ 부른 횟수';
-  head.appendChild(count);
+
+  head.appendChild(left);
   head.appendChild(hint);
   fnListEl.appendChild(head);
 
@@ -1389,11 +2109,18 @@ function showFunctionList(node) {
     fnListEl.appendChild(empty);
     //함수가 없으면 전체 코드를 바로 보여준다
     if (typeof showFullFileCode === 'function') showFullFileCode(filePath);
+    if (isRiskyFile) showCouplingExplanation({ file: filePath, metrics });
     return;
   }
 
   const list = document.createElement('div');
-  list.className = 'fn-list';
+  list.className = 'fn-list-body';
+
+  //접기/펼치기 클릭 이벤트
+  head.addEventListener('click', () => {
+    const isCollapsed = fnListEl.classList.toggle('collapsed');
+    chevron.textContent = isCollapsed ? '▸' : '▾';
+  });
 
   const openFn = (fn, index) => {
     if (fn.code && typeof showCodeViewer === 'function') {
@@ -1439,6 +2166,7 @@ function showFunctionList(node) {
   } else {
     panel.classList.remove('collapsed');
   }
+  if (isRiskyFile) showCouplingExplanation({ file: filePath, metrics });
 }
 
 /* ── 엣지 프리뷰 (Phase 2) ── */

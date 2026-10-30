@@ -4,7 +4,7 @@ const { COUPLING_CRITERIA } = require('../config/couplingThresholds');
 //HAZARD 사유별 판정 근거와 권장 조치 (사유 키는 metricsService의 hazard_reasons와 같다)
 const HAZARD_ADVICE = {
   instability: {
-    reason: `불안정성 I > ${COUPLING_CRITERIA.warnMax}`,
+    reason: `불안정성 I > ${COUPLING_CRITERIA.warnMax} (CBO ≥ ${COUPLING_CRITERIA.minCboHazard || 10})`,
     suggestion:
       '다른 파일에 기대기만 하고 이 파일에 기대는 곳은 적어 외부 변경에 쉽게 흔들립니다. ' +
       '자주 바뀌는 의존 대상을 인터페이스(추상화) 뒤로 숨기는 의존성 역전(DIP)을 적용하세요.',

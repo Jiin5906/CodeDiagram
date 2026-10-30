@@ -12,11 +12,15 @@
       crossorigin
       href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"
     />
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/d2coding@1.3.2/d2coding-subset.css" />
-    <link rel="stylesheet" href="css/style.css?v=15" />
     <link
       rel="stylesheet"
-      href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
+    />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/d2coding@1.3.2/d2coding-subset.css" />
+    <link rel="stylesheet" href="css/style.css?v=27" />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css"
     />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/python.min.js"></script>
@@ -213,6 +217,47 @@
         </div>
         <div id="file-tree-content"></div>
       </div>
+      <!--진단 패널 (좌측 접이식, 파일 탐색기와 동일한 사이드 드로어)-->
+      <div id="diagnostics-panel" class="collapsed">
+        <div class="file-tree-header">
+          <span id="diagnostics-title">코드 진단 결과</span>
+          <button id="diagnostics-close" aria-label="닫기">&times;</button>
+        </div>
+        <!--진단 검색: 파일명·함수명·메시지로 필터링-->
+        <div class="diag-search">
+          <svg
+            class="diag-search-icon"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <circle cx="11" cy="11" r="7" />
+            <path d="m20 20-3.5-3.5" />
+          </svg>
+          <input
+            type="search"
+            id="diag-search-input"
+            placeholder="파일명·함수명으로 검색"
+            autocomplete="off"
+            aria-label="진단 결과 검색"
+          />
+          <span id="diag-search-count" aria-live="polite"></span>
+        </div>
+        <!--가변 플렉스 블록 탭 바 (DIAG_CATEGORIES 레지스트리에서 자동 생성)-->
+        <div
+          id="diag-cat-bar"
+          class="diag-cat-bar"
+          role="tablist"
+          aria-label="진단 항목 분류"
+        ></div>
+        <div class="diag-scroll">
+          <div id="diagnostics-content"></div>
+        </div>
+      </div>
       <div id="graph-container">
         <div id="empty-state">
           <div class="empty-state-title">분석할 프로젝트를 입력하세요</div>
@@ -271,7 +316,7 @@
         </div>
       </div>
       <div id="code-viewer-panel" class="collapsed">
-        <!--왼쪽 가장자리를 끌어서 코드 뷰어 너비를 조절한다-->
+        <!--왼쪽 가장자리를 끌어서 너비를 조절한다-->
         <div id="code-viewer-resizer" title="끌어서 너비 조절 (더블클릭: 기본 크기)"></div>
         <div class="code-viewer-header">
           <span id="code-viewer-filename">소스코드</span>
@@ -342,45 +387,6 @@
       </div>
     </div>
 
-    <!--진단 패널-->
-    <div id="diagnostics-panel" class="overlay hidden">
-      <div class="overlay-header">
-        <span id="diagnostics-title">코드 진단 결과</span>
-        <button id="diagnostics-close">&times;</button>
-      </div>
-      <!--진단 검색: 파일명·함수명·메시지로 필터링-->
-      <div class="diag-search">
-        <svg
-          class="diag-search-icon"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          aria-hidden="true"
-        >
-          <circle cx="11" cy="11" r="7" />
-          <path d="m20 20-3.5-3.5" />
-        </svg>
-        <input
-          type="search"
-          id="diag-search-input"
-          placeholder="파일명·함수명으로 검색"
-          autocomplete="off"
-          aria-label="진단 결과 검색"
-        />
-        <span id="diag-search-count" aria-live="polite"></span>
-      </div>
-      <div class="diag-scroll">
-        <div id="diagnostics-content"></div>
-        <div id="suggestions-section">
-          <div class="suggestions-header">리팩토링 제안</div>
-          <div id="suggestions-content"></div>
-        </div>
-      </div>
-    </div>
-
     <!--Diff 비교 오버레이-->
     <div id="diff-overlay" class="hidden">
       <div class="diff-overlay-inner">
@@ -395,13 +401,13 @@
     <script src="js/graph.js?v=23"></script>
     <script src="js/forceSim.js?v=4"></script>
     <script src="js/codeEffects.js?v=5"></script>
-    <script src="js/codeViewer.js?v=10"></script>
+    <script src="js/codeViewer.js?v=15"></script>
     <script src="js/canvasCard.js?v=3"></script>
     <script src="js/localGraph.js?v=3"></script>
     <script src="js/minimap.js?v=3"></script>
-    <script src="js/interactions.js?v=12"></script>
+    <script src="js/interactions.js?v=22"></script>
     <script src="js/diffPreview.js?v=2"></script>
-    <script src="js/fileTree.js?v=4"></script>
-    <script src="js/app.js?v=15"></script>
+    <script src="js/fileTree.js?v=6"></script>
+    <script src="js/app.js?v=17"></script>
   </body>
 </html>

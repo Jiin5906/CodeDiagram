@@ -76,4 +76,33 @@ describe('Anthropic Messages API contract', () => {
     mockCreate.mockRejectedValue(Object.assign(new Error('overloaded'), { status: 529 }));
     await expect(loadAiService().explainFunction(input)).rejects.toThrow('overloaded');
   });
+
+  test('explainCoupling sends coupling metrics and dependencies in prompt', async () => {
+    mockCreate.mockResolvedValue(response);
+    const couplingInput = {
+      filePath: 'services/order.py',
+      code: 'import auth\nimport db\ndef create_order(): pass',
+      metrics: {
+        status: 'HAZARD',
+        instability: 0.85,
+        ca: 1,
+        ce: 6,
+        cbo: 7,
+        hazard_reasons: ['instability', 'efferent'],
+      },
+      dependencies: {
+        incoming: ['app.py'],
+        outgoing: ['auth.py', 'db.py'],
+      },
+    };
+    await expect(loadAiService().explainCoupling(couplingInput)).resolves.toBe(
+      response.content[0].text,
+    );
+
+    expect(mockCreate).toHaveBeenCalledTimes(1);
+    const req = mockCreate.mock.calls[0][0];
+    expect(req.messages[0].content).toContain('services/order.py');
+    expect(req.messages[0].content).toContain('HAZARD');
+    expect(req.messages[0].content).toContain('auth.py, db.py');
+  });
 });

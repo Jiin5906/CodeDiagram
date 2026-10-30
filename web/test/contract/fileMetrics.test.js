@@ -22,6 +22,7 @@ const PROJECTS = [
   'java_project',
   'web_project',
   'inline_script_project',
+  'hazard_project',
 ];
 
 //파일 노드를 응답 스키마 형태({ node_id, metrics, refactor_target })로 바꾼다
