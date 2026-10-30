@@ -1,0 +1,73 @@
+{
+  "description": "AI 리팩토링(/api/refactor) 응답 형식. aiService가 이 스키마를 Claude API의 output_config.format으로 그대로 보내 응답을 강제하므로, 구조화 출력이 지원하는 키워드(type, properties, required, additionalProperties, items, description)만 쓴다. 바꾸면 프론트엔드(diffPreview.js)와 계약 테스트도 함께 갱신한다.",
+  "type": "object",
+  "properties": {
+    "summary": {
+      "type": "string",
+      "description": "리팩토링 방향을 한두 문장으로 요약"
+    },
+    "steps": {
+      "type": "array",
+      "description": "적용 순서대로 나열한 리팩토링 단계",
+      "items": { "type": "string" }
+    },
+    "changes": {
+      "type": "array",
+      "description": "파일별 코드 변경. before는 원본에서 바뀌는 부분, after는 바뀐 뒤의 코드다. 새 파일이면 before를 빈 문자열로 둔다.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "file": { "type": "string", "description": "프로젝트 루트 기준 상대 경로" },
+          "before": { "type": "string" },
+          "after": { "type": "string" },
+          "explanation": { "type": "string" }
+        },
+        "required": ["file", "before", "after", "explanation"],
+        "additionalProperties": false
+      }
+    },
+    "graphDelta": {
+      "type": "object",
+      "description": "리팩토링 후 그래프 변화. 노드 ID는 그래프 형식('경로' 또는 '경로::qualifiedName')을 따른다.",
+      "properties": {
+        "addedNodes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "label": { "type": "string" }
+            },
+            "required": ["id", "label"],
+            "additionalProperties": false
+          }
+        },
+        "removedEdges": { "$ref": "#/$defs/EdgeList" },
+        "addedEdges": { "$ref": "#/$defs/EdgeList" }
+      },
+      "required": ["addedNodes", "removedEdges", "addedEdges"],
+      "additionalProperties": false
+    },
+    "risks": {
+      "type": "array",
+      "description": "적용할 때 주의할 점이나 동작이 바뀔 수 있는 부분",
+      "items": { "type": "string" }
+    }
+  },
+  "required": ["summary", "steps", "changes", "graphDelta", "risks"],
+  "additionalProperties": false,
+  "$defs": {
+    "EdgeList": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "source": { "type": "string" },
+          "target": { "type": "string" }
+        },
+        "required": ["source", "target"],
+        "additionalProperties": false
+      }
+    }
+  }
+}

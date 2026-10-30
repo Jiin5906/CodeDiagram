@@ -17,6 +17,16 @@ updates:
       prefix: chore(deps)
       prefix-development: chore(deps-dev)
     groups:
+      # 프론트엔드 라이브러리(public/vendor/로 복사해서 서빙)는 따로 묶는다. 여러 그룹에 맞으면 먼저 적힌 그룹에 들어간다.
+      # 이 PR은 vendor 복사본을 갱신하기 전까지 CI(vendor.test.js)가 실패한다. 절차: .github/PIPELINE_GUIDE.md "프론트엔드 라이브러리"
+      frontend-libs:
+        patterns:
+          - 'cytoscape*'
+          - 'cose-base'
+          - 'layout-base'
+          - 'dagre'
+          - 'd3-*'
+          - '@highlightjs/cdn-assets'
       # 개발 도구의 minor/patch 갱신은 PR 하나로 묶는다
       dev-tools:
         dependency-type: development
