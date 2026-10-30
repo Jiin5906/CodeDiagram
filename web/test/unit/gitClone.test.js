@@ -106,6 +106,12 @@ describe('cloneRepo 임시 폴더와 동시 요청', () => {
     expect(reposEntries().some((name) => name.includes('.tmp-'))).toBe(false);
   });
 
+  test('폴더 이름은 URL 경로의 마지막 부분에서 안전한 문자만 쓰고 항상 repos/ 바로 아래다', async () => {
+    const dir = await cloneRepo('https://github.com/cd-test/My.Repo%5C..%5Cx.git');
+    expect(path.resolve(path.dirname(dir))).toBe(path.resolve(REPOS_DIR));
+    expect(path.basename(dir)).toMatch(/^My_Repo_5C___5Cx-[0-9a-f]{12}$/);
+  });
+
   test('같은 URL을 동시에 요청하면 clone은 한 번만 하고 결과를 나눠 갖는다', async () => {
     /** @type {() => void} */
     let finish = () => {};

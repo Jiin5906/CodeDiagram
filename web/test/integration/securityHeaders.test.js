@@ -145,6 +145,20 @@ describe('CSP 위반 보고', () => {
     expect(warnSpy.mock.calls[0][0]).toContain('style-src-attr');
   });
 
+  test('보고 값의 줄바꿈은 지워서 가짜 로그 줄을 만들 수 없다', async () => {
+    await request(app)
+      .post('/api/csp-report')
+      .set('content-type', 'application/csp-report')
+      .send(
+        JSON.stringify({
+          'csp-report': { 'blocked-uri': 'x\n[auth] admin login ok\r\n' },
+        }),
+      );
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy.mock.calls[0][0]).not.toMatch(/[\r\n]/);
+    expect(warnSpy.mock.calls[0][0]).toContain('x?[auth] admin login ok??');
+  });
+
   test('10KB가 넘는 보고는 받지 않는다', async () => {
     const res = await request(app)
       .post('/api/csp-report')

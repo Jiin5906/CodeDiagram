@@ -60,6 +60,8 @@ describe('validateGitUrl', () => {
     ['ext::sh -c touch% /tmp/pwned', 400],
     ['https://user:pw@github.com/x/y', 400],
     ['https://token@github.com/x/y', 400],
+    ['https://github.com/x/y?ref=main', 400],
+    ['https://github.com/x/y#\\..\\..\\..\\evil', 400],
     ['https://github.com:8443/x/y', 403],
     ['https://127.0.0.1/x.git', 403],
     ['https://[::1]/x', 403],

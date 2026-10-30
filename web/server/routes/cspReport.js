@@ -36,8 +36,11 @@ function violationsOf(body) {
 }
 
 //로그 한 줄에 필요한 값만 짧게 남긴다 (보고 내용은 브라우저가 보낸 것이라 길이를 자른다)
+//줄바꿈 같은 제어 문자는 ?로 바꿔, 가짜 로그 줄을 끼워 넣지 못하게 한다
 function short(value) {
-  return String(value ?? '-').slice(0, 200);
+  return String(value ?? '-')
+    .replace(/\p{Cc}/gu, '?')
+    .slice(0, 200);
 }
 
 router.post('/', parseReport, (req, res) => {

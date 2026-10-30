@@ -145,6 +145,10 @@ function validateGitUrl(source) {
   if (!gitHosts().has(hostKey)) {
     throw pathError(403, `허용되지 않은 Git 호스트입니다: ${hostKey}`);
   }
+  //?나 # 뒤에는 \가 인코딩되지 않고 남아서, Windows에서 clone 폴더 이름이 repos/ 밖을 가리킬 수 있다
+  if (url.search || url.hash) {
+    throw pathError(400, 'Git URL에 ?나 #를 넣을 수 없습니다.');
+  }
   return url.href;
 }
 
@@ -279,8 +283,17 @@ function holdRepo(dirPath) {
 //url은 validateGitUrl을 거친 값이어야 한다.
 async function cloneRepo(url) {
   const hash = crypto.createHash('sha256').update(url).digest('hex').slice(0, 12);
-  const repoName = url.split('/').pop().replace('.git', '') || 'repo';
+  //폴더 이름은 URL 경로의 마지막 부분에서 안전한 문자만 남겨 만든다 (경로 구분자나 ..이 들어가지 않게)
+  const lastSegment = new URL(url).pathname.split('/').pop() || '';
+  const repoName =
+    lastSegment
+      .replace(/\.git$/, '')
+      .replace(/[^A-Za-z0-9_-]/g, '_')
+      .slice(0, 64) || 'repo';
   const targetDir = path.join(REPOS_DIR, `${repoName}-${hash}`);
+  if (path.dirname(path.resolve(targetDir)) !== path.resolve(REPOS_DIR)) {
+    throw pathError(400, '올바르지 않은 Git URL입니다.');
+  }
 
   //임시 폴더에 받은 뒤 이름을 바꾸므로, 표시 없는 이름의 폴더는 항상 완성된 clone이다
   // eslint-disable-next-line security/detect-non-literal-fs-filename -- REPOS_DIR 아래 해시로 만든 경로
