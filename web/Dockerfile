@@ -13,6 +13,10 @@ COPY package.json package-lock.json .npmrc ./
 
 # ---- test: 개발 의존성까지 설치하고 테스트를 실행 ----
 FROM base AS test
+# clone 보안 설정(GIT_ALLOW_PROTOCOL 등)을 진짜 git으로 검사하는 테스트가 있어 git을 설치한다
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends git \
+ && rm -rf /var/lib/apt/lists/*
 RUN npm ci
 COPY . .
 CMD ["npm", "test"]
@@ -24,6 +28,8 @@ RUN npm ci --omit=dev && npm cache clean --force
 # ---- prod: 빌드 도구 없는 실행 이미지 ----
 FROM node:22.23.3-trixie-slim@sha256:b26b04c123d9ff8ab646ceb18b9d75a1173acf64b9a401094b906d27b29338d4 AS prod
 ENV NODE_ENV=production
+# 컨테이너 밖(-p 포트 매핑)에서 들어오는 요청을 받으려면 모든 인터페이스에 바인딩해야 한다
+ENV HOST=0.0.0.0
 # Git URL 분석 시 simple-git이 git 바이너리로 clone한다
 # 베이스 이미지 이후 나온 OS 보안 업데이트를 반영하고, 실행에 필요 없는 npm/corepack은 지운다(Trivy 지적 대상)
 RUN apt-get update \

@@ -56,7 +56,7 @@ npm run benchmark           # 대규모 코드 자동 생성 후 파싱 시간/�
 
 ### 프론트엔드 (`web/public/`)
 
-번들러/모듈 시스템 없이 `index.html`에서 `<script>` 태그로 순서대로 로드되는 **전역 스코프 스크립트**다. 함수와 상태(`cy`, `lastAnalysisData` 등)는 전역으로 공유되므로 로드 순서(`graph.js` → `codeViewer.js` → `canvasCard.js` → `localGraph.js` → `interactions.js` → `diffPreview.js` → `fileTree.js` → `auth.js` → `app.js`)가 중요하고, 새 파일을 추가하면 `index.html`에 태그를 넣어야 한다. 외부 라이브러리(Cytoscape, fcose, dagre, highlight.js)는 CDN에서 로드한다. 캐시 무효화를 위해 일부 스크립트에 `?v=N` 쿼리가 붙어 있다.
+번들러/모듈 시스템 없이 `index.html`에서 `<script>` 태그로 순서대로 로드되는 **전역 스코프 스크립트**다. 함수와 상태(`cy`, `lastAnalysisData` 등)는 전역으로 공유되므로 로드 순서(`graph.js` → `codeViewer.js` → `canvasCard.js` → `localGraph.js` → `interactions.js` → `diffPreview.js` → `fileTree.js` → `auth.js` → `app.js`)가 중요하고, 새 파일을 추가하면 `index.html`에 태그를 넣어야 한다. 외부 라이브러리(Cytoscape, fcose, dagre, d3, highlight.js)는 devDependencies에 정확한 버전으로 두고 `npm run vendor`로 `public/vendor/<이름>@<버전>/`에 복사해 커밋한 것을 서빙한다(CSP `script-src 'self'`). 버전을 바꾸면 `index.html` 경로도 고친다(절차는 `.github/PIPELINE_GUIDE.md` "프론트엔드 라이브러리"). 폰트만 jsDelivr + SRI다. 캐시 무효화를 위해 일부 스크립트에 `?v=N` 쿼리가 붙어 있다.
 
 - `app.js`: 진입점. 분석 폼 제출 → `/api/analyze` → `renderGraph`, 파일 트리, 범례 구성
 - `graph.js`: Cytoscape 초기화, 스타일, 뷰 모드별 렌더링(`renderGraph`/`renderFunctionView`/`renderPackageView`/`renderFileDetailView`), 줌 레벨에 따른 시맨틱 줌(LOD)

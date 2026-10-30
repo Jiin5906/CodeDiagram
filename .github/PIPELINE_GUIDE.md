@@ -51,6 +51,7 @@ copy .env.example .env                        # AI 해설을 쓰려면 ANTHROPIC
 | `npm run scan:staged` | gitleaks로 스테이징된 변경만 검사 (커밋 훅이 사용) |
 | `npm run scan:image` | Trivy로 `code-diagram:local` 이미지 취약점 검사 (Docker) |
 | `npm run docker:build` / `docker:test` / `docker:run` | prod 이미지 빌드 / test 스테이지에서 테스트 / 서버 실행 |
+| `npm run vendor` | 프론트엔드 라이브러리를 `node_modules`에서 `public/vendor/`로 복사 (아래 "프론트엔드 라이브러리") |
 
 Android(루트에서, 현재 보류): `./gradlew testDebugUnitTest lintDebug assembleDebug`
 
@@ -118,6 +119,28 @@ Android(루트에서, 현재 보류): `./gradlew testDebugUnitTest lintDebug ass
 - **보호 규칙**: 무료 요금제 비공개 저장소라서 아래 두 기능이 강제되지 않습니다. 강제하려면 저장소를 공개로 바꾸거나 GitHub Pro/Team이 필요합니다.
   - "CI 통과해야 병합 가능" 같은 브랜치 보호
   - Environments 승인자(required reviewers)
+
+## 프론트엔드 라이브러리
+
+Cytoscape, fcose, dagre, d3, highlight.js는 CDN이 아니라 서버가 직접 서빙합니다. CDN 변조·장애와 무관하게 하고, CSP의 `script-src`를 `'self'`만 남기기 위해서입니다.
+
+- 패키지는 `web/package.json`의 **devDependencies에 정확한 버전**으로 있습니다. 운영 이미지와 `npm run audit`(운영 의존성)에는 들어가지 않습니다.
+- `npm run vendor`(`scripts/vendor.js`)가 필요한 파일과 LICENSE만 `web/public/vendor/<이름>@<버전>/`로 복사하고, 이 복사본을 **커밋**합니다.
+- 경로에 버전이 들어가서 서버가 `/vendor`에 1년 캐시(immutable)를 겁니다. 버전이 바뀌면 URL도 바뀌므로 이전 파일이 캐시에 남지 않습니다.
+- 폰트(Pretendard, D2Coding)만 jsDelivr에서 받고, `integrity`(SRI)가 맞지 않으면 대체 글꼴로 표시됩니다.
+- `public/vendor/`는 ESLint·Prettier 대상에서 빠져 있습니다. 포맷하면 원본과 달라져 테스트가 실패합니다.
+
+**버전을 올릴 때** (Dependabot `frontend-libs` PR 포함)
+
+1. `web/`에서 `npm install` 후 `npm run vendor`
+2. `public/index.html`의 `vendor/<이름>@<버전>/` 경로를 새 버전으로 수정
+3. `npx jest test/unit/vendor.test.js test/integration/securityHeaders.test.js`
+   - 복사본이 설치된 패키지와 다르거나, `index.html` 경로가 어긋나거나, 쓰지 않는 파일이 남으면 실패합니다.
+   - Cytoscape가 실행 중에 넣는 `<style>` 내용이 바뀌면 실패합니다. 이때는 `server/middleware/securityHeaders.js`의 `CYTOSCAPE_INJECTED_STYLE`을 새 내용으로 고칩니다.
+4. `npm start` 후 브라우저에서 분석 → 파일/함수 뷰 → 진단 패널 → 코드 보기 → diff 미리보기를 한 번씩 확인합니다. 서버 콘솔에 `[csp]` 줄이 나오면 CSP에 막힌 것입니다. 확인 중에는 `.env`에 `CSP_REPORT_ONLY=true`를 두면 막지 않고 보고만 받습니다.
+5. `public/vendor/`, `index.html`, `package.json`, `package-lock.json`을 함께 커밋합니다.
+
+폰트 버전을 바꿀 때는 `index.html`의 `integrity` 값을 새로 계산하고(`curl -sL <URL> | openssl dgst -sha384 -binary | openssl base64 -A`), `securityHeaders.js`의 `FONT_PACKAGES` 경로도 고칩니다. jsDelivr가 자동 생성하는 `.min.css`는 내용이 바뀔 수 있어 SRI를 쓸 수 없으니 원본 파일을 씁니다.
 
 ## 일부러 CI를 깨뜨려 확인하는 방법
 

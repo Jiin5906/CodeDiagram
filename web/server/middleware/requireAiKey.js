@@ -29,6 +29,8 @@ function requireAiKey(req, res, next) {
     });
   }
   res.locals.aiApiKey = apiKey;
+  //AI 호출 횟수 제한(aiRateLimit)이 누구의 비용인지 구분하는 데 쓴다
+  res.locals.aiKeySource = sessionKey ? 'session' : 'fallback';
   next();
 }
 

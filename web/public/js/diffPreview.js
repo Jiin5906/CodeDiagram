@@ -173,6 +173,9 @@ function hideDiffView() {
   if (overlay) overlay.classList.add('hidden');
 }
 
+//닫기 버튼. CSP가 인라인 onclick을 막으므로 여기서 연결한다 (스크립트가 body 끝에서 로드되어 버튼이 이미 있다)
+document.getElementById('diff-close')?.addEventListener('click', hideDiffView);
+
 //── AI 리팩토링 ──
 //제안 하나를 /api/refactor로 보내고, 받은 리팩토링안을 Diff 오버레이에 보여준다.
 //결과는 미리보기일 뿐이며 사용자 파일은 바꾸지 않는다.

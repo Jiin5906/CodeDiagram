@@ -15,6 +15,8 @@ module.exports = [
       'test/fixtures/',
       'test/.benchmark_tmp/',
       'docs/',
+      //npm run vendor로 복사한 라이브러리 원본 (우리 코드가 아님)
+      'public/vendor/',
     ],
   },
   js.configs.recommended,

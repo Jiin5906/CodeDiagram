@@ -12,6 +12,7 @@ const sessionStore = require('../services/sessionStore');
 const { verifyApiKey } = require('../services/aiService');
 const { loginRateLimit } = require('../middleware/loginRateLimit');
 const { readSessionId, setSessionCookie, clearSessionCookie } = require('../utils/cookies');
+const { asyncHandler } = require('../utils/errors');
 
 const router = express.Router();
 
@@ -23,38 +24,42 @@ function dummyLoginEnabled() {
   return process.env.NODE_ENV !== 'production' && process.env.AUTH_DUMMY_LOGIN !== 'false';
 }
 
-router.post('/login', loginRateLimit, async (req, res) => {
-  const apiKey = typeof req.body?.apiKey === 'string' ? req.body.apiKey.trim() : '';
-  if (!API_KEY_PATTERN.test(apiKey)) {
-    if (dummyLoginEnabled()) {
-      startSession(req, res, '');
-      return res.json({ loggedIn: true, dummy: true });
-    }
-    return res.status(400).json({
-      error: 'Anthropic API 키 형식이 아닙니다. sk-ant-로 시작하는 키를 입력해 주세요.',
-      code: 'INVALID_KEY_FORMAT',
-    });
-  }
-
-  try {
-    if (!(await verifyApiKey(apiKey))) {
-      return res.status(401).json({
-        error: 'API 키가 올바르지 않거나 권한이 없습니다.',
-        code: 'INVALID_KEY',
+router.post(
+  '/login',
+  loginRateLimit,
+  asyncHandler(async (req, res) => {
+    const apiKey = typeof req.body?.apiKey === 'string' ? req.body.apiKey.trim() : '';
+    if (!API_KEY_PATTERN.test(apiKey)) {
+      if (dummyLoginEnabled()) {
+        startSession(req, res, '');
+        return res.json({ loggedIn: true, dummy: true });
+      }
+      return res.status(400).json({
+        error: 'Anthropic API 키 형식이 아닙니다. sk-ant-로 시작하는 키를 입력해 주세요.',
+        code: 'INVALID_KEY_FORMAT',
       });
     }
-  } catch (err) {
-    //에러 객체 전체를 찍지 않는다 (요청 정보에 키가 섞여 있을 수 있다)
-    console.error(`[auth] 키 검증 중 오류: ${err.name}`);
-    return res.status(502).json({
-      error: 'Anthropic 서버에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요.',
-      code: 'VERIFY_FAILED',
-    });
-  }
 
-  startSession(req, res, apiKey);
-  res.json({ loggedIn: true });
-});
+    try {
+      if (!(await verifyApiKey(apiKey))) {
+        return res.status(401).json({
+          error: 'API 키가 올바르지 않거나 권한이 없습니다.',
+          code: 'INVALID_KEY',
+        });
+      }
+    } catch (err) {
+      //에러 객체 전체를 찍지 않는다 (요청 정보에 키가 섞여 있을 수 있다)
+      console.error(`[auth] 키 검증 중 오류: ${err.name}`);
+      return res.status(502).json({
+        error: 'Anthropic 서버에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요.',
+        code: 'VERIFY_FAILED',
+      });
+    }
+
+    startSession(req, res, apiKey);
+    res.json({ loggedIn: true });
+  }),
+);
 
 //이전 세션은 지우고 새 세션ID를 발급한다 (세션 고정 공격 방지)
 function startSession(req, res, apiKey) {
