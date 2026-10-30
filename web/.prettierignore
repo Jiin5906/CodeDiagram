@@ -5,3 +5,5 @@ docs/
 test/fixtures/
 test/.benchmark_tmp/
 package-lock.json
+# npm run vendor로 복사한 라이브러리 원본. 포맷하면 설치된 패키지와 달라져 vendor 테스트가 실패한다
+public/vendor/

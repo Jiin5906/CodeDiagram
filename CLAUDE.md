@@ -31,7 +31,7 @@ npm run benchmark           # 대규모 코드 자동 생성 후 파싱 시간/�
 - 테스트는 날짜·랜덤·네트워크에 기대지 않게 쓴다.
 - Jest는 커스텀 환경(`test/helpers/treeSitterEnvironment.js`)으로 tree-sitter를 워커당 한 번만 로드한다. tree-sitter 0.22 래퍼가 다시 로드되면 `rootNode`이 `undefined`가 되기 때문이다.
 - 언어별 테스트 픽스처는 `web/test/fixtures/<lang>_project/`에 있다.
-- AI 해설(`/api/explain`)은 `web/.env`에 `ANTHROPIC_API_KEY`가 필요하다(`.env.example` 참고). 없으면 503을 반환하고 나머지 기능은 정상 동작한다.
+- AI 해설(`/api/explain`)·리팩토링(`/api/refactor`)은 사용자가 Anthropic API 키로 로그인(`/api/auth/login`)해야 쓸 수 있다. 키는 서버 메모리 세션(`sessionStore`)에만 두고 브라우저에는 HttpOnly 쿠키로 세션ID만 준다. 로그인하지 않으면 401(`LOGIN_REQUIRED`)이고 나머지 기능은 정상 동작한다. `web/.env`의 `ANTHROPIC_API_KEY`는 개발·테스트용 예비 키이며 `NODE_ENV=production`에서는 쓰지 않는다.
 - Android 앱은 루트에서 `./gradlew assembleDebug`로 빌드한다(웹 서버가 먼저 떠 있어야 의미가 있음). 현재 출시 계획이 없어 CI에서 보류 중이며, 라이브러리 버전 불일치로 빌드가 실패하는 상태다.
 
 ## 아키텍처
@@ -56,7 +56,7 @@ npm run benchmark           # 대규모 코드 자동 생성 후 파싱 시간/�
 
 ### 프론트엔드 (`web/public/`)
 
-번들러/모듈 시스템 없이 `index.html`에서 `<script>` 태그로 순서대로 로드되는 **전역 스코프 스크립트**다. 함수와 상태(`cy`, `lastAnalysisData` 등)는 전역으로 공유되므로 로드 순서(`graph.js` → `codeViewer.js` → `canvasCard.js` → `localGraph.js` → `interactions.js` → `diffPreview.js` → `fileTree.js` → `app.js`)가 중요하고, 새 파일을 추가하면 `index.html`에 태그를 넣어야 한다. 외부 라이브러리(Cytoscape, fcose, dagre, highlight.js)는 CDN에서 로드한다. 캐시 무효화를 위해 일부 스크립트에 `?v=N` 쿼리가 붙어 있다.
+번들러/모듈 시스템 없이 `index.html`에서 `<script>` 태그로 순서대로 로드되는 **전역 스코프 스크립트**다. 함수와 상태(`cy`, `lastAnalysisData` 등)는 전역으로 공유되므로 로드 순서(`graph.js` → `codeViewer.js` → `canvasCard.js` → `localGraph.js` → `interactions.js` → `diffPreview.js` → `fileTree.js` → `auth.js` → `app.js`)가 중요하고, 새 파일을 추가하면 `index.html`에 태그를 넣어야 한다. 외부 라이브러리(Cytoscape, fcose, dagre, d3, highlight.js)는 devDependencies에 정확한 버전으로 두고 `npm run vendor`로 `public/vendor/<이름>@<버전>/`에 복사해 커밋한 것을 서빙한다(CSP `script-src 'self'`). 버전을 바꾸면 `index.html` 경로도 고친다(절차는 `.github/PIPELINE_GUIDE.md` "프론트엔드 라이브러리"). 폰트만 jsDelivr + SRI다. 캐시 무효화를 위해 일부 스크립트에 `?v=N` 쿼리가 붙어 있다.
 
 - `app.js`: 진입점. 분석 폼 제출 → `/api/analyze` → `renderGraph`, 파일 트리, 범례 구성
 - `graph.js`: Cytoscape 초기화, 스타일, 뷰 모드별 렌더링(`renderGraph`/`renderFunctionView`/`renderPackageView`/`renderFileDetailView`), 줌 레벨에 따른 시맨틱 줌(LOD)
