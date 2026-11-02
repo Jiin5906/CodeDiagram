@@ -10,7 +10,7 @@ function edge(source, target) {
   return { source, target, references: [{ line: 1 }] };
 }
 
-describe('judgeInstability — I 경계값', () => {
+describe('judgeInstability — I 경계값 (CBO >= 10 충족 시)', () => {
   test.each([
     [0.0, 'SAFE'],
     [0.4, 'SAFE'],
@@ -19,25 +19,47 @@ describe('judgeInstability — I 경계값', () => {
     [0.7001, 'HAZARD'],
     [1.0, 'HAZARD'],
   ])('I = %s → %s', (instability, expected) => {
-    expect(judgeInstability(instability, 0).status).toBe(expected);
+    expect(judgeInstability(instability, 0, 10).status).toBe(expected);
+  });
+});
+
+describe('judgeInstability — CBO 경계값 (소수 결합도 오분류 방지)', () => {
+  test('CBO < 5이면 I > 0.7이어도 SAFE (예: Ce 3 Ca 0, 또는 Ce 2 Ca 1)', () => {
+    expect(judgeInstability(1.0, 3, 3)).toEqual({ status: 'SAFE', hazardReasons: [] });
+    expect(judgeInstability(2 / 3, 2, 3)).toEqual({ status: 'SAFE', hazardReasons: [] });
+  });
+
+  test('5 <= CBO < 10이고 I > 0.4이면 WARN (예: Ce 5 Ca 0)', () => {
+    expect(judgeInstability(1.0, 5, 5)).toEqual({ status: 'WARN', hazardReasons: [] });
+    expect(judgeInstability(4 / 6, 4, 6)).toEqual({ status: 'WARN', hazardReasons: [] });
+  });
+
+  test('I > 0.7이고 CBO >= 10이면 HAZARD (사유: instability)', () => {
+    expect(judgeInstability(0.8, 8, 10)).toEqual({
+      status: 'HAZARD',
+      hazardReasons: ['instability'],
+    });
   });
 });
 
 describe('judgeInstability — Ce 경계값과 HAZARD 사유', () => {
   test('Ce = 9는 I 구간대로 판정한다', () => {
-    expect(judgeInstability(0.5, 9)).toEqual({ status: 'WARN', hazardReasons: [] });
+    expect(judgeInstability(0.5, 9, 9)).toEqual({ status: 'WARN', hazardReasons: [] });
   });
 
   test('Ce = 10이면 I가 낮아도 HAZARD (사유: efferent)', () => {
-    expect(judgeInstability(0.5, 10)).toEqual({ status: 'HAZARD', hazardReasons: ['efferent'] });
+    expect(judgeInstability(0.5, 10, 10)).toEqual({
+      status: 'HAZARD',
+      hazardReasons: ['efferent'],
+    });
   });
 
-  test('I > 0.7만 넘으면 사유는 instability', () => {
-    expect(judgeInstability(0.8, 3).hazardReasons).toEqual(['instability']);
+  test('I > 0.7이고 CBO >= 10 (Ce < 10)이면 사유는 instability', () => {
+    expect(judgeInstability(0.8, 8, 10).hazardReasons).toEqual(['instability']);
   });
 
   test('둘 다 넘으면 사유 두 개', () => {
-    expect(judgeInstability(0.9, 12).hazardReasons).toEqual(['instability', 'efferent']);
+    expect(judgeInstability(0.9, 12, 12).hazardReasons).toEqual(['instability', 'efferent']);
   });
 });
 
@@ -84,10 +106,10 @@ describe('computeFileMetrics — Ca·Ce 집계 규칙', () => {
     expect(m['lib/external.py']).toBeUndefined();
   });
 
-  test('상속 엣지만 있어도 반영한다', () => {
+  test('상속 엣지만 있어도 반영한다 (CBO < 5이므로 SAFE)', () => {
     const inheritance = [edge('c.py::Child', 'd.py::Parent')];
     const m = computeFileMetrics([[], inheritance, []], files);
-    expect(m['c.py']).toMatchObject({ ca: 0, ce: 1, cbo: 1, instability: 1, status: 'HAZARD' });
+    expect(m['c.py']).toMatchObject({ ca: 0, ce: 1, cbo: 1, instability: 1, status: 'SAFE' });
     expect(m['d.py']).toMatchObject({ ca: 1, ce: 0, cbo: 1, instability: 0, status: 'SAFE' });
   });
 

@@ -8,28 +8,38 @@
 
 /* 화면 크기에 맞춰 변하는 크기 토큰 — 패널 너비·글자 크기는 여기서 조절한다 */
 :root {
-  /* 에디터 톤 팔레트 — 중립 회색 + 강조색 하나 */
-  --bg-editor: #1e1f22;
-  --bg-panel: #2b2d30;
-  --bg-field: #1e1f22;
-  --bg-hover: #35373b;
-  --bg-hover-strong: #43454a;
-  --bg-selected: #2e436e;
-  --border: #393b40;
-  --border-strong: #4e5157;
-  --text: #dfe1e5;
-  --text-2: #a8abb2;
-  --text-3: #6f737a;
-  --accent: #3574f0;
-  --accent-hover: #2f66d6;
-  --accent-text: #548af7;
-  --accent-tint: rgba(53, 116, 240, 0.16);
-  --warn: #d6a547;
-  --warn-bg: #3d3322;
-  --error: #e06666;
-  --ok: #5fb865;
-  --shadow-float: 0 4px 14px rgba(0, 0, 0, 0.35);
-  --font-ui: 'Pretendard Variable', 'Pretendard', -apple-system, 'Segoe UI', sans-serif;
+  /* 4대 핵심 베이스 컬러 체계 (#fffffa, #010400, #0a8754, #5c80bc) */
+  --canvas: #fffffa;
+  --ink: #010400;
+  --green: #0a8754;
+  --green-hover: #086d44;
+  --blue: #5c80bc;
+  --blue-ink: #34558f;
+  --panel: #f1f2ea;
+  --panel-2: #e4e6dc;
+
+  /* 시맨틱 UI 변수 매핑 */
+  --bg-editor: var(--canvas);
+  --bg-panel: var(--panel);
+  --bg-field: var(--canvas);
+  --bg-hover: var(--panel-2);
+  --bg-hover-strong: #d5d8cc;
+  --bg-selected: rgba(92, 128, 188, 0.18);
+  --border: rgba(92, 128, 188, 0.35);
+  --border-strong: rgba(92, 128, 188, 0.75);
+  --text: var(--ink);
+  --text-2: #38403a;
+  --text-3: #6b736d;
+  --accent: var(--green);
+  --accent-hover: var(--green-hover);
+  --accent-text: var(--blue-ink);
+  --accent-tint: rgba(10, 135, 84, 0.12);
+  --warn: #c27d10;
+  --warn-bg: #fdf5e6;
+  --error: #d9383a;
+  --ok: var(--green);
+  --shadow-float: 0 4px 16px rgba(1, 4, 0, 0.12);
+  --font-ui: 'Inter', 'Pretendard Variable', 'Pretendard', -apple-system, 'Segoe UI', sans-serif;
   --font-code: 'D2Coding', 'JetBrains Mono', Consolas, monospace;
 
   --panel-tree-w: clamp(200px, 18vw, 300px);
@@ -67,19 +77,19 @@ body {
 #top-bar {
   display: flex;
   align-items: center;
-  gap: 12px;
-  height: 44px;
+  gap: 16px;
+  height: 52px;
   padding: 0 var(--topbar-pad-x);
-  background: var(--bg-panel);
+  background: var(--panel);
   border-bottom: 1px solid var(--border);
   min-width: 0;
 }
 
 #top-bar .logo {
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 700;
-  color: var(--text);
-  letter-spacing: -0.2px;
+  color: var(--ink);
+  letter-spacing: -0.3px;
   white-space: nowrap;
   margin-right: 4px;
 }
@@ -88,20 +98,19 @@ body {
   display: flex;
   flex: 1;
   gap: 8px;
-  max-width: 720px;
+  max-width: 680px;
   align-items: center;
-  flex-wrap: wrap;
 }
 
 #source-input {
   flex: 1;
-  height: 28px;
-  padding: 0 10px;
-  background: var(--bg-field);
+  height: 36px;
+  padding: 0 12px;
+  background: var(--canvas);
   border: 1px solid var(--border-strong);
   border-radius: 4px;
-  color: var(--text);
-  font-size: 13px;
+  color: var(--ink);
+  font-size: 13.5px;
   outline: none;
   transition:
     border-color 0.15s,
@@ -113,30 +122,36 @@ body {
 }
 
 #source-input:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent);
+  border-color: var(--ink);
+  box-shadow: 0 0 0 1px var(--ink);
 }
 
 #analyze-btn {
-  height: 28px;
-  padding: 0 14px;
-  background: var(--accent);
-  color: #ffffff;
+  height: 36px;
+  padding: 0 16px;
+  background: var(--green);
+  color: var(--canvas);
   border: none;
   border-radius: 4px;
-  font-size: 13px;
+  font-size: 13.5px;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.15s;
+  transition:
+    background 0.15s,
+    transform 0.1s;
   white-space: nowrap;
 }
 
 #analyze-btn:hover {
-  background: var(--accent-hover);
+  background: var(--green-hover);
+}
+
+#analyze-btn:active {
+  transform: scale(0.98);
 }
 
 #analyze-btn:disabled {
-  opacity: 0.4;
+  opacity: 0.5;
   cursor: not-allowed;
 }
 
@@ -596,15 +611,15 @@ body {
 
 /* ── 좌측 리본 (아이콘 + 라벨) ── */
 #ribbon {
-  width: 64px;
-  min-width: 64px;
-  background: var(--bg-panel);
+  width: 60px;
+  min-width: 60px;
+  background: var(--panel);
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 8px 0;
-  gap: 2px;
+  padding: 10px 0;
+  gap: 4px;
   flex-shrink: 0;
   position: relative;
   z-index: 40;
@@ -612,8 +627,8 @@ body {
 
 .ribbon-btn {
   position: relative;
-  width: 52px;
-  min-height: 54px;
+  width: 48px;
+  min-height: 50px;
   padding: 6px 2px 5px;
   background: transparent;
   border: none;
@@ -626,8 +641,8 @@ body {
   justify-content: center;
   gap: 4px;
   transition:
-    background 0.18s,
-    color 0.18s;
+    background 0.15s,
+    color 0.15s;
 }
 
 .ribbon-btn.hidden {
@@ -636,7 +651,7 @@ body {
 
 /* 아이콘은 SVG 라인 아이콘(currentColor)으로 통일 — 이모지는 OS마다 모양이 달라 쓰지 않는다 */
 .ribbon-icon {
-  width: 32px;
+  width: 30px;
   height: 26px;
   display: flex;
   align-items: center;
@@ -646,8 +661,8 @@ body {
 }
 
 .ribbon-icon svg {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   display: block;
 }
 
@@ -660,25 +675,26 @@ body {
 }
 
 .ribbon-btn:hover {
-  color: var(--text);
+  color: var(--ink);
 }
 
 .ribbon-btn:hover .ribbon-icon {
-  background: var(--bg-hover);
+  background: var(--panel-2);
 }
 
 .ribbon-btn:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--ink);
   outline-offset: -2px;
 }
 
 /* 활성 상태: 아이콘 뒤 회색 사각형 + 밝은 글자 (IDE 도구 창 버튼과 같은 방식) */
 .ribbon-btn.active {
-  color: var(--text);
+  color: var(--ink);
 }
 
 .ribbon-btn.active .ribbon-icon {
   background: var(--bg-hover-strong);
+  color: var(--ink);
 }
 
 /* 설명 말풍선 — 기본 title 툴팁은 늦게 떠서 data-tip으로 바로 보여준다 */
@@ -1035,10 +1051,11 @@ body.cv-resizing {
   display: grid;
   grid-template-columns: max-content minmax(0, 1fr);
   grid-template-rows: minmax(100%, max-content);
-  background: var(--bg-editor);
+  background: var(--canvas);
   font-size: var(--code-font);
   line-height: 1.6;
   font-family: var(--font-code);
+  color: var(--ink);
 }
 
 .code-line-numbers {
@@ -1055,7 +1072,7 @@ body.cv-resizing {
   white-space: pre;
   flex-shrink: 0;
   border-right: 1px solid var(--border);
-  background: var(--bg-editor);
+  background: var(--panel);
 }
 
 /* pre에 overflow를 주면 코드만 따로 스크롤되어 줄번호와 어긋난다 — 스크롤은 #code-viewer-content가 맡는다 */
@@ -1074,20 +1091,19 @@ body.cv-resizing {
   min-width: 100%;
   z-index: 0;
   pointer-events: none;
-  background: rgba(250, 204, 21, 0.1);
-  box-shadow:
-    inset 0 1px 0 rgba(250, 204, 21, 0.25),
-    inset 0 -1px 0 rgba(250, 204, 21, 0.25);
+  background: rgba(234, 179, 8, 0.16);
+  border-top: 1px solid rgba(234, 179, 8, 0.45);
+  border-bottom: 1px solid rgba(234, 179, 8, 0.45);
   animation: cv-line-flash 1.2s ease-out;
 }
 
 @keyframes cv-line-flash {
   0%,
   30% {
-    background: rgba(250, 204, 21, 0.28);
+    background: rgba(234, 179, 8, 0.32);
   }
   100% {
-    background: rgba(250, 204, 21, 0.1);
+    background: rgba(234, 179, 8, 0.16);
   }
 }
 
@@ -1096,7 +1112,43 @@ body.cv-resizing {
   display: block;
   background: transparent !important;
   font-size: var(--code-font);
-  line-height: 1.6;
+  font-weight: 500;
+  line-height: 1.65;
+  color: #111411;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* highlight.js 라이트 테마 가독성 보강 (고대비) */
+#code-viewer-content code .hljs-keyword,
+#code-viewer-content code .hljs-selector-tag {
+  color: #cf222e;
+  font-weight: 600;
+}
+
+#code-viewer-content code .hljs-string,
+#code-viewer-content code .hljs-title {
+  color: #0a8754;
+}
+
+#code-viewer-content code .hljs-title.class_,
+#code-viewer-content code .hljs-title.function_ {
+  color: #34558f;
+  font-weight: 600;
+}
+
+#code-viewer-content code .hljs-comment {
+  color: #57606a;
+  font-style: italic;
+}
+
+#code-viewer-content code .hljs-number {
+  color: #0550ae;
+}
+
+#code-viewer-content code .hljs-variable,
+#code-viewer-content code .hljs-params {
+  color: #24292f;
 }
 
 /* ── 그래프 영역 ── */
@@ -1104,7 +1156,7 @@ body.cv-resizing {
   flex: 1;
   position: relative;
   overflow: hidden;
-  background-color: var(--bg-editor);
+  background-color: var(--canvas);
 }
 
 #cy {
@@ -1172,18 +1224,37 @@ body.cv-resizing {
   color: var(--text);
 }
 
-/* ── 진단 패널 ── */
+/* ── 진단 패널 (좌측 사이드 드로어) ── */
 #diagnostics-panel {
-  left: calc(64px + 16px);
-  right: auto;
   width: var(--overlay-w);
+  min-width: var(--overlay-w);
+  background: var(--bg-panel);
+  border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
+  transition:
+    width 0.3s,
+    min-width 0.3s,
+    opacity 0.3s;
   overflow: hidden;
+  height: 100%;
 }
 
+#diagnostics-panel.collapsed {
+  width: 0 !important;
+  min-width: 0 !important;
+  opacity: 0;
+  border-right: none;
+  pointer-events: none;
+}
+
+#diagnostics-panel > .file-tree-header,
 #diagnostics-panel > .overlay-header {
   flex-shrink: 0;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  padding: 10px 14px;
 }
 
 #diagnostics-panel #diagnostics-content,
@@ -1191,7 +1262,251 @@ body.cv-resizing {
   flex-shrink: 0;
 }
 
-/* 헤더·검색창은 고정, 목록만 스크롤 */
+/* 가변 플렉스 블록 탭 바 (DIAG_CATEGORIES 레지스트리 기반) */
+.diag-cat-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-panel);
+  flex-shrink: 0;
+}
+
+.diag-cat-block {
+  flex: 1 1 auto;
+  min-width: 96px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 7px 10px;
+  background: var(--canvas);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-2);
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.diag-cat-block:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+
+.diag-cat-block.active {
+  background: var(--bg-selected);
+  color: var(--text);
+  border-color: var(--blue);
+  box-shadow: inset 0 -2px 0 var(--blue);
+}
+
+.diag-cat-label {
+  white-space: nowrap;
+}
+
+.diag-cat-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  background: var(--bg-hover);
+  color: var(--text);
+  border: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.diag-cat-badge.badge-hazard {
+  background: #dc2626;
+  color: #fffffa;
+  border-color: #dc2626;
+}
+
+.diag-cat-badge.badge-warn {
+  background: #f59e0b;
+  color: #010400;
+  border-color: #f59e0b;
+}
+
+.diag-cat-badge.badge-safe {
+  background: #0a8754;
+  color: #fffffa;
+  border-color: #0a8754;
+}
+
+.diag-cat-pane.hidden {
+  display: none !important;
+}
+
+/* 접이식 서브 그룹 (순환 참조 유형별 / 결합도 등급별 공통) */
+.diag-group {
+  margin-bottom: 10px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--canvas);
+  overflow: hidden;
+}
+
+.diag-group.status-filtered-out {
+  display: none !important;
+}
+
+.diag-group-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--bg-hover);
+  border: none;
+  border-bottom: 1px solid var(--border);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s ease;
+}
+
+.diag-group-header:hover {
+  background: var(--bg-hover-strong);
+}
+
+.diag-group.collapsed .diag-group-header {
+  border-bottom: none;
+}
+
+.diag-group.collapsed .diag-group-body {
+  display: none;
+}
+
+.diag-group-head-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.diag-group-chevron {
+  font-size: 12px;
+  color: var(--text-2);
+  width: 12px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.diag-group-body {
+  padding: 4px 0;
+}
+
+/* 결합도 등급 그룹 배지 (HAZARD 빨강, WARN 노랑, SAFE 초록, N/A 검정) */
+.coupling-group-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.coupling-group-badge.status-hazard {
+  background: #dc2626;
+  color: #fffffa;
+}
+
+.coupling-group-badge.status-warn {
+  background: #f59e0b;
+  color: #010400;
+}
+
+.coupling-group-badge.status-safe {
+  background: #0a8754;
+  color: #fffffa;
+}
+
+.coupling-group-badge.status-na {
+  background: #010400;
+  color: #fffffa;
+}
+
+/* 결합도 등급 필터 칩 바 */
+.coupling-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-bottom: 10px;
+}
+
+.coupling-filter-chip {
+  padding: 4px 8px;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+  background: var(--canvas);
+  color: var(--text-2);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease,
+    opacity 0.15s ease;
+}
+
+.coupling-filter-chip:hover {
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+.coupling-filter-chip.chip-all.active {
+  background: var(--blue);
+  color: #fffffa;
+  border-color: var(--blue);
+}
+
+.coupling-filter-chip.chip-hazard.active {
+  background: #dc2626;
+  color: #fffffa;
+  border-color: #dc2626;
+}
+
+.coupling-filter-chip.chip-warn.active {
+  background: #f59e0b;
+  color: #010400;
+  border-color: #f59e0b;
+}
+
+.coupling-filter-chip.chip-safe.active {
+  background: #0a8754;
+  color: #fffffa;
+  border-color: #0a8754;
+}
+
+.coupling-filter-chip.chip-na.active {
+  background: #010400;
+  color: #fffffa;
+  border-color: #010400;
+}
+
+/* 헤더·검색창·블록바는 고정, 목록만 스크롤 */
 #diagnostics-panel .diag-scroll {
   flex: 1;
   overflow-y: auto;
@@ -1199,7 +1514,7 @@ body.cv-resizing {
 }
 
 #diagnostics-content {
-  padding: 12px 16px;
+  padding: 12px 14px;
   font-size: var(--ui-font);
   color: var(--text);
 }
@@ -1774,6 +2089,16 @@ body.cv-resizing {
   overflow-y: auto;
   border-bottom: 1px solid var(--border);
   background: var(--bg-field);
+  transition: max-height 0.2s ease;
+}
+
+#code-viewer-fnlist.collapsed {
+  max-height: 36px;
+  overflow: hidden;
+}
+
+#code-viewer-fnlist.collapsed .fn-list-body {
+  display: none;
 }
 
 .fn-list-head {
@@ -1784,12 +2109,38 @@ body.cv-resizing {
   justify-content: space-between;
   align-items: center;
   gap: 8px;
-  padding: 7px 14px;
+  padding: 8px 14px;
   font-size: 12px;
   font-weight: 600;
   color: var(--text-2);
-  background: var(--bg-field);
+  background: var(--panel);
   border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.12s;
+}
+
+.fn-list-head:hover {
+  background: var(--panel-2);
+  color: var(--ink);
+}
+
+.fn-list-head-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.fn-list-chevron {
+  font-size: 11px;
+  color: var(--text-3);
+  display: inline-block;
+  width: 12px;
+}
+
+.fn-list-title {
+  font-weight: 600;
+  color: var(--ink);
 }
 
 .fn-list-hint {
@@ -1820,7 +2171,7 @@ body.cv-resizing {
 /* ── 코드 뷰어 내 AI 해설 (함수 뷰) ── */
 #code-viewer-explain {
   flex-shrink: 0;
-  max-height: 35%;
+  max-height: 42%;
   display: flex;
   flex-direction: column;
   border-bottom: 1px solid var(--border);
@@ -1870,6 +2221,410 @@ body.cv-resizing {
 #cv-explain-body .cv-explain-note {
   color: var(--text-3);
   font-size: 12px;
+}
+
+/* ── Figma UI: AI Code Insight Card (.ai-card) ── */
+#code-viewer-explain.is-ai-card {
+  background: var(--canvas);
+  border-bottom: 1px solid var(--border);
+  max-height: 60%;
+}
+
+#code-viewer-explain.is-ai-card .cv-explain-head {
+  display: none;
+}
+
+#code-viewer-explain.is-ai-card #cv-explain-body {
+  padding: 0;
+}
+
+.ai-card {
+  margin: 12px;
+  padding: 12px;
+  border: 2px solid var(--blue);
+  background: var(--canvas);
+  color: var(--ink);
+  box-sizing: border-box;
+}
+
+.ai-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.ai-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ai-heading-icon {
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  background: var(--blue);
+  color: var(--canvas);
+  flex-shrink: 0;
+}
+
+.ai-heading strong {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+}
+
+.ai-top-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ai-card-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--ink);
+  cursor: pointer;
+  transition:
+    transform 0.15s ease,
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.ai-card-toggle:hover {
+  background: rgba(92, 128, 188, 0.12);
+  border-color: var(--blue);
+}
+
+.ai-toggle-chevron {
+  font-size: 11px;
+  line-height: 1;
+  transition: transform 0.2s ease;
+  display: inline-block;
+  user-select: none;
+}
+
+.ai-card.collapsed {
+  padding-bottom: 10px;
+}
+
+.ai-card.collapsed .ai-card-top {
+  cursor: pointer;
+}
+
+.ai-card.collapsed .ai-toggle-chevron {
+  transform: rotate(-90deg);
+}
+
+.ai-card.collapsed .ai-card-body {
+  display: none;
+}
+
+.severity {
+  padding: 2px 7px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Status Warning Colors: HAZARD=Red, WARN=Yellow, SAFE=Green, N/A=Black */
+.severity-hazard {
+  background: #dc2626 !important;
+  color: #ffffff !important;
+}
+
+.severity-warn {
+  background: #f59e0b !important;
+  color: #010400 !important;
+}
+
+.severity-safe {
+  background: #0a8754 !important;
+  color: #fffffa !important;
+}
+
+.severity-na,
+.severity-n-a {
+  background: #010400 !important;
+  color: #fffffa !important;
+}
+
+.insight-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0 6px;
+  line-height: 1.4;
+}
+
+.insight-filename {
+  font-family: var(--font-code);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.insight-percent {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  font-family: var(--font-code);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.ai-card p {
+  color: var(--ink);
+  font-size: 12px;
+  line-height: 1.55;
+  margin: 4px 0 0;
+  word-break: keep-all;
+}
+
+.ai-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.ai-actions button {
+  height: 28px;
+  padding: 0 14px;
+  background: var(--blue);
+  color: var(--canvas);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  border: 1px solid var(--blue);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    opacity 0.15s ease,
+    background 0.15s ease;
+}
+
+.ai-actions button:hover {
+  opacity: 0.9;
+}
+
+.ai-actions button:active {
+  transform: translateY(1px);
+}
+
+.ai-actions button.ai-btn-secondary {
+  background: transparent;
+  border: 1px solid var(--blue);
+  color: var(--ink);
+}
+
+/* AI Steps inside ai-card */
+.ai-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--blue);
+}
+
+.ai-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 7px 10px;
+  background: rgba(92, 128, 188, 0.06);
+  border: 1px solid rgba(92, 128, 188, 0.25);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink);
+}
+
+.ai-step-tag {
+  flex-shrink: 0;
+  padding: 2px 6px;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.ai-step-tag.step-diag {
+  background: var(--blue);
+  color: var(--canvas);
+}
+
+.ai-step-tag.step-target {
+  background: transparent;
+  border: 1px solid var(--blue);
+  color: var(--blue);
+}
+
+.ai-step-tag.step-action {
+  background: var(--green);
+  color: var(--canvas);
+}
+
+.ai-step-text {
+  flex: 1;
+  word-break: break-word;
+}
+
+/* 결합도 리팩토링 제안 상단 배지 및 3줄 단계 카드 */
+.cv-coupling-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: 8px;
+  padding-bottom: 7px;
+  border-bottom: 1px dashed var(--border);
+}
+
+.cv-coupling-badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.cv-coupling-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+.cv-coupling-badge.status-hazard {
+  color: #f87171;
+  background: rgba(239, 68, 68, 0.16);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+}
+
+.cv-coupling-badge.status-warn {
+  color: #facc15;
+  background: rgba(234, 179, 8, 0.15);
+  border: 1px solid rgba(234, 179, 8, 0.35);
+}
+
+.cv-coupling-chip {
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-family: var(--font-code);
+  font-size: 11px;
+  color: var(--text-2);
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+}
+
+.cv-coupling-ai-btn {
+  margin-left: auto;
+  padding: 3px 10px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--canvas);
+  background: var(--green);
+  border: 1px solid var(--green);
+  border-radius: 4px;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    transform 0.1s;
+}
+
+.cv-coupling-ai-btn:hover {
+  background: var(--green-hover);
+}
+
+.cv-coupling-ai-btn:active {
+  transform: scale(0.97);
+}
+
+.cv-coupling-hint {
+  padding: 4px 0 2px;
+  font-size: 11.5px;
+  color: var(--text-3);
+  line-height: 1.4;
+}
+
+.cv-coupling-deps {
+  font-family: var(--font-code);
+  font-size: 11px;
+  color: var(--text-3);
+  line-height: 1.4;
+}
+
+.cv-explain-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+.cv-coupling-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cv-coupling-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 4px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  line-height: 1.5;
+}
+
+.cv-step-tag {
+  flex-shrink: 0;
+  margin-top: 1px;
+  padding: 2px 7px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.cv-step-tag.step-diag {
+  color: #c92a2a;
+  background: rgba(217, 56, 58, 0.12);
+  border: 1px solid rgba(217, 56, 58, 0.25);
+}
+
+.cv-step-tag.step-target {
+  color: var(--blue-ink);
+  background: rgba(92, 128, 188, 0.15);
+  border: 1px solid rgba(92, 128, 188, 0.3);
+}
+
+.cv-step-tag.step-action {
+  color: var(--green);
+  background: rgba(10, 135, 84, 0.12);
+  border: 1px solid rgba(10, 135, 84, 0.25);
+}
+
+.cv-step-text {
+  font-size: 12.5px;
+  color: var(--ink);
 }
 
 /* ── 범례 하단: 단축키 안내 ── */
@@ -2527,12 +3282,22 @@ kbd {
     max-width: none;
   }
 
+  /* 진단 패널: 모바일에서 전체 너비 오버레이 */
   #diagnostics-panel {
-    width: calc(100vw - 20px);
-    left: 10px;
-    top: 10px;
-    bottom: 66px;
-    max-height: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100% !important;
+    min-width: 100% !important;
+    height: 100vh;
+    z-index: 150;
+    border-right: none;
+  }
+
+  #diagnostics-panel.collapsed {
+    width: 0 !important;
+    min-width: 0 !important;
+    opacity: 0;
   }
 
   #diag-search-input {

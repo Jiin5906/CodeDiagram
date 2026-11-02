@@ -3,9 +3,10 @@ const request = require('supertest');
 
 jest.mock('../../server/services/aiService', () => ({
   explainFunction: jest.fn(),
+  explainCoupling: jest.fn(),
 }));
 
-const { explainFunction } = require('../../server/services/aiService');
+const { explainFunction, explainCoupling } = require('../../server/services/aiService');
 const cache = require('../../server/services/cacheService');
 const app = require('../../server/index');
 
@@ -14,6 +15,7 @@ const body = { name: 'add', code: 'def add(a, b):\n    return a + b', filePath: 
 beforeEach(() => {
   cache.clear();
   jest.mocked(explainFunction).mockReset();
+  jest.mocked(explainCoupling).mockReset();
 });
 
 test('calls the AI once and serves the second request from cache', async () => {
@@ -46,4 +48,32 @@ test('502 when the AI call fails', async () => {
   const res = await request(app).post('/api/explain').send(body);
   expect(res.status).toBe(502);
   errorSpy.mockRestore();
+});
+
+test('POST /api/explain/coupling caches AI refactoring suggestions', async () => {
+  const couplingBody = {
+    filePath: 'order.py',
+    code: 'import auth\ndef run(): pass',
+    metrics: { status: 'HAZARD', instability: 0.9, ca: 0, ce: 5, cbo: 5 },
+    dependencies: { incoming: [], outgoing: ['auth.py'] },
+  };
+  jest
+    .mocked(explainCoupling)
+    .mockResolvedValue('1. 결합도 진단: 높음\n2. 분리 대상: auth\n3. 리팩토링 방향: 분리');
+
+  const first = await request(app).post('/api/explain/coupling').send(couplingBody);
+  expect(first.status).toBe(200);
+  expect(first.body).toEqual({
+    explanation: '1. 결합도 진단: 높음\n2. 분리 대상: auth\n3. 리팩토링 방향: 분리',
+    cached: false,
+  });
+
+  const second = await request(app).post('/api/explain/coupling').send(couplingBody);
+  expect(second.body.cached).toBe(true);
+  expect(explainCoupling).toHaveBeenCalledTimes(1);
+});
+
+test('POST /api/explain/coupling returns 400 when filePath or code is missing', async () => {
+  const res = await request(app).post('/api/explain/coupling').send({ filePath: 'order.py' });
+  expect(res.status).toBe(400);
 });

@@ -7,6 +7,7 @@ const path = require('path');
 const router = express.Router();
 const { getProjectRoot } = require('../services/projectRegistry');
 const { SUPPORTED_EXTENSIONS } = require('../services/gitService');
+const { readSourceFile } = require('../utils/fileEncoding');
 
 const MAX_SIZE = 512 * 1024; // 512KB
 
@@ -47,8 +48,8 @@ router.get('/', (req, res) => {
       return res.status(413).json({ error: '파일이 너무 커서 표시할 수 없습니다' });
     }
 
-    // eslint-disable-next-line security/detect-non-literal-fs-filename -- 루트 내부로 검증된 경로
-    res.json({ path: relPath, code: fs.readFileSync(realFile, 'utf-8') });
+    //UTF-8 우선 시도 및 EUC-KR(CP949) 자동 감지 디코딩
+    res.json({ path: relPath, code: readSourceFile(realFile) });
   } catch (err) {
     if (err.code === 'ENOENT') {
       return res.status(404).json({ error: '파일을 찾을 수 없습니다' });

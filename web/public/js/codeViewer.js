@@ -91,14 +91,22 @@ async function _loadViewerLocation(filePath, startLine, endLine, name, fallback)
 
   const setTitle = () => {
     if (!filename) return;
-    //에디터처럼 '파일:줄' 형식으로 표시하고 이름은 뒤에 붙인다
-    const where = startLine
+    const baseName = (filePath || '').split('/').pop() || filePath || '';
+    const cleanFnName = name ? String(name).replace(/\s*\([\d↓↑ ]+\)$/, '') : '';
+    const lineInfo = startLine
       ? startLine === endLine || !endLine
         ? `:${startLine}`
         : `:${startLine}-${endLine}`
       : '';
-    filename.textContent = (filePath || '') + where + (name ? '  ' + name : '');
-    filename.title = filename.textContent;
+
+    //긴 전체 경로 대신 "파일명 > 함수명 :줄번호" 형식으로 표시하여 가독성 개선
+    if (cleanFnName && cleanFnName !== baseName && cleanFnName !== '전체 코드') {
+      filename.textContent = `${baseName} > ${cleanFnName}${lineInfo}`;
+    } else {
+      filename.textContent = `${baseName}${lineInfo}`;
+    }
+    //호버 툴팁에는 전체 경로 보존
+    filename.title = (filePath || '') + lineInfo + (name ? '  ' + name : '');
   };
 
   const canFetch = !!(
@@ -222,11 +230,11 @@ function showCodeAtLocation(filePath, startLine, endLine, name, options) {
     if (fnList) fnList.classList.add('hidden');
   }
   hideViewerExplain();
-  _openCodeViewerPanel(panel);
+  _openCodeViewerPanel(panel, options);
   _loadViewerLocation(filePath, startLine, endLine || startLine, name, null);
 }
 
-function _openCodeViewerPanel(panel) {
+function _openCodeViewerPanel(panel, options) {
   //파일 노드 위에 떠 있던 함수 미리보기가 코드 창을 가리지 않게 먼저 닫는다
   if (typeof hideFunctionPreview === 'function') hideFunctionPreview();
   if (typeof hideEdgePreview === 'function') hideEdgePreview();
@@ -237,7 +245,9 @@ function _openCodeViewerPanel(panel) {
   setTimeout(() => {
     if (typeof cy !== 'undefined' && cy) {
       cy.resize();
-      cy.fit(undefined, 30);
+      if (!options || !options.skipFit) {
+        cy.fit(undefined, 30);
+      }
     }
   }, 310);
 }
@@ -290,18 +300,28 @@ function hideCodeViewer() {
 /* ── 코드 뷰어 내 AI 해설 영역 ── */
 
 //해설 영역을 비우고 보여준다. 내용을 채울 본문 요소를 돌려준다.
-function showViewerExplain() {
+function showViewerExplain(titleText = 'AI 해설') {
   const box = document.getElementById('code-viewer-explain');
   const body = document.getElementById('cv-explain-body');
   if (!box || !body) return null;
-  box.classList.remove('hidden');
+  const titleEl = box.querySelector('.cv-explain-title');
+  if (titleEl) titleEl.textContent = titleText;
+  const toggleBtn = document.getElementById('cv-explain-toggle');
+  box.classList.remove('hidden', 'collapsed');
+  if (titleText !== 'AI 결합도 리팩토링 제안') {
+    box.classList.remove('is-ai-card');
+  }
+  if (toggleBtn) toggleBtn.setAttribute('aria-expanded', 'true');
   body.textContent = '';
   return body;
 }
 
 function hideViewerExplain() {
   const box = document.getElementById('code-viewer-explain');
-  if (box) box.classList.add('hidden');
+  if (box) {
+    box.classList.add('hidden');
+    box.classList.remove('is-ai-card');
+  }
 }
 
 /* ── 코드 뷰어 너비 조절 ──
