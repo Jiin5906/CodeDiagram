@@ -91,6 +91,38 @@ router.post(
   }),
 );
 
+//결합도 요청의 참조 목록(incoming/outgoing) 상한
+const DEP_LIMITS = { maxItems: 200, maxChars: FIELD_LIMITS.filePath };
+//metrics 객체를 JSON으로 바꾼 길이 상한 (지표 몇 개라 이 정도면 충분하다)
+const MAX_METRICS_CHARS = 2000;
+
+//참조 목록을 검사하고 프롬프트에 쓰는 두 배열만 남긴다. 문제가 있으면 { status, error }
+function normalizeDependencies(dependencies) {
+  const value = { incoming: [], outgoing: [] };
+  if (dependencies === undefined || dependencies === null) return { value };
+  for (const field of ['incoming', 'outgoing']) {
+    const list = dependencies[field];
+    if (list === undefined || list === null) continue;
+    if (!Array.isArray(list) || list.some((item) => typeof item !== 'string')) {
+      return { status: 400, error: `dependencies.${field}는 문자열 배열이어야 합니다` };
+    }
+    if (list.length > DEP_LIMITS.maxItems) {
+      return {
+        status: 413,
+        error: `dependencies.${field}가 너무 많습니다 (최대 ${DEP_LIMITS.maxItems}개)`,
+      };
+    }
+    if (list.some((item) => item.length > DEP_LIMITS.maxChars)) {
+      return {
+        status: 413,
+        error: `dependencies.${field} 항목이 너무 깁니다 (최대 ${DEP_LIMITS.maxChars}자)`,
+      };
+    }
+    value[field] = list;
+  }
+  return { value };
+}
+
 //파일 결합도 위험(HAZARD/WARN) 진단 및 3줄 리팩토링 제안 생성
 //함수 해설과 같이 로그인한 사용자의 키와 사용 횟수 제한을 거친다.
 router.post(
@@ -118,7 +150,18 @@ router.post(
       }
     }
 
-    const cacheKey = `coupling::${filePath}::${JSON.stringify(metrics || {})}::${code}`;
+    const deps = normalizeDependencies(dependencies);
+    if (deps.error) {
+      return res.status(deps.status).json({ error: deps.error });
+    }
+    const metricsJson = JSON.stringify(metrics || {});
+    if (metricsJson.length > MAX_METRICS_CHARS) {
+      return res.status(413).json({ error: `metrics가 너무 깁니다 (최대 ${MAX_METRICS_CHARS}자)` });
+    }
+
+    //프롬프트에 들어가는 입력을 모두 키에 넣는다. 하나라도 빠지면 다른 입력으로 만든 결과가
+    //같은 키로 저장되어 다른 사용자에게 나갈 수 있다 (캐시는 사용자끼리 공유된다)
+    const cacheKey = JSON.stringify(['coupling', filePath, code, metrics || {}, deps.value]);
     const cached = cache.get(cacheKey);
     if (cached) {
       return res.json({ explanation: cached, cached: true });
@@ -132,7 +175,7 @@ router.post(
           filePath,
           code,
           metrics: metrics || {},
-          dependencies: dependencies || {},
+          dependencies: deps.value,
         },
         res.locals.aiApiKey,
       );
