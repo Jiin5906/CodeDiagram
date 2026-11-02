@@ -152,6 +152,82 @@ function validateGitUrl(source) {
   return url.href;
 }
 
+//Git 및 빌드/런타임, 게임 엔진(Unity 등)에서 제외할 디렉토리 목록
+const IGNORED_DIRS = new Set([
+  '__pycache__',
+  'venv',
+  'node_modules',
+  '.git',
+  'env',
+  'dist',
+  'build',
+  'vendor',
+  'bower_components',
+  'bin',
+  'obj',
+  'Debug',
+  'Release',
+  'cmake-build-debug',
+  'cmake-build-release',
+  'target',
+  'out',
+  // Unity 및 게임 엔진 임시/캐시 디렉토리
+  'Library',
+  'Temp',
+  'Logs',
+  'UserSettings',
+  'MemoryCaptures',
+  'Recordings',
+  'Build',
+  'Builds',
+]);
+
+//GitHub/GitLab 브랜치 트리 URL(예: .../tree/dev) 또는 일반 Git URL 파싱
+function parseGitSource(source) {
+  const cleanSource = source.trim().replace(/\/+$/, '');
+  const treeMatch = cleanSource.match(
+    /^(https?:\/\/.+?\/([^/]+?))(?:\.git)?(?:\/-\/|\/)tree\/(.+)$/,
+  );
+  if (treeMatch) {
+    const rawBranch = treeMatch[3].split('?')[0].split('#')[0].replace(/\/+$/, '');
+    return {
+      cloneUrl: `${treeMatch[1]}.git`,
+      branch: rawBranch,
+      repoName: treeMatch[2],
+      cacheKey: cleanSource,
+    };
+  }
+
+  const cleanUrl = cleanSource.split('?')[0].split('#')[0];
+  const repoName =
+    cleanUrl
+      .split('/')
+      .pop()
+      .replace(/\.git$/, '') || 'repo';
+  return {
+    cloneUrl: cleanSource,
+    branch: null,
+    repoName,
+    cacheKey: cleanSource,
+  };
+}
+
+//브랜치 이름은 git 참조에 쓰는 문자만 허용한다. -로 시작하면 옵션으로, ..은 상위 경로로 읽힐 수 있어 막는다.
+function isSafeBranch(branch) {
+  return (
+    branch.length > 0 &&
+    branch.length <= 200 &&
+    /^[A-Za-z0-9._/-]+$/.test(branch) &&
+    !branch.startsWith('-') &&
+    !branch.includes('..')
+  );
+}
+
+//폴더 이름 조각에 안전한 문자만 남긴다
+function safeDirPart(value) {
+  return value.replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 64);
+}
+
 //프로젝트 경로를 가져오는 함수다. URL이면 검사 후 clone하고 로컬 경로면 허용 루트 정책을 거친다.
 async function getProjectPath(source) {
   if (looksLikeUrl(source)) {
@@ -282,15 +358,15 @@ function holdRepo(dirPath) {
 //git 저장소를 repos/ 디렉토리에 얕은 복제하는 함수다. 이미 있으면 재사용함.
 //url은 validateGitUrl을 거친 값이어야 한다.
 async function cloneRepo(url) {
+  const { cloneUrl, branch, repoName: rawName } = parseGitSource(url);
+  if (branch !== null && !isSafeBranch(branch)) {
+    throw pathError(400, '올바르지 않은 브랜치 이름입니다.');
+  }
   const hash = crypto.createHash('sha256').update(url).digest('hex').slice(0, 12);
-  //폴더 이름은 URL 경로의 마지막 부분에서 안전한 문자만 남겨 만든다 (경로 구분자나 ..이 들어가지 않게)
-  const lastSegment = new URL(url).pathname.split('/').pop() || '';
-  const repoName =
-    lastSegment
-      .replace(/\.git$/, '')
-      .replace(/[^A-Za-z0-9_-]/g, '_')
-      .slice(0, 64) || 'repo';
-  const targetDir = path.join(REPOS_DIR, `${repoName}-${hash}`);
+  //폴더 이름은 저장소 이름과 브랜치에서 안전한 문자만 남겨 만든다 (경로 구분자나 ..이 들어가지 않게)
+  const repoName = safeDirPart(rawName) || 'repo';
+  const branchSuffix = branch ? `-${safeDirPart(branch)}` : '';
+  const targetDir = path.join(REPOS_DIR, `${repoName}${branchSuffix}-${hash}`);
   if (path.dirname(path.resolve(targetDir)) !== path.resolve(REPOS_DIR)) {
     throw pathError(400, '올바르지 않은 Git URL입니다.');
   }
@@ -305,21 +381,25 @@ async function cloneRepo(url) {
   const pending = inflightClones.get(targetDir);
   if (pending) return pending;
 
-  const job = cloneIntoPlace(url, targetDir).finally(() => inflightClones.delete(targetDir));
+  const job = cloneIntoPlace(cloneUrl, branch, targetDir).finally(() =>
+    inflightClones.delete(targetDir),
+  );
   inflightClones.set(targetDir, job);
   return job;
 }
 
 //임시 폴더에 clone하고 성공하면 targetDir로 이름을 바꾼다.
 //중간에 실패·중단돼도 targetDir에는 반쯤 받은 폴더가 생기지 않아 다음 요청이 깨진 폴더를 재사용하지 않는다.
-async function cloneIntoPlace(url, targetDir) {
+async function cloneIntoPlace(cloneUrl, branch, targetDir) {
   const tmpDir = `${targetDir}${TMP_MARK}${crypto.randomBytes(4).toString('hex')}`;
   const signal = AbortSignal.timeout(
     numberFromEnv('CLONE_TIMEOUT_SEC', DEFAULT_CLONE_TIMEOUT_SEC) * 1000,
   );
 
   try {
-    await cloneGit(signal).clone(url, tmpDir, CLONE_ARGS);
+    //브랜치 URL(.../tree/dev)이면 그 브랜치만 받는다
+    const args = branch ? [...CLONE_ARGS, '--branch', branch] : CLONE_ARGS;
+    await cloneGit(signal).clone(cloneUrl, tmpDir, args);
     // eslint-disable-next-line security/detect-non-literal-fs-filename -- REPOS_DIR 아래 해시로 만든 경로
     fs.renameSync(tmpDir, targetDir);
   } catch (err) {
@@ -441,26 +521,7 @@ function findFiles(dirPath) {
       const fullPath = path.join(dir, entry.name);
 
       if (entry.isDirectory()) {
-        if (
-          entry.name.startsWith('.') ||
-          entry.name === '__pycache__' ||
-          entry.name === 'venv' ||
-          entry.name === 'node_modules' ||
-          entry.name === '.git' ||
-          entry.name === 'env' ||
-          entry.name === 'dist' ||
-          entry.name === 'build' ||
-          entry.name === 'vendor' ||
-          entry.name === 'bower_components' ||
-          entry.name === 'bin' ||
-          entry.name === 'obj' ||
-          entry.name === 'Debug' ||
-          entry.name === 'Release' ||
-          entry.name === 'cmake-build-debug' ||
-          entry.name === 'cmake-build-release' ||
-          entry.name === 'target' ||
-          entry.name === 'out'
-        ) {
+        if (entry.name.startsWith('.') || IGNORED_DIRS.has(entry.name)) {
           continue;
         }
         walk(fullPath);
@@ -510,4 +571,6 @@ module.exports = {
   pruneRepos,
   findFiles,
   SUPPORTED_EXTENSIONS,
+  parseGitSource,
+  IGNORED_DIRS,
 };
