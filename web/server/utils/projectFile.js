@@ -4,6 +4,7 @@
 const fs = require('fs');
 const path = require('path');
 const { SUPPORTED_EXTENSIONS } = require('../services/gitService');
+const { readSourceFile } = require('./fileEncoding');
 
 const MAX_SIZE = 512 * 1024; // 512KB
 
@@ -39,8 +40,8 @@ function readProjectFile(root, relPath) {
       throw fileError(413, '파일이 너무 커서 표시할 수 없습니다');
     }
 
-    // eslint-disable-next-line security/detect-non-literal-fs-filename -- 루트 내부로 검증된 경로
-    return fs.readFileSync(realFile, 'utf-8');
+    //UTF-8 우선 시도 및 EUC-KR(CP949) 자동 감지 디코딩
+    return readSourceFile(realFile);
   } catch (err) {
     if (err.status) throw err;
     if (err.code === 'ENOENT') {

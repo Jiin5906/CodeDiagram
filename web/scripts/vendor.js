@@ -39,7 +39,7 @@ const MANIFEST = [
       'languages/csharp.min.js',
       'languages/java.min.js',
       'languages/css.min.js',
-      'styles/github-dark.min.css',
+      'styles/github.min.css',
     ],
   },
 ];

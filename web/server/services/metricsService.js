@@ -7,15 +7,20 @@ function fileOf(nodeId) {
   return nodeId.split('::')[0];
 }
 
-//불안정성 지수와 Ce로 등급을 판정한다.
-function judgeInstability(instability, ce) {
-  const { safeMax, warnMax, ceHazard } = COUPLING_CRITERIA;
+//불안정성 지수와 Ce, CBO로 등급을 판정한다.
+//소수 법칙(Law of Small Numbers)에 의한 왜곡 방지:
+//- CBO < minCboWarn(5): 경량 모듈로 간주하여 항상 SAFE
+//- minCboWarn(5) ≤ CBO < minCboHazard(10): I > safeMax(0.4)이면 WARN
+//- CBO ≥ minCboHazard(10): I > warnMax(0.7)이면 HAZARD
+//- Ce ≥ ceHazard(10): CBO와 무관하게 efferent 사유로 HAZARD
+function judgeInstability(instability, ce, cbo = ce) {
+  const { safeMax, warnMax, ceHazard, minCboHazard = 10, minCboWarn = 5 } = COUPLING_CRITERIA;
   const hazardReasons = [];
-  if (instability > warnMax) hazardReasons.push('instability');
+  if (instability > warnMax && cbo >= minCboHazard) hazardReasons.push('instability');
   if (ce >= ceHazard) hazardReasons.push('efferent');
 
   if (hazardReasons.length > 0) return { status: 'HAZARD', hazardReasons };
-  if (instability > safeMax) return { status: 'WARN', hazardReasons };
+  if (instability > safeMax && cbo >= minCboWarn) return { status: 'WARN', hazardReasons };
   return { status: 'SAFE', hazardReasons };
 }
 
@@ -25,8 +30,9 @@ function classifyCoupling({ ca, ce }) {
   if (ca + ce === 0) {
     return { instability: null, status: 'N/A', hazardReasons: [] };
   }
+  const cbo = ca + ce;
   const instability = ce / (ca + ce);
-  const { status, hazardReasons } = judgeInstability(instability, ce);
+  const { status, hazardReasons } = judgeInstability(instability, ce, cbo);
   return { instability: Math.round(instability * 1000) / 1000, status, hazardReasons };
 }
 

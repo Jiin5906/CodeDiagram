@@ -100,9 +100,11 @@
         "name": { "type": "string", "minLength": 1 },
         "safeMax": { "type": "number", "minimum": 0, "maximum": 1 },
         "warnMax": { "type": "number", "minimum": 0, "maximum": 1 },
+        "minCboWarn": { "type": "integer", "minimum": 1 },
+        "minCboHazard": { "type": "integer", "minimum": 1 },
         "ceHazard": { "type": "integer", "minimum": 1 }
       },
-      "required": ["name", "safeMax", "warnMax", "ceHazard"],
+      "required": ["name", "safeMax", "warnMax", "minCboWarn", "minCboHazard", "ceHazard"],
       "additionalProperties": false
     }
   }

@@ -3,7 +3,7 @@
 
 const express = require('express');
 const router = express.Router();
-const { explainFunction } = require('../services/aiService');
+const { explainFunction, explainCoupling } = require('../services/aiService');
 const cache = require('../services/cacheService');
 const requireAiKey = require('../middleware/requireAiKey');
 const { takeAiQuota } = require('../middleware/aiRateLimit');
@@ -87,6 +87,67 @@ router.post(
       }
       const errorId = logError('Explain error', err);
       res.status(502).json({ error: 'AI 설명 생성에 실패했습니다.', errorId });
+    }
+  }),
+);
+
+//파일 결합도 위험(HAZARD/WARN) 진단 및 3줄 리팩토링 제안 생성
+//함수 해설과 같이 로그인한 사용자의 키와 사용 횟수 제한을 거친다.
+router.post(
+  '/coupling',
+  requireAiKey,
+  asyncHandler(async (req, res) => {
+    const { filePath, code, metrics, dependencies } = req.body || {};
+
+    if (typeof filePath !== 'string' || !filePath || typeof code !== 'string' || !code) {
+      return res.status(400).json({ error: 'filePath and code are required' });
+    }
+    if (filePath.length > FIELD_LIMITS.filePath) {
+      return res
+        .status(413)
+        .json({ error: `filePath가 너무 깁니다 (최대 ${FIELD_LIMITS.filePath}자)` });
+    }
+    //지표와 참조 목록은 객체여야 한다 (프롬프트에 그대로 들어가므로 형태를 확인한다)
+    for (const [field, value] of Object.entries({ metrics, dependencies })) {
+      if (
+        value !== undefined &&
+        value !== null &&
+        (typeof value !== 'object' || Array.isArray(value))
+      ) {
+        return res.status(400).json({ error: `${field}는 객체여야 합니다` });
+      }
+    }
+
+    const cacheKey = `coupling::${filePath}::${JSON.stringify(metrics || {})}::${code}`;
+    const cached = cache.get(cacheKey);
+    if (cached) {
+      return res.json({ explanation: cached, cached: true });
+    }
+
+    if (!takeAiQuota(req, res)) return;
+
+    try {
+      const explanation = await explainCoupling(
+        {
+          filePath,
+          code,
+          metrics: metrics || {},
+          dependencies: dependencies || {},
+        },
+        res.locals.aiApiKey,
+      );
+
+      cache.set(cacheKey, explanation);
+      res.json({ explanation, cached: false });
+    } catch (err) {
+      if (err.code === 'AI_KEY_MISSING' || err.code === 'AI_KEY_REJECTED') {
+        return res.status(401).json({
+          error: 'API 키가 거부되었습니다. 키를 다시 등록해 주세요.',
+          code: err.code,
+        });
+      }
+      const errorId = logError('Coupling explain error', err);
+      res.status(502).json({ error: 'AI 결합도 리팩토링 제안 생성에 실패했습니다.', errorId });
     }
   }),
 );

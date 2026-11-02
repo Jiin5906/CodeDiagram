@@ -226,6 +226,11 @@ function reorderTreeItems(draggedPath, targetPath, container) {
 function focusFileNode(filePath) {
   if (!cy) return;
 
+  //로컬 그래프 모드가 켜져 있으면 전체 보기로 복귀 후 포커스
+  if (typeof isLocalGraphActive === 'function' && isLocalGraphActive()) {
+    exitLocalGraph(false);
+  }
+
   //뷰 모드에 따라 적절한 노드 타입으로 검색
   const selector = currentViewMode === 'file' ? '[type="file-node"]' : '[type="file"]';
   const fileNodes = cy.nodes(selector).filter((n) => n.data('fullPath') === filePath);
@@ -259,7 +264,17 @@ function setupFileTree() {
   if (!toggleBtn || !panel) return;
 
   toggleBtn.addEventListener('click', () => {
+    const willOpen = panel.classList.contains('collapsed');
+    if (willOpen) {
+      if (typeof hideDiagnosticsPanel === 'function') {
+        hideDiagnosticsPanel();
+      } else {
+        const diagPanel = document.getElementById('diagnostics-panel');
+        if (diagPanel) diagPanel.classList.add('collapsed');
+      }
+    }
     panel.classList.toggle('collapsed');
+
     //패널 전환 후 그래프 리사이즈 + 화면 맞춤
     setTimeout(() => {
       if (cy) {
