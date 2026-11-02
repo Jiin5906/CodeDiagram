@@ -31,7 +31,7 @@ npm run benchmark           # 대규모 코드 자동 생성 후 파싱 시간/�
 - 테스트는 날짜·랜덤·네트워크에 기대지 않게 쓴다.
 - Jest는 커스텀 환경(`test/helpers/treeSitterEnvironment.js`)으로 tree-sitter를 워커당 한 번만 로드한다. tree-sitter 0.22 래퍼가 다시 로드되면 `rootNode`이 `undefined`가 되기 때문이다.
 - 언어별 테스트 픽스처는 `web/test/fixtures/<lang>_project/`에 있다.
-- AI 해설(`/api/explain`)은 `web/.env`에 `ANTHROPIC_API_KEY`가 필요하다(`.env.example` 참고). 없으면 503을 반환하고 나머지 기능은 정상 동작한다.
+- AI 해설(`/api/explain`)·리팩토링(`/api/refactor`)은 사용자가 Anthropic API 키로 로그인(`/api/auth/login`)해야 쓸 수 있다. 키는 서버 메모리 세션(`sessionStore`)에만 두고 브라우저에는 HttpOnly 쿠키로 세션ID만 준다. 로그인하지 않으면 401(`LOGIN_REQUIRED`)이고 나머지 기능은 정상 동작한다. `web/.env`의 `ANTHROPIC_API_KEY`는 개발·테스트용 예비 키이며 `NODE_ENV=production`에서는 쓰지 않는다.
 - Android 앱은 루트에서 `./gradlew assembleDebug`로 빌드한다(웹 서버가 먼저 떠 있어야 의미가 있음). 현재 출시 계획이 없어 CI에서 보류 중이며, 라이브러리 버전 불일치로 빌드가 실패하는 상태다.
 
 ## 아키텍처
@@ -45,7 +45,7 @@ npm run benchmark           # 대규모 코드 자동 생성 후 파싱 시간/�
 3. **언어가 두 계열로 나뉜다** — 이 구분이 코드 전반에 걸쳐 있다:
    - **티어 언어** (`python`, `cpp`, `csharp`, `typescript`): `resolver.js`(`resolveCalls`, `resolveInheritance`, `resolveVariableRefs`)로 해석, `buildTieredNodes`로 노드 생성
    - **웹 언어** (`html`, `css`, `javascript`): `webResolver.js`(`resolveWebRelations`, `resolveJsCalls`)로 해석, `buildWebNodes`로 노드 생성. HTML의 인라인 `<script>`는 JS 파서로 다시 파싱되어 병합된다.
-4. `metricsService`(파일 결합도) → `diagnosticsService`(순환 참조, 결합도, God Class/Function) → `refactoringService`(제안 생성)
+4. `metricsService`(파일 결합도) → `diagnosticsService`(순환 참조, 결합도) → `refactoringService`(제안 생성)
 5. 결과 JSON: `nodes`, `edges`, `inheritanceEdges`, `variableEdges`, `webEdges`, `packageNodes`, `tiers`, `langs`, `diagnostics`, `suggestions`, `cycleEdgeIds`, `fileCounts`, `warnings` 등. 노드는 Cytoscape `{ data: {...} }` 형식이며 compound(parent) 관계로 언어/파일/클래스 계층을 표현한다.
 
 모든 파서는 공통 형태 `{ functions, calls, imports, classes, variables, variableRefs }`(웹 파서는 `domAccesses`, `eventBindings`, `inlineScripts` 등 추가)를 반환한다. 스키마는 `web/schemas/parser-output-schema.json`에 정의되어(`test/contract/parserOutput.test.js`가 검증) 있으니 파서 출력을 바꾸면 함께 갱신한다. 새 언어를 추가할 때는 `parser.js` 디스패치, `gitService`의 `SUPPORTED_EXTENSIONS`, `graphBuilder`의 `TIERED_LANGUAGES`/`fileCounts`, 프론트엔드 highlight.js 언어 스크립트(`index.html`)를 모두 손봐야 한다.
@@ -56,7 +56,7 @@ npm run benchmark           # 대규모 코드 자동 생성 후 파싱 시간/�
 
 ### 프론트엔드 (`web/public/`)
 
-번들러/모듈 시스템 없이 `index.html`에서 `<script>` 태그로 순서대로 로드되는 **전역 스코프 스크립트**다. 함수와 상태(`cy`, `lastAnalysisData` 등)는 전역으로 공유되므로 로드 순서(`graph.js` → `codeViewer.js` → `canvasCard.js` → `localGraph.js` → `minimap.js` → `interactions.js` → `diffPreview.js` → `fileTree.js` → `app.js`)가 중요하고, 새 파일을 추가하면 `index.html`에 태그를 넣어야 한다. 외부 라이브러리(Cytoscape, fcose, dagre, highlight.js)는 CDN에서 로드한다. 캐시 무효화를 위해 일부 스크립트에 `?v=N` 쿼리가 붙어 있다.
+번들러/모듈 시스템 없이 `index.html`에서 `<script>` 태그로 순서대로 로드되는 **전역 스코프 스크립트**다. 함수와 상태(`cy`, `lastAnalysisData` 등)는 전역으로 공유되므로 로드 순서(`graph.js` → `codeViewer.js` → `canvasCard.js` → `localGraph.js` → `interactions.js` → `diffPreview.js` → `fileTree.js` → `auth.js` → `app.js`)가 중요하고, 새 파일을 추가하면 `index.html`에 태그를 넣어야 한다. 외부 라이브러리(Cytoscape, fcose, dagre, d3, highlight.js)는 devDependencies에 정확한 버전으로 두고 `npm run vendor`로 `public/vendor/<이름>@<버전>/`에 복사해 커밋한 것을 서빙한다(CSP `script-src 'self'`). 버전을 바꾸면 `index.html` 경로도 고친다(절차는 `.github/PIPELINE_GUIDE.md` "프론트엔드 라이브러리"). 폰트만 jsDelivr + SRI다. 캐시 무효화를 위해 일부 스크립트에 `?v=N` 쿼리가 붙어 있다.
 
 - `app.js`: 진입점. 분석 폼 제출 → `/api/analyze` → `renderGraph`, 파일 트리, 범례 구성
 - `graph.js`: Cytoscape 초기화, 스타일, 뷰 모드별 렌더링(`renderGraph`/`renderFunctionView`/`renderPackageView`/`renderFileDetailView`), 줌 레벨에 따른 시맨틱 줌(LOD)

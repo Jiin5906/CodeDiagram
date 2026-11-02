@@ -142,10 +142,6 @@ function initGraph(container) {
 
       //진단 표시 (codeEffects.js가 클래스를 붙인다) — 깜빡임 없이 바깥 테두리 색으로 고정 표시
       {
-        selector: 'node[type="file-node"].diag-warning',
-        style: { 'border-color': '#c27d10', 'border-width': 2.5 },
-      },
-      {
         selector: 'node[type="file-node"].diag-error',
         style: { 'border-color': '#D9383A', 'border-width': 2.5 },
       },
@@ -827,6 +823,32 @@ function initGraph(container) {
           width: 1,
         },
       },
+      //AI 리팩토링 미리보기에서 새로 생길 노드·엣지 (diffPreview.js가 임시로 추가)
+      {
+        selector: 'node.ai-ghost',
+        style: {
+          'background-color': '#22C55E',
+          'background-opacity': 0.25,
+          'border-color': '#22C55E',
+          'border-style': 'dashed',
+          'border-width': 2,
+          label: 'data(label)',
+          color: '#86EFAC',
+          'font-size': 11,
+        },
+      },
+      {
+        selector: 'edge.ai-ghost',
+        style: {
+          'line-color': '#22C55E',
+          'line-style': 'dashed',
+          'line-opacity': 0.8,
+          'target-arrow-color': '#22C55E',
+          'target-arrow-shape': 'triangle',
+          'curve-style': 'bezier',
+          width: 1.5,
+        },
+      },
 
       //함수 뷰에서 선택한 함수의 연결선 — 공통 edge 규칙(line-opacity: 0)보다 뒤에 있어야 선이 보인다
       {
@@ -1310,7 +1332,6 @@ function renderGraph(data) {
   console.log(`[renderGraph] 파일 노드 뷰: ${fileCount}개 파일, ${fileEdgeMap.size}개 엣지`);
 
   setupSemanticZoom();
-  if (typeof initMinimap === 'function') initMinimap();
   if (typeof applyCodeEffects === 'function') applyCodeEffects(data);
 
   return cy;
@@ -1326,7 +1347,6 @@ function renderFunctionView(data) {
   if (typeof stopCodeEffects === 'function') stopCodeEffects();
 
   teardownSemanticZoom();
-  if (typeof destroyMinimap === 'function') destroyMinimap();
 
   graphData = data;
   currentViewMode = 'function';

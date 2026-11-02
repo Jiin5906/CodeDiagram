@@ -54,12 +54,13 @@ describe('summarizeCoupling', () => {
 
 describe('runDiagnostics', () => {
   test('coupling을 돌려주고 기존 couplingIssues는 없다', () => {
-    const result = runDiagnostics([], [], [], [], [entry('a.py', 'SAFE', 0, 1)]);
+    const result = runDiagnostics([], [entry('a.py', 'SAFE', 0, 1)]);
     expect(result.coupling.files).toHaveLength(1);
     expect(result).not.toHaveProperty('couplingIssues');
+    expect(result).not.toHaveProperty('antiPatterns');
   });
 
   test('결합도 항목을 넘기지 않아도 빈 목록으로 동작한다', () => {
-    expect(runDiagnostics([], [], [], []).coupling.files).toEqual([]);
+    expect(runDiagnostics([]).coupling.files).toEqual([]);
   });
 });

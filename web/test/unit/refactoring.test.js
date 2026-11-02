@@ -17,7 +17,6 @@ function diagnosticsWith(files, extra = {}) {
   return {
     cycles: { functions: [], files: [] },
     coupling: { criteria: COUPLING_CRITERIA, files },
-    antiPatterns: [],
     ...extra,
   };
 }
@@ -92,14 +91,11 @@ describe('generateSuggestions — 결합도 제안', () => {
 });
 
 describe('generateSuggestions — 기존 제안 유지', () => {
-  test('순환 참조와 안티패턴 제안은 그대로 만든다', () => {
+  test('순환 참조 제안은 그대로 만든다', () => {
     const diagnostics = diagnosticsWith([], {
-      cycles: { functions: [], files: [['a.py', 'b.py', 'a.py']] },
-      antiPatterns: [
-        { type: 'god_function', nodeId: 'a.py::big', message: 'big은 80줄', severity: 'info' },
-      ],
+      cycles: { functions: [['a.py::f', 'a.py::g', 'a.py::f']], files: [['a.py', 'b.py', 'a.py']] },
     });
     const types = generateSuggestions(diagnostics).map((s) => s.type);
-    expect(types).toEqual(['cycle', 'antipattern']);
+    expect(types).toEqual(['cycle', 'cycle']);
   });
 });

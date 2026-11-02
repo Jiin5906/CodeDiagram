@@ -733,9 +733,12 @@ function _buildCouplingPane(coupling) {
   pane.className = 'diag-cat-pane';
   pane.dataset.cat = 'coupling';
 
-  const files = (coupling && coupling.files) || [];
+  //SAFE·N/A는 손볼 필요가 없으므로 진단 패널에서는 WARN 이상만 보여 준다 (#17 결정)
+  const statuses = ['HAZARD', 'WARN'];
+  const files = ((coupling && coupling.files) || []).filter((e) =>
+    statuses.includes(e.metrics && e.metrics.status),
+  );
   const criteria = coupling && coupling.criteria;
-  const statuses = ['HAZARD', 'WARN', 'SAFE', 'N/A'];
   const byStatus = { HAZARD: [], WARN: [], SAFE: [], 'N/A': [] };
 
   for (const entry of files) {
@@ -751,7 +754,7 @@ function _buildCouplingPane(coupling) {
   if (files.length === 0) {
     const empty = document.createElement('div');
     empty.className = 'diag-empty';
-    empty.textContent = '분석된 파일이 없습니다';
+    empty.textContent = '결합도가 높은 파일이 없습니다';
     pane.appendChild(empty);
   } else {
     if (criteria) {
@@ -909,6 +912,14 @@ function _buildSuggestionsPane(suggestions) {
         if (typeof showDiffView === 'function') showDiffView(sug);
       });
       actions.appendChild(diffBtn);
+
+      const aiBtn = document.createElement('button');
+      aiBtn.className = 'suggestion-preview-btn';
+      aiBtn.textContent = 'AI 리팩토링';
+      aiBtn.addEventListener('click', () => {
+        if (typeof showAiRefactor === 'function') showAiRefactor(sug);
+      });
+      actions.appendChild(aiBtn);
       item.appendChild(actions);
 
       pane.appendChild(item);
@@ -1199,8 +1210,6 @@ function showRefsInViewer(references, sourceId, targetId) {
 
 /* ── AI 해설 (코드 뷰어 안에 표시) ── */
 
-//API 키가 없다는 응답을 한 번 받으면 이후에는 요청하지 않는다
-let explainUnavailableMsg = null;
 //빠르게 여러 함수를 클릭했을 때 늦게 온 이전 응답이 덮어쓰지 않도록 요청 순번을 둔다
 let explainSeq = 0;
 
@@ -1219,6 +1228,20 @@ function _explainNote(body, text) {
   body.appendChild(note);
 }
 
+//로그인이 필요하다는 안내와 버튼. 함수를 누를 때마다 해설을 요청하므로 로그인 창을 저절로 띄우지 않는다.
+function _explainLoginNote(body, funcData) {
+  _explainNote(body, 'AI 해설은 Anthropic API 키를 등록해야 볼 수 있습니다.');
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'explain-login-btn';
+  btn.textContent = 'API 키 등록';
+  btn.addEventListener('click', () => {
+    //로그인에 성공하면 이 함수의 해설을 다시 요청한다
+    openLoginModal(() => showExplanation(funcData));
+  });
+  body.appendChild(btn);
+}
+
 async function showExplanation(funcData) {
   if (typeof showViewerExplain !== 'function') return;
   const body = showViewerExplain();
@@ -1231,12 +1254,6 @@ async function showExplanation(funcData) {
     body.appendChild(explainCache[nodeId].cloneNode(true));
     return;
   }
-  //API 키가 없다는 안내는 처음 한 번만 보여주고, 이후에는 해설 칸을 숨겨 코드 공간을 넓게 쓴다
-  if (explainUnavailableMsg) {
-    if (typeof hideViewerExplain === 'function') hideViewerExplain();
-    return;
-  }
-
   _explainNote(body, 'AI 해설을 생성하고 있습니다...');
 
   try {
@@ -1256,10 +1273,10 @@ async function showExplanation(funcData) {
     if (!response.ok) {
       const err = await response.json().catch(() => ({}));
       if (seq !== explainSeq) return;
-      if (response.status === 503) {
-        explainUnavailableMsg =
-          'API 키가 설정되지 않아 AI 해설을 쓸 수 없습니다. (web/.env의 ANTHROPIC_API_KEY)';
-        _explainNote(body, explainUnavailableMsg);
+      if (response.status === 401) {
+        //세션이 만료됐거나 키가 거부됐다. 버튼 라벨도 로그인 상태로 되돌린다.
+        if (typeof refreshAuthState === 'function') refreshAuthState();
+        _explainLoginNote(body, funcData);
       } else {
         _explainNote(body, `해설을 가져올 수 없습니다: ${err.error || '서버 오류'}`);
       }
@@ -1645,8 +1662,15 @@ async function showCouplingExplanation(entry, autoFetch = false) {
       if (seq !== explainSeq) return;
 
       let explanationText = '';
+      //로그인 전 임시 요약은 캐시하지 않는다 (로그인 후 재요청이 캐시에 막히지 않게)
+      let cacheable = true;
       if (!response.ok) {
-        if (response.status === 503) {
+        if (response.status === 401) {
+          cacheable = false;
+          //로그인하지 않았거나 키가 거부됐다. 로컬 지표 요약을 먼저 보여 주고, 로그인하면 다시 요청한다.
+          explanationText = _buildFallbackCouplingText(filePath, metrics, deps);
+          if (typeof requireLoginFor === 'function') requireLoginFor(fetchAndRenderAI);
+        } else if (response.status === 503) {
           explanationText = _buildFallbackCouplingText(filePath, metrics, deps);
         } else {
           const err = await response.json().catch(() => ({}));
@@ -1671,7 +1695,7 @@ async function showCouplingExplanation(entry, autoFetch = false) {
         explanationText = data.explanation || _buildFallbackCouplingText(filePath, metrics, deps);
       }
 
-      explainCache[cacheKey] = explanationText;
+      if (cacheable) explainCache[cacheKey] = explanationText;
 
       body.textContent = '';
       body.appendChild(
@@ -1772,6 +1796,12 @@ function setupKeyboardShortcuts() {
     const isInput = activeTag === 'INPUT' || activeTag === 'TEXTAREA';
 
     if (e.key === 'Escape') {
+      //로그인 창이 가장 위에 있으므로 먼저 닫는다
+      if (typeof isLoginModalOpen === 'function' && isLoginModalOpen()) {
+        closeLoginModal();
+        return;
+      }
+
       //단축키 도움말이 열려 있으면 그것만 닫는다
       if (isShortcutsHelpOpen()) {
         toggleShortcutsHelp(false);

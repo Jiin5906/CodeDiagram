@@ -48,7 +48,9 @@ function fileCouplingData(metricsByFile, filePath) {
 }
 
 //프로젝트 디렉토리에서 그래프를 만드는 비동기 함수다.
-async function buildGraph(projectPath) {
+//options.signal이 abort되면(브라우저가 연결을 끊음) 다음 청크 경계에서 AbortError를 던지고 멈춘다.
+async function buildGraph(projectPath, options = {}) {
+  const { signal } = options;
   const { files, warnings } = findFiles(projectPath);
 
   if (files.length === 0) {
@@ -90,7 +92,8 @@ async function buildGraph(projectPath) {
       try {
         code = readSourceFile(file.path);
       } catch (err) {
-        warnings.push(`Failed to read ${file.relativePath}: ${err.message}`);
+        //err.message에는 절대경로가 들어 있어 응답에 싣지 않고 에러 코드(ENOENT, EACCES 등)만 남긴다
+        warnings.push(`Failed to read ${file.relativePath}: ${err.code || 'read error'}`);
         continue;
       }
 
@@ -98,7 +101,9 @@ async function buildGraph(projectPath) {
       try {
         result = parseFile(code, file.relativePath, file.language);
       } catch (err) {
-        warnings.push(`Failed to parse ${file.relativePath}: ${err.message}`);
+        //파서 에러 상세는 서버 로그에만 남긴다
+        console.warn(`[parse] ${file.relativePath}:`, err);
+        warnings.push(`Failed to parse ${file.relativePath}`);
         continue;
       }
 
@@ -138,6 +143,8 @@ async function buildGraph(projectPath) {
 
     if (i + CHUNK_SIZE < allFiles.length) {
       await yieldToEventLoop();
+      //양보하는 동안 연결이 끊겼으면 남은 파싱을 하지 않는다
+      signal?.throwIfAborted();
     }
   }
 
@@ -240,18 +247,8 @@ async function buildGraph(projectPath) {
     ...fileCouplingData(metricsByFile, f.relativePath),
   }));
 
-  //전체 함수·클래스 목록 (티어 기반 + JS)
-  const allFunctions = [...tieredFunctions, ...jsFunctions];
-  const allClasses = [...tieredClasses, ...jsClasses];
-
   //진단 실행
-  const diagnostics = runDiagnostics(
-    allCallEdges,
-    allFunctions,
-    allClasses,
-    webParsedFiles,
-    fileCouplingEntries,
-  );
+  const diagnostics = runDiagnostics(allCallEdges, fileCouplingEntries);
 
   //리팩토링 제안 생성
   const suggestions = generateSuggestions(diagnostics);
