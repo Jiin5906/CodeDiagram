@@ -21,4 +21,12 @@ function getProjectRoot(id) {
   return projects.get(id) || null;
 }
 
-module.exports = { registerProject, getProjectRoot };
+//등록된 프로젝트 루트인지 확인한다. repos/ 정리가 /api/file이 쓰는 폴더를 지우지 않게 한다.
+function isRegistered(projectPath) {
+  for (const registered of projects.values()) {
+    if (registered === projectPath) return true;
+  }
+  return false;
+}
+
+module.exports = { registerProject, getProjectRoot, isRegistered };

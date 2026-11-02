@@ -1,5 +1,6 @@
-# 저장소에는 LF로 저장한다 (Windows 체크아웃 시 autocrlf가 변환)
-* text=auto
+# 저장소와 작업 트리 모두 LF로 둔다. 각자의 core.autocrlf 설정과 관계없이 적용된다.
+# Prettier(.prettierrc.json의 endOfLine: lf)가 CRLF를 포맷 위반으로 보므로, Windows에서 CRLF로 풀리면 format:check가 실패한다.
+* text=auto eol=lf
 
 # 리눅스 컨테이너/CI에서 실행되는 파일은 작업 트리에서도 LF 유지
 *.sh text eol=lf
@@ -7,6 +8,9 @@ Dockerfile text eol=lf
 gradlew text eol=lf
 .husky/* text eol=lf
 *.bat text eol=crlf
+
+# npm 패키지에서 그대로 복사한 라이브러리는 줄바꿈을 바꾸지 않는다 (test/unit/vendor.test.js가 원본과 바이트 단위로 비교)
+web/public/vendor/** -text
 
 # 바이너리
 *.jar binary

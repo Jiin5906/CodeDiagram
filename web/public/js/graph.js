@@ -823,6 +823,32 @@ function initGraph(container) {
           width: 1,
         },
       },
+      //AI 리팩토링 미리보기에서 새로 생길 노드·엣지 (diffPreview.js가 임시로 추가)
+      {
+        selector: 'node.ai-ghost',
+        style: {
+          'background-color': '#22C55E',
+          'background-opacity': 0.25,
+          'border-color': '#22C55E',
+          'border-style': 'dashed',
+          'border-width': 2,
+          label: 'data(label)',
+          color: '#86EFAC',
+          'font-size': 11,
+        },
+      },
+      {
+        selector: 'edge.ai-ghost',
+        style: {
+          'line-color': '#22C55E',
+          'line-style': 'dashed',
+          'line-opacity': 0.8,
+          'target-arrow-color': '#22C55E',
+          'target-arrow-shape': 'triangle',
+          'curve-style': 'bezier',
+          width: 1.5,
+        },
+      },
 
       //함수 뷰에서 선택한 함수의 연결선 — 공통 edge 규칙(line-opacity: 0)보다 뒤에 있어야 선이 보인다
       {

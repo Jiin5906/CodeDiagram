@@ -4,13 +4,29 @@
 const response = require('../fixtures/anthropic/message_response.json');
 
 const mockCreate = jest.fn();
-jest.mock('@anthropic-ai/sdk', () => ({
-  Anthropic: jest.fn().mockImplementation(() => ({ messages: { create: mockCreate } })),
-}));
+const mockList = jest.fn();
+//실제 SDK처럼 에러 클래스를 Anthropic의 정적 속성으로 둔다 (aiService가 instanceof로 검사한다)
+jest.mock('@anthropic-ai/sdk', () => {
+  class APIError extends Error {}
+  const Anthropic = Object.assign(
+    jest.fn().mockImplementation(() => ({
+      messages: { create: mockCreate },
+      models: { list: mockList },
+    })),
+    {
+      AuthenticationError: class AuthenticationError extends APIError {},
+      PermissionDeniedError: class PermissionDeniedError extends APIError {},
+    },
+  );
+  return { Anthropic };
+});
+const { Anthropic } = require('@anthropic-ai/sdk');
+
+const KEY = 'test-key-not-real';
 
 /** @returns {typeof import('../../server/services/aiService')} */
 function loadAiService() {
-  //aiService는 클라이언트를 모듈 전역에 캐시하므로 테스트마다 새로 불러온다
+  //테스트끼리 모듈 상태가 섞이지 않게 테스트마다 새로 불러온다
   let mod;
   jest.isolateModules(() => {
     mod = require('../../server/services/aiService');
@@ -28,17 +44,13 @@ const input = {
 
 beforeEach(() => {
   mockCreate.mockReset();
-  process.env.ANTHROPIC_API_KEY = 'test-key-not-real';
-});
-
-afterEach(() => {
-  delete process.env.ANTHROPIC_API_KEY;
+  mockList.mockReset();
 });
 
 describe('Anthropic Messages API contract', () => {
   test('sends a valid Messages API request', async () => {
     mockCreate.mockResolvedValue(response);
-    await loadAiService().explainFunction(input);
+    await loadAiService().explainFunction(input, KEY);
 
     expect(mockCreate).toHaveBeenCalledTimes(1);
     const req = mockCreate.mock.calls[0][0];
@@ -55,7 +67,9 @@ describe('Anthropic Messages API contract', () => {
 
   test('returns the text of the first content block', async () => {
     mockCreate.mockResolvedValue(response);
-    await expect(loadAiService().explainFunction(input)).resolves.toBe(response.content[0].text);
+    await expect(loadAiService().explainFunction(input, KEY)).resolves.toBe(
+      response.content[0].text,
+    );
   });
 
   test('returns undefined when the first block is not text', async () => {
@@ -63,17 +77,47 @@ describe('Anthropic Messages API contract', () => {
       ...response,
       content: [{ type: 'tool_use', id: 'toolu_01', name: 'x', input: {} }],
     });
-    await expect(loadAiService().explainFunction(input)).resolves.toBeUndefined();
+    await expect(loadAiService().explainFunction(input, KEY)).resolves.toBeUndefined();
   });
 
-  test('throws an API_KEY error when the key is missing', async () => {
-    delete process.env.ANTHROPIC_API_KEY;
-    await expect(loadAiService().explainFunction(input)).rejects.toThrow('ANTHROPIC_API_KEY');
+  test('throws AI_KEY_MISSING without calling the API when no key is given', async () => {
+    await expect(loadAiService().explainFunction(input)).rejects.toMatchObject({
+      code: 'AI_KEY_MISSING',
+    });
     expect(mockCreate).not.toHaveBeenCalled();
+  });
+
+  test('turns an authentication error into AI_KEY_REJECTED', async () => {
+    mockCreate.mockRejectedValue(new Anthropic.AuthenticationError('invalid x-api-key'));
+    await expect(loadAiService().explainFunction(input, KEY)).rejects.toMatchObject({
+      code: 'AI_KEY_REJECTED',
+    });
   });
 
   test('propagates API errors to the caller', async () => {
     mockCreate.mockRejectedValue(Object.assign(new Error('overloaded'), { status: 529 }));
-    await expect(loadAiService().explainFunction(input)).rejects.toThrow('overloaded');
+    await expect(loadAiService().explainFunction(input, KEY)).rejects.toThrow('overloaded');
+  });
+});
+
+describe('verifyApiKey', () => {
+  test('lists one model with no retries and a short timeout', async () => {
+    mockList.mockResolvedValue({ data: [] });
+    await expect(loadAiService().verifyApiKey(KEY)).resolves.toBe(true);
+    expect(mockList).toHaveBeenCalledWith({ limit: 1 });
+    expect(Anthropic).toHaveBeenLastCalledWith({ apiKey: KEY, maxRetries: 0, timeout: 10_000 });
+  });
+
+  test.each([
+    ['401', Anthropic.AuthenticationError],
+    ['403', Anthropic.PermissionDeniedError],
+  ])('returns false on %s', async (_, ErrorClass) => {
+    mockList.mockRejectedValue(new ErrorClass('denied'));
+    await expect(loadAiService().verifyApiKey(KEY)).resolves.toBe(false);
+  });
+
+  test('rethrows network errors', async () => {
+    mockList.mockRejectedValue(new Error('ECONNRESET'));
+    await expect(loadAiService().verifyApiKey(KEY)).rejects.toThrow('ECONNRESET');
   });
 });
