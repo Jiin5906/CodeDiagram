@@ -4,7 +4,7 @@
 # Dependabot은 FROM의 ARG 변수를 읽지 못하므로 두 FROM에 같은 이미지를 직접 쓴다 (바꿀 때 함께 바꿀 것).
 
 # ---- base: tree-sitter 네이티브 모듈 빌드 도구 ----
-FROM node:22.23.3-trixie-slim@sha256:b26b04c123d9ff8ab646ceb18b9d75a1173acf64b9a401094b906d27b29338d4 AS base
+FROM node:22.23.4-trixie-slim@sha256:2117f713a417f3aff682ac8f5bc2ebbdf1beed51f36e67ab1e0fd3866b6d2d8f AS base
 WORKDIR /app
 RUN apt-get update \
  && apt-get install -y --no-install-recommends python3 make g++ \
@@ -26,7 +26,7 @@ FROM base AS deps-prod
 RUN npm ci --omit=dev && npm cache clean --force
 
 # ---- prod: 빌드 도구 없는 실행 이미지 ----
-FROM node:22.23.3-trixie-slim@sha256:b26b04c123d9ff8ab646ceb18b9d75a1173acf64b9a401094b906d27b29338d4 AS prod
+FROM node:22.23.4-trixie-slim@sha256:2117f713a417f3aff682ac8f5bc2ebbdf1beed51f36e67ab1e0fd3866b6d2d8f AS prod
 ENV NODE_ENV=production
 # 컨테이너 밖(-p 포트 매핑)에서 들어오는 요청을 받으려면 모든 인터페이스에 바인딩해야 한다
 ENV HOST=0.0.0.0
