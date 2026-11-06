@@ -154,6 +154,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  //CLI /all 명령어에서 ?source= 파라미터를 넘긴 경우 자동으로 분석을 시작한다.
+  const _cliParams = new URLSearchParams(window.location.search);
+  const _cliSource = _cliParams.get('source');
+  if (_cliSource && input) {
+    input.value = _cliSource;
+    //히스토리에 파라미터가 남지 않도록 URL을 정리한다.
+    window.history.replaceState({}, '', window.location.pathname);
+    form.dispatchEvent(new Event('submit'));
+  }
+
   //진단 버튼 클릭 (열려 있으면 닫고, 닫혀 있으면 열기 - 토글)
   document.getElementById('diagnostics-btn').addEventListener('click', () => {
     if (!lastAnalysisData) return;
