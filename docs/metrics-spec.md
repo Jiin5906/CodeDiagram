@@ -23,18 +23,19 @@
 ## 2. 3단계 계층형 결합도 판정 체계 (3-Tier Architecture)
 
 ```mermaid
+%%{init: {'flowchart': {'wrappingWidth': 600}}}%%
 flowchart TD
-    Start["파일 결합도 측정<br/>(Ca, Ce, CBO, I)"] --> CheckCBO{"CBO 절대 규모 판별"}
+    Start["파일 결합도 측정 (Ca, Ce, CBO, I)"] --> CheckCBO{"CBO 절대 규모 판별"}
     
-    CheckCBO -- "CBO < 5<br/>(경량 컴포넌트)" --> Tier1["Tier 1: 소수 왜곡 보호 구역<br/>(I 비율 무관 SAFE 확정)"]
-    CheckCBO -- "5 <= CBO < 10<br/>(중간 규모)" --> Tier2{"Tier 2: 중간 모니터링<br/>I > safeMax(0.4) ?"}
-    CheckCBO -- "CBO >= 10<br/>(대규모 결합)" --> Tier3{"Tier 3: 고결합도 위험 구역<br/>I > 0.7 OR Ce >= 10 ?"}
+    CheckCBO -- "CBO < 5 (경량 컴포넌트)" --> Tier1["Tier 1: 소수 왜곡 보호 구역<br/>(I 비율과 무관하게 SAFE)"]
+    CheckCBO -- "5 <= CBO < 10 (중간 규모)" --> Tier2{"Tier 2: 중간 결합도 모니터링<br/>I > safeMax(0.4) ?"}
+    CheckCBO -- "CBO >= 10 (대규모 결합)" --> Tier3{"Tier 3: 고결합도 위험 구역<br/>I > warnMax(0.7) OR Ce >= 10 ?"}
 
-    Tier2 -- "조건 부합 (Yes)" --> StatusWarn["판정: WARN (주의)"]
-    Tier2 -- "조건 미달 (No)" --> StatusSafe["판정: SAFE (안전)"]
+    Tier2 -- "Yes" --> StatusWarn["판정: WARN (주의)"]
+    Tier2 -- "No" --> StatusSafe["판정: SAFE (안전)"]
 
-    Tier3 -- "위험 감지 (Yes)" --> StatusHazard["판정: HAZARD (위험)<br/>AI 리팩토링 권고 대상"]
-    Tier3 -- "일반 결합 (No)" --> StatusWarn
+    Tier3 -- "Yes" --> StatusHazard["판정: HAZARD (위험)<br/>리팩토링 1순위 권고"]
+    Tier3 -- "No (I <= 0.7)" --> StatusWarn
 ```
 
 ### 2.1 판정 계층 상세 규격

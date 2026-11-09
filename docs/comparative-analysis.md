@@ -11,21 +11,22 @@
 * **CodeRefactor의 포지셔닝:** 공인 소프트웨어 공학 결합도 지표와 2D 인터랙티브 캔버스 시각화, 그리고 Claude AI 기반 Before/After Diff 생성을 **웹 브라우저 탭 하나(Zero-Install)**로 제공합니다.
 
 ```mermaid
+%%{init: {'flowchart': {'wrappingWidth': 600}}}%%
 flowchart TD
-    subgraph Traditional ["전통 정적 분석 (Micro)"]
-        SQ["SonarQube<br/>- 함수 단위 복잡도 집중<br/>- 결합도 수식 폐기<br/>- 아키텍처 조망 부재"]
+    subgraph Traditional ["전통 정적 분석 도구 (Micro Lint)"]
+        SQ["SonarQube<br/>- 함수 단위 순환/인지 복잡도<br/>- 결합도 수식 영구 폐기<br/>- 전체 아키텍처 조망 불가"]
     end
 
-    subgraph Architecture ["전문 아키텍처 도구 (Macro)"]
-        ND["NDepend / Sonargraph<br/>- Robert C. Martin 지표<br/>- 무거운 설치형 도구<br/>- AI 리팩토링 부재"]
+    subgraph Architecture ["전문 아키텍처 분석 도구 (Macro Architecture)"]
+        ND["NDepend / Sonargraph<br/>- Robert C. Martin: Ca, Ce, Instability I<br/>- 무거운 전용 설치형 프로그램<br/>- AI 리팩토링 부재"]
     end
 
     subgraph OurProject ["CodeRefactor (본 프로젝트)"]
-        CR["Zero-Install 웹 브라우저<br/>+ 공인 결합도 지표 (I, CBO)<br/>+ 소수 법칙 왜곡 방지<br/>+ Claude AI 전후 Diff 생성"]
+        CR["Zero-Install 웹 브라우저 구동<br/>+ Robert C. Martin 공인 결합도 (I, CBO)<br/>+ 소수 법칙 왜곡 방지 및 프록시 폴딩<br/>+ Claude AI Before/After Diff 자동 생성"]
     end
 
-    Traditional -.->|"거시적 조망 한계"| OurProject
-    Architecture -.->|"설치 장벽 극복 및 AI 결합"| OurProject
+    Traditional -.->|"거시적 아키텍처 결함 감지 불가"| OurProject
+    Architecture -.->|"설치 장벽 극복 및 생성형 AI 결합"| OurProject
 ```
 
 ---
