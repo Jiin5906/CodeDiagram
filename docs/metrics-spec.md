@@ -26,7 +26,7 @@
 flowchart TD
     Start["파일 결합도 측정<br/>(Ca, Ce, CBO, I)"] --> CheckCBO{"CBO 절대 규모 판별"}
     
-    CheckCBO -- "CBO < 5<br/>(경량 컴포넌트)" --> Tier1["Tier 1: 소수 왜곡 보호 구역<br/>(I 비율과 무관하게 SAFE 확정)"]
+    CheckCBO -- "CBO < 5<br/>(경량 컴포넌트)" --> Tier1["Tier 1: 소수 왜곡 보호 구역<br/>(I 비율 무관 SAFE 확정)"]
     CheckCBO -- "5 <= CBO < 10<br/>(중간 규모)" --> Tier2{"Tier 2: 중간 모니터링<br/>I > safeMax(0.4) ?"}
     CheckCBO -- "CBO >= 10<br/>(대규모 결합)" --> Tier3{"Tier 3: 고결합도 위험 구역<br/>I > 0.7 OR Ce >= 10 ?"}
 
@@ -35,15 +35,6 @@ flowchart TD
 
     Tier3 -- "위험 감지 (Yes)" --> StatusHazard["판정: HAZARD (위험)<br/>AI 리팩토링 권고 대상"]
     Tier3 -- "일반 결합 (No)" --> StatusWarn
-
-    style Start width:220px
-    style CheckCBO width:220px
-    style Tier1 width:260px
-    style Tier2 width:240px
-    style Tier3 width:260px
-    style StatusWarn width:200px
-    style StatusSafe width:200px
-    style StatusHazard width:220px
 ```
 
 ### 2.1 판정 계층 상세 규격

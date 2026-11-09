@@ -27,31 +27,18 @@ NDepend, Sonargraph 등 엔터프라이즈 정적 분석 도구의 격리 원칙
 flowchart TD
     A["저장소 소스코드 전체"] --> B["정적 분석 및 분류 엔진"]
     
-    B -->|"1st-Party 판별"| C["Application / Business Domain Code"]
-    B -->|"외부 프레임워크 감지"| D["Third-Party / Framework Dependencies"]
+    B -->|"1st-Party 판별"| C["Application 도메인 코드"]
+    B -->|"외부 프레임워크 감지"| D["Third-Party 외부 라이브러리"]
     
     C --> E["메인 도메인 분석 파이프라인"]
     E --> E1["결합도 및 불안정성 정밀 계산"]
-    E --> E2["LOD 핵심 캔버스 렌더링 대상"]
-    E --> E3["Claude AI 리팩토링 피드백 대상"]
+    E --> E2["LOD 핵심 캔버스 렌더링"]
+    E --> E3["Claude AI 리팩토링 피드백"]
     
     D --> F["보조 경계 메타데이터 파이프라인"]
-    F --> F1["LOD 랭킹 우선순위 하향 강등"]
-    F --> F2["캔버스 단독 거대 노드 생성 차단"]
-    F --> F3["프록시 폴딩: 도메인 간 직접선 합성"]
-
-    style A width:200px
-    style B width:220px
-    style C width:280px
-    style D width:280px
-    style E width:240px
-    style E1 width:250px
-    style E2 width:250px
-    style E3 width:250px
-    style F width:260px
-    style F1 width:260px
-    style F2 width:260px
-    style F3 width:260px
+    F --> F1["LOD 랭킹 우선순위 하향"]
+    F --> F2["캔버스 단독 거대 노드 차단"]
+    F --> F3["프록시 폴딩: 직접선 합성"]
 ```
 
 ---
