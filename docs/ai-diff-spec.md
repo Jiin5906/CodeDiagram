@@ -13,20 +13,20 @@ sequenceDiagram
     participant UI as Diff 뷰어 (diffPreview.js)
     participant Server as Express 서버 (/api/refactor)
     participant Cache as Cache Service (LRU)
-    participant AI as Anthropic Claude API (claude-3-5-sonnet)
+    participant AI as Anthropic Claude API
 
-    Dev->>UI: 위험(HAZARD) 노드 선택 & AI 리팩토링 요청
-    UI->>Server: POST /api/refactor (파일 경로, 결합도 지표, 참조 파일 목록)
-    Server->>Cache: SHA-256(프롬프트 전문) 해시 키 조회
+    Dev->>UI: 위험(HAZARD) 노드 선택 및 리팩토링 요청
+    UI->>Server: POST /api/refactor (메트릭 및 파일 정보)
+    Server->>Cache: SHA-256 해시 키 캐시 조회
     alt 캐시 히트 (Cache Hit)
-        Cache-->>Server: 캐시된 3줄 진단 및 Diff 코드 즉시 반환
+        Cache-->>Server: 캐시된 3줄 진단 및 Diff 코드 반환
     else 캐시 미스 (Cache Miss)
-        Server->>AI: 엔지니어링 시스템 프롬프트 + AST 스니펫 전달
-        AI-->>Server: 3단계 가이드 및 리팩토링 코드 반환
-        Server->>Cache: LRU 캐시에 저장 (최대 500개 상한)
+        Server->>AI: 시스템 프롬프트 및 AST 스니펫 전달
+        AI-->>Server: 3단계 처방 및 리팩토링 코드 반환
+        Server->>Cache: LRU 캐시에 저장 (최대 500개)
     end
-    Server-->>UI: 진단 결과 및 Before/After 코드 반환
-    UI->>Dev: Monaco Editor 스플릿 뷰로 전후 코드 Diff 시각적 렌더링
+    Server-->>UI: 진단 결과 및 전후 코드 반환
+    UI->>Dev: Monaco Editor 스플릿 뷰 Diff 렌더링
 ```
 
 ---

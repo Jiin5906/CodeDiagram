@@ -12,20 +12,24 @@
 
 ```mermaid
 flowchart TD
-    subgraph Traditional ["전통 정적 분석 도구 (Micro Lint)"]
+    subgraph Traditional ["전통 정적 분석 (Micro)"]
         SQ["SonarQube<br/>- 함수 단위 순환/인지 복잡도<br/>- 결합도 수식 영구 폐기<br/>- 전체 아키텍처 조망 불가"]
     end
 
-    subgraph Architecture ["전문 아키텍처 분석 도구 (Macro Architecture)"]
-        ND["NDepend / Sonargraph<br/>- Robert C. Martin: Ca, Ce, Instability I<br/>- 무거운 전용 설치형 프로그램<br/>- AI 리팩토링 부재"]
+    subgraph Architecture ["전문 아키텍처 분석 도구 (Macro)"]
+        ND["NDepend / Sonargraph<br/>- Robert C. Martin 지표 (Ca, Ce, I)<br/>- 무거운 설치형 엔터프라이즈 도구<br/>- AI 리팩토링 기능 부재"]
     end
 
     subgraph OurProject ["CodeRefactor (본 프로젝트)"]
         CR["Zero-Install 웹 브라우저 구동<br/>+ Robert C. Martin 공인 결합도 (I, CBO)<br/>+ 소수 법칙 왜곡 방지 및 프록시 폴딩<br/>+ Claude AI Before/After Diff 자동 생성"]
     end
 
-    Traditional -.->|"거시적 아키텍처 결함 감지 불가"| OurProject
-    Architecture -.->|"설치 장벽 극복 및 생성형 AI 결합"| OurProject
+    Traditional -.->|"거시적 결함 감지 한계<br/>(아키텍처 조망 불가)"| OurProject
+    Architecture -.->|"설치 장벽 극복 및<br/>생성형 AI 결합"| OurProject
+
+    style SQ width:240px
+    style ND width:250px
+    style CR width:290px
 ```
 
 ---

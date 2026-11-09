@@ -11,34 +11,34 @@
 ```mermaid
 flowchart TD
     subgraph PresentationLayer ["1. Presentation Layer (Vanilla JS + Cytoscape.js)"]
-        UI_Tree["파일 트리 패널 (디렉토리/파일 계층 포커스)"]
-        UI_Control["상단 제어 툴바<br>- 타깃 언어 선택<br>- 상태별 필터 칩 (ALL/HAZARD/WARN/SAFE)<br>- 온디맨드 결합도 진단 버튼"]
-        UI_Canvas["인터랙티브 캔버스 (Cytoscape.js)<br>- 노드 크기: CBO = Ca + Ce 비례<br>- 3단계 신호등 색상 (SAFE, WARN, HAZARD)<br>- 플러그인 토글 시 간접 호출 축약 렌더링"]
-        UI_Panel["상세 정보 사이드 패널 (Monaco Editor Diff & AI 조언)"]
-        UI_CodeLens["CodeLens 팝업 (엣지 클릭 시 실제 소스 라인 점프)"]
+        UI_Tree["파일 트리 패널<br/>(디렉토리 및 파일 계층 포커스)"]
+        UI_Control["상단 제어 툴바<br/>- 타깃 언어 선택<br/>- 상태별 필터 칩 (ALL / HAZARD / WARN / SAFE)<br/>- 온디맨드 결합도 진단 실행"]
+        UI_Canvas["인터랙티브 캔버스 (Cytoscape.js)<br/>- 노드 크기: CBO (Ca + Ce) 비례<br/>- 3단계 신호등 색상 (SAFE, WARN, HAZARD)<br/>- 플러그인 토글 시 간접 호출 축약 렌더링"]
+        UI_Panel["상세 정보 사이드 패널<br/>(Monaco Editor Diff 뷰어 & AI 처방)"]
+        UI_CodeLens["CodeLens 팝업<br/>(엣지 클릭 시 실제 소스 라인 점프)"]
     end
 
     subgraph ApplicationLayer ["2. Application Layer (Node.js Express + Tree-sitter)"]
-        App_Parser["Tree-sitter 다국어 AST 파서 엔진<br>(Java, C/C++, Python, C#, JS/TS 구문 분석)"]
-        App_Filter["1st-Party 벤더 필터링 모듈<br>(Linguist 규칙 기반 isPlugin/isFirstParty 판별)"]
-        App_Toggle["플러그인 간접선 축약 모듈<br>(Plugin OFF 시 도메인 클래스 간 직접선 합성)"]
-        App_Metrics["구조 결합도 산출 모듈<br>(Robert C. Martin Instability & CBO 계산)"]
-        App_Schema["그래프 스키마 정규화 모듈 (Graph JSON 변환)"]
+        App_Parser["Tree-sitter 다국어 AST 파서 엔진<br/>(Java, C/C++, Python, C#, JS/TS 구문 분석)"]
+        App_Filter["1st-Party 벤더 필터링 모듈<br/>(Linguist 규칙 기반 isPlugin/isFirstParty 판별)"]
+        App_Toggle["플러그인 간접선 축약 모듈<br/>(Plugin OFF 시 도메인 클래스 간 직접선 합성)"]
+        App_Metrics["구조 결합도 산출 모듈<br/>(Robert C. Martin Instability & CBO 계산)"]
+        App_Schema["그래프 스키마 정규화 모듈<br/>(Graph JSON 변환 및 정규화)"]
     end
 
     subgraph DataAccessLayer ["3. Data Access Layer (In-Memory Cache & File I/O)"]
-        DA_Git["Git Clone Manager (임시 Shallow Clone 및 보안 검증)"]
-        DA_Cache["Cache Service (파싱 결과 및 AI 요약 인메모리 LRU 캐싱)"]
-        DA_Storage["Local File Storage & Cache DB (샌드박스 파일 관리)"]
+        DA_Git["Git Clone Manager<br/>(임시 Shallow Clone 및 보안 검증)"]
+        DA_Cache["Cache Service<br/>(파싱 결과 및 AI 요약 인메모리 LRU 캐싱)"]
+        DA_Storage["Local File Storage & Cache DB<br/>(격리된 샌드박스 파일 관리)"]
     end
 
     subgraph ExternalCloud ["4. External Cloud & AI Service"]
         Ext_GitHub["GitHub API / 원격 Git 저장소"]
-        Ext_Claude["Anthropic Claude API (Mock Provider 폴백 완비)"]
+        Ext_Claude["Anthropic Claude API<br/>(Mock Provider 폴백 완비)"]
     end
 
     %% 데이터 흐름
-    Ext_GitHub -->|git clone| DA_Git
+    Ext_GitHub -->|git clone 복제| DA_Git
     DA_Git -->|소스 파일 전달| App_Parser
     App_Parser -->|AST 구문 트리| App_Filter
     App_Filter -->|도메인 AST + isPlugin 플래그| App_Toggle
@@ -54,6 +54,22 @@ flowchart TD
     UI_Canvas -->|위험 노드 클릭| UI_Panel
     UI_Panel -->|함수 AST 스니펫 전달| Ext_Claude
     Ext_Claude -->|3줄 요약 및 Before/After Diff 수신| UI_Panel
+
+    style UI_Tree width:280px
+    style UI_Control width:300px
+    style UI_Canvas width:300px
+    style UI_Panel width:280px
+    style UI_CodeLens width:280px
+    style App_Parser width:300px
+    style App_Filter width:300px
+    style App_Toggle width:300px
+    style App_Metrics width:300px
+    style App_Schema width:300px
+    style DA_Git width:280px
+    style DA_Cache width:280px
+    style DA_Storage width:280px
+    style Ext_GitHub width:260px
+    style Ext_Claude width:260px
 ```
 
 ---
