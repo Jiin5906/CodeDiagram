@@ -277,11 +277,13 @@ GitHub URL 또는 로컬 경로를 전달받아 Tree-sitter 파싱 후 Cytoscape
 
 ---
 
-## 관련 산출물 문서 목록
+## 문서 (Documentation)
 
-- [제품요구사항정의서 (PRD v2.2)](../PPT&PDF&DOCX/Project/PRD/CodeRefactor_PRD_(v2.2)_20261012.pdf)
-- [기술요구명세서 (TRD v1.2)](../캡스톤노트/캡스톤_프로젝트문서/CodeRefactor_TRD_(v1.0)_20261012.md)
-- [프로그램 개발 명세서](../캡스톤노트/캡스톤_프로젝트문서/CodeRefactor_프로그램개발_(v1.0)_20261012.md)
-- [프로그램 목록 (v1.2)](../PPT&PDF&DOCX/Project/프로그램목록/CodeRefactor_프로그램목록_(v1.2)_20261024.xlsx)
-- [WBS 갠트 차트 (v3.2)](../PPT&PDF&DOCX/Project/WBS/CodeRefactor_WBS_(v3.2)_20261024.xlsx)
-- [프로그램 목록 & WBS 최신 동기화 명세서](../캡스톤노트/캡스톤_프로젝트문서/CodeRefactor_프로그램목록_WBS_동기화_(v1.2)_20261024.md)
+* [시스템 아키텍처 및 데이터 파이프라인 (Architecture & Pipeline)](./docs/architecture.md)
+* [결합도 메트릭 산출 규격 및 소수 법칙 왜곡 방지 (Metrics Specification)](./docs/metrics-spec.md)
+* [1st-Party 벤더 필터링 및 프록시 폴딩 (Proxy Folding & LOD)](./docs/filtering-lod.md)
+* [정적 분석 도구(SonarQube) 대비 비교 분석 (Comparative Analysis)](./docs/comparative-analysis.md)
+* [AI 리팩토링 프롬프트 및 Before/After Diff 뷰어 명세 (AI & Diff Engine)](./docs/ai-diff-spec.md)
+* [CodeDiagram CLI 터미널 도구 사용자 가이드 (CLI Guide)](./docs/cli-guide.md)
+
+> **안내:** PRD(제품요구사항정의서)·TRD(기술요구명세서)·WBS(일정표)·프로그램 목록은 한성대학교 기업연계 SW캡스톤디자인 공식 양식에 따른 **별도 산출물 문서(구글 드라이브 및 최종보고서 세트)로 관리**됩니다.
