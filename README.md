@@ -286,4 +286,4 @@ GitHub URL 또는 로컬 경로를 전달받아 Tree-sitter 파싱 후 Cytoscape
 * [AI 리팩토링 프롬프트 및 Before/After Diff 뷰어 명세 (AI & Diff Engine)](./docs/ai-diff-spec.md)
 * [CodeDiagram CLI 터미널 도구 사용자 가이드 (CLI Guide)](./docs/cli-guide.md)
 
-> **안내:** PRD(제품요구사항정의서)·TRD(기술요구명세서)·WBS(일정표)·프로그램 목록은 한성대학교 기업연계 SW캡스톤디자인 공식 양식에 따른 **별도 산출물 문서(구글 드라이브 및 최종보고서 세트)로 관리**됩니다.
+> PRD(제품요구사항정의서)·TRD(기술요구명세서)·WBS(일정표)·프로그램 목록은 한성대학교 기업연계 SW캡스톤디자인 공식 양식에 따른 **별도 산출물 문서로 관리**됩니다.
