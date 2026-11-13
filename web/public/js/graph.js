@@ -2,7 +2,7 @@
 //Phase 1 리뉴얼: 파일 노드 기반 플랫 그래프 + 옵시디언 스타일 글로우/디밍
 
 let cy = null;
-//현재 뷰 모드: 'file' (기본) 또는 'function' 또는 'package' 또는 'file-detail'
+//현재 뷰 모드: 'file' (기본) 또는 'package' 또는 'file-detail' (함수 뷰는 삭제했다)
 let currentViewMode = 'file';
 //원본 그래프 데이터 보관
 let graphData = null;
@@ -19,8 +19,8 @@ const LANG_COLORS = {
   css: { bg: '#8A6CC2', border: '#674F95' },
 };
 
-//결합도 HAZARD 표시색 (CR-RFC-2026-002). 판정은 서버가 하고, 그래프는 HAZARD만 표시한다.
-//파일 노드의 채움색(언어)과 크기(함수 수)는 바꾸지 않는다.
+//결합도 HAZARD 표시색 (CR-RFC-2026-002). 판정은 서버가 하고,
+//파일 뷰는 원 뒤 글로우(codeEffects.js, WARN 주황·HAZARD 빨강), 파일 상세 뷰는 파일 박스 테두리로 표시한다.
 const COUPLING_HAZARD_COLOR = '#EF4444';
 
 //파일 노드 데이터에서 결합도 판정을 꺼낸다.
@@ -112,16 +112,6 @@ function initGraph(container) {
           'transition-property': 'opacity, border-width, border-color, color, text-opacity',
           'transition-duration': '0.2s',
           'transition-timing-function': 'ease-out',
-        },
-      },
-      //결합도 HAZARD 파일 — 원 밖으로 띄운 빨간 링 (테두리는 순환 참조·선택·검색 표시가 쓰므로 겹치지 않게 outline을 쓴다)
-      {
-        selector: 'node[type="file-node"][couplingStatus = "HAZARD"]',
-        style: {
-          'outline-width': 2.5,
-          'outline-offset': 2,
-          'outline-color': COUPLING_HAZARD_COLOR,
-          'outline-opacity': 0.95,
         },
       },
       //클릭 시 기본 회색 사각 오버레이 제거
@@ -1210,10 +1200,9 @@ function renderGraph(data) {
 
   //Step 4: 파일 노드 엘리먼트 생성
   const elements = [];
-  const funcCounts = Array.from(fileNodeMap.values())
-    .filter((f) => connectedFiles.has(f.id))
-    .map((f) => f.funcCount);
-  const maxFuncCount = Math.max(1, ...funcCounts);
+  const visibleFiles = Array.from(fileNodeMap.values()).filter((f) => connectedFiles.has(f.id));
+  const maxFuncCount = Math.max(1, ...visibleFiles.map((f) => f.funcCount));
+  const maxLines = Math.max(1, ...visibleFiles.map((f) => f.lineCount || 0));
 
   for (const [fileId, fileInfo] of fileNodeMap) {
     if (!connectedFiles.has(fileId)) continue;
@@ -1221,9 +1210,12 @@ function renderGraph(data) {
     const lang = fileInfo.language || 'python';
     const colors = LANG_COLORS[lang] || LANG_COLORS.python;
     const funcCount = fileInfo.funcCount;
+    const lineCount = fileInfo.lineCount || 0;
 
-    //크기: 함수 수에 비례 (min 14, max 42). 옵시디언처럼 작은 원으로, 제곱근으로 완만하게 키운다.
-    const size = 14 + Math.sqrt(funcCount / maxFuncCount) * 28;
+    //크기: 줄 수 비율과 함수 수 비율 중 큰 쪽 (min 14, max 48).
+    //코드가 긴 파일과 함수가 많은 파일이 모두 크게 보인다. 제곱근으로 완만하게 키운다.
+    const ratio = Math.max(lineCount / maxLines, funcCount / maxFuncCount);
+    const size = 14 + Math.sqrt(ratio) * 34;
 
     //함수를 inbound 참조 순으로 정렬
     fileInfo.functions.sort((a, b) => (b.inDegree || 0) - (a.inDegree || 0));
@@ -1237,13 +1229,14 @@ function renderGraph(data) {
         label: fileName,
         shortLabel: shortName,
         fullLabel: fileName,
-        detailLabel: `${fileName}\n함수 ${funcCount}개`,
+        detailLabel: `${fileName}\n${lineCount}줄 · 함수 ${funcCount}개`,
         type: 'file-node',
         language: lang,
         fullPath: fileInfo.fullPath,
         color: colors.bg,
         borderColor: colors.border,
         funcCount: funcCount,
+        lineCount: lineCount,
         functions: fileInfo.functions,
         metrics: fileInfo.metrics,
         couplingStatus: couplingStatusOf(fileInfo),
@@ -1338,171 +1331,6 @@ function renderGraph(data) {
 }
 
 /* ══════════════════════════════════════════════════════════════════
-   함수 뷰 (기존 renderGraph 보존)
-   ══════════════════════════════════════════════════════════════════ */
-
-function renderFunctionView(data) {
-  if (!cy) return;
-  if (typeof stopForceSim === 'function') stopForceSim();
-  if (typeof stopCodeEffects === 'function') stopCodeEffects();
-
-  teardownSemanticZoom();
-
-  graphData = data;
-  currentViewMode = 'function';
-
-  cy.elements().remove();
-
-  //엣지에 연결된 함수 노드 ID 수집 (고립 함수 필터링용)
-  const connectedIds = new Set();
-  for (const edge of data.edges) {
-    connectedIds.add(edge.source);
-    connectedIds.add(edge.target);
-  }
-  if (data.inheritanceEdges) {
-    for (const edge of data.inheritanceEdges) {
-      connectedIds.add(edge.source);
-      connectedIds.add(edge.target);
-    }
-  }
-  if (data.variableEdges) {
-    for (const edge of data.variableEdges) {
-      connectedIds.add(edge.source);
-      connectedIds.add(edge.target);
-    }
-  }
-  if (data.webEdges) {
-    for (const edge of data.webEdges) {
-      connectedIds.add(edge.source);
-      connectedIds.add(edge.target);
-    }
-  }
-
-  //파일 탐색기에서 접은 폴더에 속한 리프 노드인지 확인
-  const isHidden = (node) => typeof isFileHidden === 'function' && isFileHidden(node.data.filePath);
-
-  //유지할 노드 ID 결정
-  const keptIds = new Set();
-  for (const node of data.nodes) {
-    if (LEAF_TYPES.has(node.data.type) && connectedIds.has(node.data.id) && !isHidden(node)) {
-      keptIds.add(node.data.id);
-    }
-  }
-  for (let pass = 0; pass < 3; pass++) {
-    for (const node of data.nodes) {
-      if (keptIds.has(node.data.id) && node.data.parent) {
-        keptIds.add(node.data.parent);
-      }
-    }
-  }
-
-  //노드 추가
-  const containerTypes = new Set(['file', 'tier', 'lang']);
-  const elements = [];
-  for (const node of data.nodes) {
-    if (LEAF_TYPES.has(node.data.type) && (!connectedIds.has(node.data.id) || isHidden(node)))
-      continue;
-    if (containerTypes.has(node.data.type) && !keptIds.has(node.data.id)) continue;
-    elements.push(
-      node.data.type === 'file'
-        ? { data: { ...node.data, couplingStatus: couplingStatusOf(node.data) } }
-        : node,
-    );
-  }
-
-  //엣지 추가
-  const addedNodeIds = new Set(
-    elements.filter((e) => e.data && !e.data.source).map((e) => e.data.id),
-  );
-  for (const edge of data.edges) {
-    if (!addedNodeIds.has(edge.source) || !addedNodeIds.has(edge.target)) continue;
-    elements.push({
-      data: {
-        id: `${edge.source}->${edge.target}`,
-        source: edge.source,
-        target: edge.target,
-        refCount: edge.references.length,
-        references: edge.references,
-        edgeType: 'call',
-      },
-    });
-  }
-  if (data.inheritanceEdges) {
-    for (const edge of data.inheritanceEdges) {
-      if (addedNodeIds.has(edge.source) && addedNodeIds.has(edge.target)) {
-        elements.push({
-          data: {
-            id: `inherit__${edge.source}->${edge.target}`,
-            source: edge.source,
-            target: edge.target,
-            edgeType: 'inheritance',
-          },
-        });
-      }
-    }
-  }
-  if (data.variableEdges) {
-    for (const edge of data.variableEdges) {
-      if (addedNodeIds.has(edge.source) && addedNodeIds.has(edge.target)) {
-        elements.push({
-          data: {
-            id: `varref__${edge.source}->${edge.target}`,
-            source: edge.source,
-            target: edge.target,
-            edgeType: 'variable-ref',
-            refCount: edge.references.length,
-            references: edge.references,
-          },
-        });
-      }
-    }
-  }
-  if (data.webEdges) {
-    for (const edge of data.webEdges) {
-      if (addedNodeIds.has(edge.source) && addedNodeIds.has(edge.target)) {
-        elements.push({
-          data: {
-            id: `web__${edge.source}->${edge.target}__${edge.type}`,
-            source: edge.source,
-            target: edge.target,
-            edgeType: edge.type,
-            refCount: edge.references ? edge.references.length : 1,
-            references: edge.references,
-          },
-        });
-      }
-    }
-  }
-
-  cy.add(elements);
-
-  //순환 참조 엣지 마킹
-  if (data.cycleEdgeIds) {
-    for (const edgeId of data.cycleEdgeIds) {
-      const edge = cy.getElementById(edgeId);
-      if (edge.length) edge.addClass('cycle-edge');
-    }
-  }
-
-  //최상위 컨테이너 ID 목록 생성
-  const sortedTiers = data.tiers ? [...data.tiers].sort((a, b) => a - b) : [];
-  const containerIds = sortedTiers.map((t) => `tier__${t}`);
-  if (data.langs) {
-    const langOrder = ['html', 'css', 'javascript'];
-    for (const lang of langOrder) {
-      if (data.langs.includes(lang)) containerIds.push(`lang__${lang}`);
-    }
-  }
-
-  //컨테이너 배치 -> fcos 결과가 arrangeContainers를 전부 덮어써서 쓰지 않도록 바꿨다.
-  arrangeContainers(containerIds);
-
-  const legendPanel = document.getElementById('legend-panel');
-  if (legendPanel) legendPanel.classList.remove('hidden');
-  return cy;
-}
-
-/* ══════════════════════════════════════════════════════════════════
    패키지 뷰 (기존 유지)
    ══════════════════════════════════════════════════════════════════ */
 
@@ -1571,168 +1399,6 @@ function renderPackageView(data) {
     randomize: true,
     numIter: 2000,
   }).run();
-}
-
-/* ══════════════════════════════════════════════════════════════════
-   컨테이너 배치 (함수 뷰 전용)
-   ══════════════════════════════════════════════════════════════════ */
-
-function arrangeContainers(containerIds) {
-  if (!containerIds || containerIds.length === 0) return;
-
-  const containerGap = 166;
-  const subTierGap = 120;
-  const fileGap = 80;
-  const fnGap = 8;
-
-  function arrangeLeafNodes(fileNode) {
-    const leafNodes = fileNode.children();
-    if (leafNodes.length === 0) return null;
-
-    const items = [];
-    leafNodes.forEach((n) => {
-      const bb = n.boundingBox();
-      items.push({ node: n, w: bb.w, h: bb.h });
-    });
-
-    const targetCols = Math.max(1, Math.ceil(Math.sqrt(items.length)));
-    const widthsSorted = items.map((f) => f.w).sort((a, b) => b - a);
-    let maxRowW = 0;
-    for (let i = 0; i < Math.min(targetCols, widthsSorted.length); i++) {
-      maxRowW += widthsSorted[i] + fnGap;
-    }
-
-    let rowX = 0,
-      rowY = 0,
-      rowMaxH = 0;
-    for (const item of items) {
-      if (rowX > 0 && rowX + item.w > maxRowW) {
-        rowX = 0;
-        rowY += rowMaxH + fnGap;
-        rowMaxH = 0;
-      }
-      item.node.position({ x: rowX + item.w / 2, y: rowY + item.h / 2 });
-      rowX += item.w + fnGap;
-      rowMaxH = Math.max(rowMaxH, item.h);
-    }
-
-    const bb = leafNodes.boundingBox();
-    return { leafNodes, bb, w: bb.w, h: bb.h };
-  }
-
-  function gridLayout(blocks, gap) {
-    if (blocks.length === 0) return null;
-    let allLeafNodes = cy.collection();
-    const cols = Math.max(1, Math.ceil(Math.cbrt(blocks.length)));
-    blocks.sort((a, b) => b.h - a.h);
-
-    let gridX = 0,
-      gridY = 0,
-      rowMaxH = 0,
-      col = 0;
-    for (const block of blocks) {
-      const dx = gridX - block.bb.x1;
-      const dy = gridY - block.bb.y1;
-      block.leafNodes.forEach((node) => {
-        const pos = node.position();
-        node.position({ x: pos.x + dx, y: pos.y + dy });
-      });
-      allLeafNodes = allLeafNodes.union(block.leafNodes);
-
-      rowMaxH = Math.max(rowMaxH, block.h);
-      gridX += block.w + gap;
-      col++;
-      if (col >= cols) {
-        gridX = 0;
-        gridY += rowMaxH + gap;
-        rowMaxH = 0;
-        col = 0;
-      }
-    }
-
-    const bb = allLeafNodes.boundingBox();
-    return { leafNodes: allLeafNodes, bb, w: bb.w, h: bb.h };
-  }
-
-  function arrangeInternals(containerNode) {
-    const children = containerNode.children();
-    if (children.length === 0) return null;
-    const firstChildType = children[0].data('type');
-
-    if (firstChildType === 'tier') {
-      const subBlocks = [];
-      children.forEach((subTier) => {
-        const result = arrangeInternals(subTier);
-        if (result) subBlocks.push(result);
-      });
-      return gridLayout(subBlocks, subTierGap);
-    } else {
-      const fileBlocks = [];
-      children.forEach((fileNode) => {
-        const result = arrangeLeafNodes(fileNode);
-        if (result) fileBlocks.push(result);
-      });
-      return gridLayout(fileBlocks, fileGap);
-    }
-  }
-
-  const containerInfo = [];
-  for (const containerId of containerIds) {
-    const containerNode = cy.getElementById(containerId);
-    if (!containerNode.length) continue;
-    if (containerNode.descendants().length === 0) continue;
-    const result = arrangeInternals(containerNode);
-    if (!result) continue;
-    containerInfo.push({ containerId, leafNodes: result.leafNodes, bb: result.bb });
-  }
-
-  if (containerInfo.length === 0) return;
-
-  const maxW = Math.max(...containerInfo.map((t) => t.bb.w));
-  const targetWidth = Math.max(maxW + containerGap, 2500);
-
-  const rows = [[]];
-  let rowW = 0;
-  for (const info of containerInfo) {
-    if (rowW > 0 && rowW + info.bb.w > targetWidth) {
-      rows.push([]);
-      rowW = 0;
-    }
-    rows[rows.length - 1].push(info);
-    rowW += info.bb.w + containerGap;
-  }
-
-  let rowY = 0;
-  for (const row of rows) {
-    const rowH = Math.max(...row.map((r) => r.bb.h));
-    let x = 0;
-    for (const info of row) {
-      const { leafNodes, bb } = info;
-      const offsetX = x - bb.x1;
-      const offsetY = rowY + (rowH - bb.h) / 2 - bb.y1;
-      leafNodes.forEach((node) => {
-        const pos = node.position();
-        node.position({ x: pos.x + offsetX, y: pos.y + offsetY });
-      });
-      x += bb.w + containerGap;
-    }
-    rowY += rowH + containerGap;
-  }
-
-  cy.fit(undefined, 20);
-
-  const allLeaves = cy.nodes(
-    '[type="function"], [type="variable"], [type="js-function"], [type="ts-function"], [type="cpp-function"], [type="csharp-function"], [type="css-variable"], [type="html-element"], [type="css-selector"]',
-  );
-  const nodeCount = allLeaves.length;
-  const zoomLevel = nodeCount <= 10 ? 1.2 : nodeCount <= 30 ? 0.9 : nodeCount <= 80 ? 0.7 : 0.5;
-  const firstLeaf = cy.nodes(
-    '[type="function"], [type="js-function"], [type="ts-function"], [type="cpp-function"], [type="csharp-function"]',
-  )[0];
-  if (firstLeaf) {
-    cy.zoom({ level: zoomLevel, position: firstLeaf.position() });
-    cy.center(firstLeaf);
-  }
 }
 
 /* ══════════════════════════════════════════════════════════════════
@@ -1906,21 +1572,6 @@ function updateLabelFade() {
   });
 }
 
-function teardownSemanticZoom() {
-  if (!cy || !_lodZoomHandler) return;
-  cy.off('zoom', _lodZoomHandler);
-  _lodZoomHandler = null;
-  clearTimeout(_lodDebounceTimer);
-
-  //모든 LOD 클래스 제거
-  const allCls = LOD_STAGES.filter((s) => s.cls).map((s) => s.cls);
-  cy.batch(() => {
-    cy.elements().removeClass(allCls.join(' ') + ' ' + LABEL_FADE_CLASSES);
-  });
-  _lodStageIndex = 2;
-  _labelFadeBucket = -1;
-}
-
 function onZoomChange() {
   if (!cy) return;
   const zoom = cy.zoom();
@@ -1989,13 +1640,10 @@ function resetHighlightState() {
   highlightState.selectedId = null;
 }
 
-//함수 뷰 엣지 표시를 엣지 토글 상태로 되돌린다
-function resetFunctionViewEdges() {
-  if (typeof edgesVisible !== 'undefined' && edgesVisible) {
-    cy.edges().style({ display: 'element', 'line-opacity': 0.3 });
-  } else {
-    cy.edges().style('display', 'none');
-  }
+//파일 뷰가 아닌 뷰(파일 상세 뷰)는 강조를 풀 때 선을 다시 숨긴다.
+//예전 함수 뷰의 "선 보기" 토글이 꺼진 상태와 같은 동작이다.
+function resetDetailViewEdges() {
+  cy.edges().style('display', 'none');
 }
 
 //세 상태를 우선순위대로 합성한다: 검색 매칭(항상 유지) 위에 포커스(hover > 선택)를 겹친다
@@ -2007,7 +1655,7 @@ function applyHighlights() {
   cy.batch(() => {
     //1. 관리하는 클래스를 모두 지우고 처음부터 다시 칠한다
     cy.elements().removeClass('highlighted dimmed hover-focus neighbor-highlight search-match');
-    if (!isFileView) resetFunctionViewEdges();
+    if (!isFileView) resetDetailViewEdges();
 
     let keep = cy.collection(); //흐리지 않을 요소
     let active = false; //검색이나 포커스 중 하나라도 있으면 나머지를 흐린다

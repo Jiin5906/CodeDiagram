@@ -3,10 +3,6 @@
 const explainCache = {};
 //접힌 노드 추적
 const collapsedNodes = new Set();
-//전체 접기 상태
-let allCollapsed = false;
-//엣지 토글 상태 (true = 모든 엣지 표시 중)
-let edgesVisible = false;
 //DOM 이벤트 리스너 중복 등록 방지 플래그
 let domListenersBound = false;
 //포커스 디밍 타이머
@@ -45,13 +41,12 @@ function setupInteractions() {
     setupDomListeners();
   }
 
-  //계층형은 파일 뷰 전용 — 함수 뷰는 박스가 겹겹이라 계층형으로 펼치면 읽을 수 없다.
+  //계층형은 파일 뷰 전용 — 파일 상세 뷰에서는 숨긴다.
   //켜 둔 상태는 기억했다가 파일 뷰로 돌아오면 다시 적용한다.
   const hierarchyBox = document.getElementById('graph-settings');
   if (hierarchyBox && graphData)
     hierarchyBox.classList.toggle('hidden', currentViewMode !== 'file');
   if (hierarchicalLayout && currentViewMode === 'file') applyHierarchicalLayout();
-  syncViewButtons();
 }
 
 /* ══════════════════════════════════════════════════════════════════
@@ -237,7 +232,6 @@ function setupFunctionViewInteractions() {
     evt.stopPropagation();
   });
 
-  setupEdgeToggle();
   setupLongPress();
 }
 
@@ -246,13 +240,7 @@ function setupFunctionViewInteractions() {
    ══════════════════════════════════════════════════════════════════ */
 
 //리본 버튼 라벨/설명 갱신. textContent를 통째로 바꾸면 아이콘이 사라지므로 라벨 span만 바꾼다.
-const RIBBON_TIPS = {
-  edgesHidden: '함수끼리 호출하는 선을 보여줍니다',
-  edgesShown: '함수끼리 호출하는 선을 감춥니다',
-  collapse: '모든 파일 그룹을 접습니다',
-  expand: '접힌 파일 그룹을 모두 펼칩니다',
-};
-
+//(지금은 주석 처리된 auth.js가 쓴다. 다시 살리면 그대로 동작하도록 남겨 둔다)
 function setRibbonLabel(id, label, tip) {
   const btn = document.getElementById(id);
   if (!btn) return;
@@ -262,44 +250,15 @@ function setRibbonLabel(id, label, tip) {
   if (tip) btn.dataset.tip = tip;
 }
 
-//보기 단위 선택 버튼의 선택 표시를 현재 뷰에 맞춘다 (파일 상세 뷰는 파일 쪽으로 표시)
-function syncViewButtons() {
-  const isFunction = currentViewMode === 'function';
-  const fileBtn = document.getElementById('view-file-btn');
-  const funcBtn = document.getElementById('view-function-btn');
-  if (fileBtn) {
-    fileBtn.classList.toggle('active', !isFunction);
-    fileBtn.setAttribute('aria-pressed', String(!isFunction));
-  }
-  if (funcBtn) {
-    funcBtn.classList.toggle('active', isFunction);
-    funcBtn.setAttribute('aria-pressed', String(isFunction));
-  }
-}
-
-//파일 뷰 ↔ 함수 뷰 전환 + 뷰 전용 버튼/범례 표시
-function setViewMode(mode) {
+//파일 뷰로 다시 그린다 (함수 뷰는 삭제되어 파일 뷰만 남았다).
+//mode 인자는 호출부 호환을 위해 받기만 한다.
+function setViewMode(_mode) {
   if (!graphData) return;
   if (typeof isLocalGraphActive === 'function' && isLocalGraphActive()) exitLocalGraph();
 
-  const isFunction = mode === 'function';
-  if (isFunction) {
-    renderFunctionView(graphData);
-  } else {
-    renderGraph(graphData);
-  }
+  renderGraph(graphData);
   setupInteractions();
-
-  const edgesBtn = document.getElementById('toggle-edges-btn');
-  const collapseBtn = document.getElementById('collapse-all-btn');
-  const legendFileView = document.getElementById('legend-file-view');
-  const legendFuncView = document.getElementById('legend-function-view');
-  if (edgesBtn) edgesBtn.classList.toggle('hidden', !isFunction);
-  if (collapseBtn) collapseBtn.classList.toggle('hidden', !isFunction);
-  if (legendFileView) legendFileView.classList.toggle('hidden', isFunction);
-  if (legendFuncView) legendFuncView.classList.toggle('hidden', !isFunction);
   document.getElementById('back-to-package-btn').classList.add('hidden');
-  syncViewButtons();
 }
 
 function setupDomListeners() {
@@ -320,27 +279,9 @@ function setupDomListeners() {
     });
   }
 
-  //보기 단위 선택 (파일 | 함수)
+  //파일 뷰 버튼 — 파일 상세 뷰에서 전체 파일 그래프로 돌아간다
   document.getElementById('view-file-btn').addEventListener('click', () => {
     if (currentViewMode !== 'file') setViewMode('file');
-  });
-  document.getElementById('view-function-btn').addEventListener('click', () => {
-    if (currentViewMode !== 'function') setViewMode('function');
-  });
-
-  //전체 접기/펼치기 버튼
-  document.getElementById('collapse-all-btn').addEventListener('click', () => {
-    if (!cy) return;
-    const fileNodes = cy.nodes('[type="file"]');
-    if (allCollapsed) {
-      fileNodes.forEach((node) => expandNode(node));
-      allCollapsed = false;
-      setRibbonLabel('collapse-all-btn', '전체 접기', RIBBON_TIPS.collapse);
-    } else {
-      fileNodes.forEach((node) => collapseNode(node));
-      allCollapsed = true;
-      setRibbonLabel('collapse-all-btn', '전체 펼치기', RIBBON_TIPS.expand);
-    }
   });
 
   setupHierarchyToggle();
@@ -852,7 +793,77 @@ function _buildCouplingPane(coupling) {
   };
 }
 
+//4. 비대 코드 카테고리 뷰 생성 — 비대 파일 분할 권고 + 비대 클래스(God Class)
+function _buildSizePane(size) {
+  const pane = document.createElement('div');
+  pane.className = 'diag-cat-pane';
+  pane.dataset.cat = 'size';
+
+  const files = (size && size.files) || [];
+  const classes = (size && size.classes) || [];
+  const criteria = size && size.criteria;
+  const severityOf = (st) => (st === 'HAZARD' ? 'error' : 'warning');
+  const baseName = (p) => p.split('/').pop();
+
+  const fileItems = files.map((e) =>
+    _makeDiagItem(
+      severityOf(e.status),
+      `${e.status} · ${baseName(e.file)} — ${e.lines}줄 · 함수 ${e.funcCount}개`,
+      [e.file],
+    ),
+  );
+  //"파일::클래스" 형태로 넘기면 _diagLocation이 그 클래스 메서드 범위로 코드를 연다.
+  //C++ 헤더처럼 같은 파일에 메서드가 없으면 메시지 끝의 "(경로:줄)"로 클래스 선언 위치를 연다.
+  const classItems = classes.map((e) =>
+    _makeDiagItem(
+      severityOf(e.status),
+      `${e.status} · ${e.className} — ${e.lines}줄 · 메서드 ${e.methods}개 (${e.file}:${e.startLine})`,
+      [`${e.file}::${e.className}`],
+    ),
+  );
+  const total = fileItems.length + classItems.length;
+  const hazardCount = [...files, ...classes].filter((e) => e.status === 'HAZARD').length;
+
+  if (total === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'diag-empty';
+    empty.textContent = '분할이 필요한 큰 파일·클래스가 없습니다';
+    pane.appendChild(empty);
+  } else {
+    if (criteria) {
+      const f = criteria.file;
+      const k = criteria.klass;
+      const note = document.createElement('div');
+      note.className = 'coupling-criteria';
+      note.textContent =
+        `판정 기준 · 파일: ${f.warnLines}줄 또는 함수 ${f.warnFuncs}개 이상 WARN, ` +
+        `${f.hazardLines}줄 또는 ${f.hazardFuncs}개 이상 HAZARD · ` +
+        `클래스: ${k.warnLines}줄 또는 메서드 ${k.warnMethods}개 이상 WARN, ` +
+        `${k.hazardLines}줄 또는 ${k.hazardMethods}개 이상 HAZARD`;
+      pane.appendChild(note);
+    }
+    if (fileItems.length > 0) {
+      pane.appendChild(_makeCollapsibleGroup('비대 파일 분할 권고', fileItems));
+    }
+    if (classItems.length > 0) {
+      pane.appendChild(_makeCollapsibleGroup('비대 클래스(God Class) 분할 필요', classItems));
+    }
+    const noMatch = document.createElement('div');
+    noMatch.className = 'diag-empty diag-no-match hidden';
+    noMatch.textContent = '일치하는 항목이 없습니다';
+    pane.appendChild(noMatch);
+  }
+
+  return {
+    pane,
+    badgeText: hazardCount > 0 ? `HAZARD ${hazardCount}` : String(total),
+    totalCount: total,
+    badgeVariant: hazardCount > 0 ? 'hazard' : total > 0 ? 'warn' : '',
+  };
+}
+
 //3. 리팩토링 제안 카테고리 뷰 생성
+//[미구현-보류] 현재 DIAG_CATEGORIES에서 빠져 있어 쓰이지 않는다
 function _buildSuggestionsPane(suggestions) {
   const pane = document.createElement('div');
   pane.className = 'diag-cat-pane';
@@ -952,10 +963,16 @@ const DIAG_CATEGORIES = [
     build: (diagnostics) => _buildCouplingPane(diagnostics && diagnostics.coupling),
   },
   {
-    id: 'suggestions',
-    label: '리팩토링 제안',
-    build: (_diagnostics, suggestions) => _buildSuggestionsPane(suggestions),
+    id: 'size',
+    label: '비대 코드',
+    build: (diagnostics) => _buildSizePane(diagnostics && diagnostics.size),
   },
+  // [미구현-보류] 리팩토링 제안 탭 (Diff·AI 리팩토링 버튼 포함) — 미구현이라 숨김
+  // {
+  //   id: 'suggestions',
+  //   label: '리팩토링 제안',
+  //   build: (_diagnostics, suggestions) => _buildSuggestionsPane(suggestions),
+  // },
 ];
 
 let _activeDiagCategory = null;
@@ -1274,9 +1291,14 @@ async function showExplanation(funcData) {
       const err = await response.json().catch(() => ({}));
       if (seq !== explainSeq) return;
       if (response.status === 401) {
-        //세션이 만료됐거나 키가 거부됐다. 버튼 라벨도 로그인 상태로 되돌린다.
-        if (typeof refreshAuthState === 'function') refreshAuthState();
-        _explainLoginNote(body, funcData);
+        // [미구현-보류] API 키 등록 UI를 숨겨서 로그인 안내 대신 일반 안내를 보여 준다
+        // //세션이 만료됐거나 키가 거부됐다. 버튼 라벨도 로그인 상태로 되돌린다.
+        // if (typeof refreshAuthState === 'function') refreshAuthState();
+        // _explainLoginNote(body, funcData);
+        _explainNote(
+          body,
+          'AI 해설을 사용할 수 없습니다. 서버 web/.env의 ANTHROPIC_API_KEY를 확인해 주세요.',
+        );
       } else {
         _explainNote(body, `해설을 가져올 수 없습니다: ${err.error || '서버 오류'}`);
       }
@@ -2043,12 +2065,13 @@ function showFunctionPreview(node, top3, position) {
   countSpan.className = 'fn-preview-count';
   countSpan.textContent = '함수 ' + funcCount + '개';
   headerDiv.appendChild(countSpan);
-  //복잡도 글로우가 있는 파일이면 이유를 함께 알려준다
-  const complexity = node.data('complexityLevel');
-  if (complexity) {
+  //결합도 글로우가 있는 파일이면 판정과 수치를 함께 알려준다 (진단 탭 "파일 결합도"와 같은 값)
+  const cStatus = node.data('couplingStatus');
+  const m = node.data('metrics');
+  if ((cStatus === 'HAZARD' || cStatus === 'WARN') && m) {
     const badge = document.createElement('span');
-    badge.className = 'fn-preview-complex level-' + complexity;
-    badge.textContent = ['', '복잡도 주의', '복잡도 높음', '복잡도 매우 높음'][complexity];
+    badge.className = 'fn-preview-complex ' + (cStatus === 'HAZARD' ? 'level-3' : 'level-2');
+    badge.textContent = `결합도 ${cStatus} · I ${m.instability} · Ce ${m.ce}`;
     headerDiv.appendChild(badge);
   }
   tooltip.appendChild(headerDiv);
@@ -2281,26 +2304,4 @@ function showEdgePreview(edge, position) {
 function hideEdgePreview() {
   const tooltip = document.getElementById('edge-preview');
   if (tooltip) tooltip.classList.add('hidden');
-}
-
-/* ── 엣지 보기 토글 ── */
-
-function setupEdgeToggle() {
-  const btn = document.getElementById('toggle-edges-btn');
-
-  btn.addEventListener('click', () => {
-    if (!cy) return;
-
-    edgesVisible = !edgesVisible;
-
-    if (edgesVisible) {
-      cy.edges().style({ display: 'element', 'line-opacity': 0.3 });
-      setRibbonLabel('toggle-edges-btn', '선 숨기기', RIBBON_TIPS.edgesShown);
-      btn.classList.add('active');
-    } else {
-      cy.edges().style({ display: 'none' });
-      setRibbonLabel('toggle-edges-btn', '선 보기', RIBBON_TIPS.edgesHidden);
-      btn.classList.remove('active');
-    }
-  });
 }

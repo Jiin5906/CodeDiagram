@@ -200,7 +200,7 @@ function buildFileTree(data) {
 //폴더 접힘이 바뀌면 현재 뷰를 다시 그린다 (파일 상세 뷰는 파일 하나만 보므로 그대로 둔다)
 function refreshGraphForTree() {
   if (!graphData || typeof setViewMode !== 'function') return;
-  if (currentViewMode === 'file' || currentViewMode === 'function') {
+  if (currentViewMode === 'file') {
     setViewMode(currentViewMode);
   }
 }

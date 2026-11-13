@@ -2,7 +2,7 @@
 //옵시디언에는 없는, 코드 분석 정보를 그래프 위에 드러내는 효과들이다.
 //- 진단 글로우: 순환 참조 파일은 붉게 숨 쉬듯 깜빡인다
 //- 호출 방향 입자: 강조된 선 위로 점들이 호출 방향(source → target)으로 흐른다
-//- 복잡도 글로우: 복잡도가 높은 파일은 원 뒤로 빛이 번지며 천천히 숨 쉬듯 밝아졌다 어두워진다 (복잡할수록 넓고 붉다)
+//- 결합도 글로우: 결합도 판정(CR-RFC-2026-002, metricsService)이 WARN·HAZARD인 파일만 원 뒤로 빛이 번진다 (WARN 주황, HAZARD 빨강)
 
 const DIAG_PULSE_INTERVAL = 1400; //글로우가 한 번 밝아졌다 어두워지는 주기의 절반(ms)
 const FLOW_SPEED = 0.6; //입자 이동 속도 (프레임당 px, 모델 좌표)
@@ -11,18 +11,14 @@ let _diagPulseTimer = null;
 let _flowRafId = null;
 let _flowEdges = null;
 
-//복잡도 글로우 설정
-const COMPLEX_TOP_RATIO = 0.12; //복잡도 점수 상위 12% 파일만 표시
-const COMPLEX_MAX_FILES = 15; //한 번에 표시하는 최대 파일 수 (그래프가 산만해지지 않도록)
-const COMPLEX_MIN_SCORE = 2; //점수가 이보다 낮으면 상위권이어도 표시하지 않음 (작은 프로젝트 대비)
-const COMPLEX_LONG_FN_LINES = 50; //긴 함수 기준 (줄 수)
-const COMPLEX_COUPLING_WEIGHT = { HAZARD: 2, WARN: 1 }; //결합도 판정(CR-RFC-2026-002)별 복잡도 가중치 — 예전 결합도 점수(0~1)×2처럼 최대 2점이다
-const COMPLEX_LEVEL_SCORES = [5, 8]; //2단계, 3단계가 되는 점수 (예: 700줄·긴 함수 3개인 파일 ≈ 8.8)
-const COMPLEX_LEVELS = [
-  { color: '214, 165, 71', spread: 1.1, strength: 0.38 }, //1단계: 주황, 은은하게
-  { color: '230, 128, 70', spread: 1.5, strength: 0.5 }, //2단계: 진한 주황
-  { color: '239, 68, 68', spread: 1.9, strength: 0.62 }, //3단계: 빨강, 가장 넓고 밝게
-];
+//결합도 글로우 — 진단 탭 "파일 결합도"와 같은 판정(파일 노드의 couplingStatus)만 그린다. 빨강은 HAZARD일 때만 쓴다.
+//color는 밝은 배경에서도 또렷하도록 채도 높은 색, strength는 가장 진한 지점의 불투명도(0~1)다.
+const COUPLING_GLOW_LEVELS = {
+  WARN: { level: 1, color: '234, 88, 12', spread: 1.4, strength: 0.72 }, //진한 주황 (#EA580C)
+  HAZARD: { level: 2, color: '220, 38, 38', spread: 1.9, strength: 0.9 }, //진한 빨강 (#DC2626)
+};
+const GLOW_MID_RATIO = 0.75; //빛 반경의 35% 지점 진하기 (가장 진한 지점 대비). 높을수록 원 둘레가 진하다
+const GLOW_BREATH_MIN = 0.75; //숨 쉬기에서 가장 옅어질 때의 진하기 (1이면 깜빡이지 않음)
 const GLOW_BREATH_MS = 2800; //한 번 밝아졌다 어두워지는 주기 (옛 버전의 1.4초 전환 × 2)
 
 let _glowRafId = null;
@@ -44,7 +40,7 @@ function applyCodeEffects(data) {
 
   _applyDiagnosticGlow(data.diagnostics);
   //움직임 줄이기 설정이면 숨 쉬는 효과 없이 일정한 밝기로 그린다
-  _startComplexityGlow(_prefersReducedMotion());
+  _startCouplingGlow(_prefersReducedMotion());
 
   if (_prefersReducedMotion()) return;
   //진단 깜빡임은 쓰지 않는다 — 계속 움직이는 요소가 그래프 읽기를 방해한다. 선택한 선 위 입자 흐름만 유지.
@@ -54,7 +50,7 @@ function applyCodeEffects(data) {
 function stopCodeEffects() {
   clearInterval(_diagPulseTimer);
   _diagPulseTimer = null;
-  _stopComplexityGlow();
+  _stopCouplingGlow();
   if (_flowRafId) cancelAnimationFrame(_flowRafId);
   _flowRafId = null;
   if (_flowEdges && cy) {
@@ -155,56 +151,18 @@ function _startEdgeFlow() {
   _flowRafId = requestAnimationFrame(frame);
 }
 
-/* ── 복잡도 글로우 ── */
+/* ── 결합도 글로우 ── */
 
-//파일 복잡도 점수: 함수 줄 수 합, 긴 함수 수, 함수 개수, 결합도 판정을 합친다.
-//진단 목록에는 info 등급이라 테두리로 표시되지 않는 "크고 복잡한 파일"을 원 뒤의 빛으로 드러낸다.
-function _fileComplexityScore(node) {
-  const fns = (node.data('functions') || []).filter(
-    (fn) => fn.type !== 'variable' && fn.type !== 'class',
-  );
-  let lines = 0;
-  let longFns = 0;
-  for (const fn of fns) {
-    if (!fn.startLine || !fn.endLine) continue;
-    const n = Math.max(1, fn.endLine - fn.startLine + 1);
-    lines += n;
-    if (n >= COMPLEX_LONG_FN_LINES) longFns++;
-  }
-  const coupling = COMPLEX_COUPLING_WEIGHT[couplingStatusOf(node.data())] || 0;
-  return lines / 150 + longFns + fns.length / 12 + coupling;
-}
-
-//복잡도 상위 파일을 골라 단계(1~3)를 매긴다
-function _pickComplexFiles() {
-  const fileNodes = cy.nodes('[type="file-node"]');
-  if (fileNodes.empty()) return [];
-
-  const scored = fileNodes
-    .map((node) => ({ node, score: _fileComplexityScore(node) }))
-    .filter((e) => e.score >= COMPLEX_MIN_SCORE)
-    .sort((a, b) => b.score - a.score);
-
-  const limit = Math.min(
-    COMPLEX_MAX_FILES,
-    Math.max(1, Math.ceil(fileNodes.length * COMPLEX_TOP_RATIO)),
-  );
-  const picked = scored.slice(0, limit);
-  if (!picked.length) return [];
-
-  return picked.map((e, i) => {
-    //단계는 상대 순위가 아닌 점수 자체로 정한다 (상위권이 모두 비슷하면 같은 단계)
-    const level =
-      e.score >= COMPLEX_LEVEL_SCORES[1] ? 3 : e.score >= COMPLEX_LEVEL_SCORES[0] ? 2 : 1;
-    e.node.data('complexityLevel', level);
+//결합도 WARN·HAZARD 파일 노드를 고른다.
+//couplingStatus는 서버 metricsService의 판정을 graph.js가 그대로 옮겨 붙인 값이라 진단 탭과 같다.
+function _pickCoupledFiles() {
+  const picked = [];
+  cy.nodes('[type="file-node"]').forEach((node) => {
+    const style = COUPLING_GLOW_LEVELS[node.data('couplingStatus')];
     //파일마다 숨 쉬는 박자를 조금씩 어긋나게 해 한꺼번에 깜빡이지 않게 한다
-    return { node: e.node, level, phase: i * 0.9 };
+    if (style) picked.push({ node, style, phase: picked.length * 0.9 });
   });
-}
-
-//범례에서 "복잡도 높은 파일" 항목을 보일지 판단하는 데 쓴다
-function complexFileCount() {
-  return _glowNodes ? _glowNodes.length : 0;
+  return picked;
 }
 
 //빛 레이어는 그래프(#cy) 뒤에 둔다. Cytoscape 캔버스는 배경이 투명해서
@@ -223,9 +181,8 @@ function _ensureGlowCanvas() {
   return canvas;
 }
 
-function _startComplexityGlow(still) {
-  if (cy) cy.nodes('[type="file-node"]').removeData('complexityLevel');
-  _glowNodes = _pickComplexFiles();
+function _startCouplingGlow(still) {
+  _glowNodes = _pickCoupledFiles();
   if (!_glowNodes.length) return;
 
   _glowCanvas = _ensureGlowCanvas();
@@ -235,7 +192,7 @@ function _startComplexityGlow(still) {
 
   const frame = (now) => {
     if (!cy || currentViewMode !== 'file' || !_glowCanvas) {
-      _stopComplexityGlow();
+      _stopCouplingGlow();
       return;
     }
 
@@ -265,9 +222,9 @@ function _startComplexityGlow(still) {
 
       const pos = node.renderedPosition();
       const r = Math.max(3, Math.max(node.renderedOuterWidth(), node.renderedOuterHeight()) / 2);
-      const style = COMPLEX_LEVELS[entry.level - 1];
+      const style = entry.style;
       //빛 반경: 원 크기에 비례하되, 많이 축소했을 때도 보이도록 최소 폭을 둔다
-      const reach = Math.max(r * style.spread, 10 + entry.level * 4);
+      const reach = Math.max(r * style.spread, 10 + style.level * 4);
       const outer = r + reach;
       if (pos.x + outer < 0 || pos.y + outer < 0 || pos.x - outer > cssW || pos.y - outer > cssH)
         continue;
@@ -276,12 +233,12 @@ function _startComplexityGlow(still) {
       const breath = still
         ? 0.5
         : 0.5 - 0.5 * Math.cos((elapsed / GLOW_BREATH_MS) * Math.PI * 2 + entry.phase);
-      const strength = style.strength * (0.6 + 0.4 * breath) * alpha;
+      const strength = style.strength * (GLOW_BREATH_MIN + (1 - GLOW_BREATH_MIN) * breath) * alpha;
       const radius = r + reach * (0.8 + 0.2 * breath);
 
       const grad = ctx.createRadialGradient(pos.x, pos.y, r * 0.6, pos.x, pos.y, radius);
       grad.addColorStop(0, `rgba(${style.color}, ${strength.toFixed(3)})`);
-      grad.addColorStop(0.35, `rgba(${style.color}, ${(strength * 0.55).toFixed(3)})`);
+      grad.addColorStop(0.35, `rgba(${style.color}, ${(strength * GLOW_MID_RATIO).toFixed(3)})`);
       grad.addColorStop(1, `rgba(${style.color}, 0)`);
       ctx.fillStyle = grad;
       ctx.beginPath();
@@ -296,7 +253,7 @@ function _startComplexityGlow(still) {
   _glowRafId = requestAnimationFrame(frame);
 }
 
-function _stopComplexityGlow() {
+function _stopCouplingGlow() {
   if (_glowRafId) cancelAnimationFrame(_glowRafId);
   _glowRafId = null;
   if (_glowCanvas) {
