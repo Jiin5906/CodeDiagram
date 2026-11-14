@@ -1212,10 +1212,10 @@ function renderGraph(data) {
     const funcCount = fileInfo.funcCount;
     const lineCount = fileInfo.lineCount || 0;
 
-    //크기: 줄 수 비율과 함수 수 비율 중 큰 쪽 (min 14, max 48).
-    //코드가 긴 파일과 함수가 많은 파일이 모두 크게 보인다. 제곱근으로 완만하게 키운다.
+    //크기: 줄 수 비율과 함수 수 비율 중 큰 쪽 (min 16, max 64).
+    //선형 스케일링으로 비대 파일과 일반 파일의 크기 격차를 드러내되, 최대 64px로 제한해 주변 구조 가림을 방지한다.
     const ratio = Math.max(lineCount / maxLines, funcCount / maxFuncCount);
-    const size = 14 + Math.sqrt(ratio) * 34;
+    const size = 16 + ratio * 48;
 
     //함수를 inbound 참조 순으로 정렬
     fileInfo.functions.sort((a, b) => (b.inDegree || 0) - (a.inDegree || 0));
