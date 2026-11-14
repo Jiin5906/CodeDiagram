@@ -269,10 +269,11 @@ function hideLoadingState(statusEl) {
 
 /* ── 패널 상태 저장/복원 (localStorage) ── */
 
-function savePanelState(key, collapsed) {
+//value는 패널이 "열려 있는지"다 (fileTree, legendOpen 모두 true = 열림)
+function savePanelState(key, value) {
   try {
     const state = JSON.parse(localStorage.getItem('codediagram-panels') || '{}');
-    state[key] = collapsed;
+    state[key] = value;
     localStorage.setItem('codediagram-panels', JSON.stringify(state));
   } catch (e) {
     /* noop */
@@ -284,7 +285,8 @@ function restorePanelState() {
     const state = JSON.parse(localStorage.getItem('codediagram-panels') || '{}');
     const fileTree = document.getElementById('file-tree-panel');
 
-    if (fileTree && state.fileTree === false) {
+    //파일 트리가 열린 채로 끝났을 때만 다시 연다 (저장값 true = 열림)
+    if (fileTree && state.fileTree === true) {
       fileTree.classList.remove('collapsed');
     }
     //코드 뷰어는 파일/함수를 눌렀을 때만 열리므로 열림 상태를 복원하지 않는다
