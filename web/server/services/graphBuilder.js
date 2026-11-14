@@ -47,6 +47,13 @@ function fileCouplingData(metricsByFile, filePath) {
   return { metrics, refactor_target: metrics.status === 'HAZARD' };
 }
 
+//줄 수 — 마지막 줄 끝의 줄바꿈은 빈 줄로 세지 않는다. CRLF·CR도 한 줄로 센다.
+function countLines(code) {
+  if (!code) return 0;
+  const lines = code.split(/\r\n|\r|\n/).length;
+  return /(\r\n|\r|\n)$/.test(code) ? lines - 1 : lines;
+}
+
 //프로젝트 디렉토리에서 그래프를 만드는 비동기 함수다.
 //options.signal이 abort되면(브라우저가 연결을 끊음) 다음 청크 경계에서 AbortError를 던지고 멈춘다.
 async function buildGraph(projectPath, options = {}) {
@@ -82,6 +89,9 @@ async function buildGraph(projectPath, options = {}) {
   const jsVariables = [];
   const jsVariableRefs = [];
 
+  //파일별 줄 수 (비대 파일 진단과 파일 노드 크기에 쓴다)
+  const fileLines = new Map();
+
   /* ── 청크 단위 파싱 ── */
   const allFiles = [...tieredFiles, ...webFiles];
   for (let i = 0; i < allFiles.length; i += CHUNK_SIZE) {
@@ -91,6 +101,7 @@ async function buildGraph(projectPath, options = {}) {
       let code;
       try {
         code = readSourceFile(file.path);
+        fileLines.set(file.relativePath, countLines(code));
       } catch (err) {
         //err.message에는 절대경로가 들어 있어 응답에 싣지 않고 에러 코드(ENOENT, EACCES 등)만 남긴다
         warnings.push(`Failed to read ${file.relativePath}: ${err.code || 'read error'}`);
@@ -247,8 +258,26 @@ async function buildGraph(projectPath, options = {}) {
     ...fileCouplingData(metricsByFile, f.relativePath),
   }));
 
+  //비대 코드 진단용 파일별 통계 (읽지 못한 파일은 뺀다)
+  const allFunctions = [...tieredFunctions, ...jsFunctions];
+  const funcCountByFile = new Map();
+  for (const fn of allFunctions) {
+    funcCountByFile.set(fn.filePath, (funcCountByFile.get(fn.filePath) || 0) + 1);
+  }
+  const fileStats = files
+    .filter((f) => fileLines.has(f.relativePath))
+    .map((f) => ({
+      file: f.relativePath,
+      lines: fileLines.get(f.relativePath),
+      funcCount: funcCountByFile.get(f.relativePath) || 0,
+    }));
+
   //진단 실행
-  const diagnostics = runDiagnostics(allCallEdges, fileCouplingEntries);
+  const diagnostics = runDiagnostics(allCallEdges, fileCouplingEntries, {
+    fileStats,
+    classes: [...tieredClasses, ...jsClasses],
+    functions: allFunctions,
+  });
 
   //리팩토링 제안 생성
   const suggestions = generateSuggestions(diagnostics);
@@ -282,6 +311,11 @@ async function buildGraph(projectPath, options = {}) {
     metricsByFile,
   );
   nodes.push(...webNodes);
+
+  //파일 노드에 줄 수를 싣는다 (파일 뷰 노드 크기·툴팁에 쓴다)
+  for (const node of nodes) {
+    if (node.data.type === 'file') node.data.lineCount = fileLines.get(node.data.fullPath) || 0;
+  }
 
   //패키지 노드 생성
   const packageNodes = buildPackageNodes(files);

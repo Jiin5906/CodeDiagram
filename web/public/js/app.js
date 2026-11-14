@@ -16,6 +16,9 @@ document.addEventListener('DOMContentLoaded', () => {
   //Cytoscape 초기화
   initGraph(container);
 
+  //분석 전에는 리본 메뉴를 잠그고, 누르면 안내한다
+  setupRibbonGuard(input, btn);
+
   //빈 상태 표시
   if (emptyState) emptyState.classList.add('visible');
 
@@ -94,6 +97,14 @@ document.addEventListener('DOMContentLoaded', () => {
       buildFileTree(data);
       setupFileTree();
 
+      //진단 패널이 열린 채로 새 분석을 하면 패널을 새 결과로 다시 그린다.
+      //패널 내용은 showDiagnosticsPanel 안에서만 만들어지므로, 부르지 않으면 이전 저장소의 진단이 남는다.
+      //열린 탭과 검색어는 showDiagnosticsPanel이 그대로 유지한다.
+      const diagPanel = document.getElementById('diagnostics-panel');
+      if (diagPanel && !diagPanel.classList.contains('collapsed')) {
+        showDiagnosticsPanel(data.diagnostics, data.suggestions);
+      }
+
       //동적 범례 렌더링
       renderDynamicLegend(data);
 
@@ -130,17 +141,8 @@ document.addEventListener('DOMContentLoaded', () => {
       //UI 요소 표시
       document.getElementById('search-input').classList.remove('hidden');
 
-      //파일 뷰 기본이므로 함수 뷰 전용 UI 숨김
-      document.getElementById('toggle-edges-btn').classList.add('hidden');
-      document.getElementById('collapse-all-btn').classList.add('hidden');
-
-      //엣지 토글 상태 초기화
-      edgesVisible = false;
-
-      //새 분석은 파일 뷰로 시작하므로 리본 라벨도 초기 상태로
-      document.getElementById('toggle-edges-btn').classList.remove('active');
-      syncViewButtons();
-      setRibbonLabel('toggle-edges-btn', '선 보기', RIBBON_TIPS.edgesHidden);
+      //첫 분석이 끝났으니 리본 메뉴 잠금을 푼다
+      setRibbonLocked(false);
 
       //localStorage에서 패널 상태 복원 (코드 뷰어는 제외 — 새 분석은 그래프 전체를 먼저 보여준다)
       restorePanelState();
@@ -166,6 +168,76 @@ document.addEventListener('DOMContentLoaded', () => {
     showDiagnosticsPanel(lastAnalysisData.diagnostics, lastAnalysisData.suggestions);
   });
 });
+
+/* ── 분석 전 메뉴 안내 ── */
+
+let _toastTimer = null;
+
+//리본 메뉴 잠금을 켜고 끈다.
+//버튼을 disabled로 만들면 클릭 이벤트 자체가 오지 않아 안내를 띄울 수 없으므로
+//aria-disabled(화면 낭독기용)와 클래스(흐린 표시)로만 잠금을 나타낸다.
+function setRibbonLocked(locked) {
+  const ribbon = document.getElementById('ribbon');
+  if (!ribbon) return;
+  ribbon.classList.toggle('needs-analysis', locked);
+  ribbon.querySelectorAll('.ribbon-btn').forEach((b) => {
+    if (locked) b.setAttribute('aria-disabled', 'true');
+    else b.removeAttribute('aria-disabled');
+  });
+}
+
+function setupRibbonGuard(input, analyzeBtn) {
+  const ribbon = document.getElementById('ribbon');
+  if (!ribbon) return;
+  setRibbonLocked(true);
+
+  //캡처 단계(세 번째 인자 true)에서 버튼보다 먼저 클릭을 받는다.
+  //여기서 전파를 멈추면 각 버튼에 붙은 원래 핸들러는 실행되지 않는다.
+  ribbon.addEventListener(
+    'click',
+    (e) => {
+      if (lastAnalysisData) return;
+      if (!e.target.closest('.ribbon-btn')) return;
+      e.preventDefault();
+      e.stopPropagation();
+      promptForSource(input, analyzeBtn);
+    },
+    true,
+  );
+
+  //강조 표시는 흔들기가 끝나거나 입력칸을 벗어나면 지운다
+  const clearAttention = () => input.classList.remove('attention');
+  input.addEventListener('animationend', clearAttention);
+  input.addEventListener('blur', clearAttention);
+}
+
+//상황에 맞는 안내를 띄우고 입력칸으로 시선을 옮긴다
+function promptForSource(input, analyzeBtn) {
+  const analyzing = analyzeBtn.disabled;
+  let message;
+  if (analyzing) message = '분석 중입니다. 잠시만 기다려 주세요';
+  else if (!input.value.trim()) message = '분석할 GitHub URL이나 폴더 경로를 먼저 입력해 주세요';
+  else message = '분석 버튼을 눌러 분석을 시작해 주세요';
+  showToast(message);
+
+  //분석 중에는 입력칸이 disabled라 포커스를 줄 수 없다
+  if (analyzing) return;
+  input.focus();
+  //애니메이션을 처음부터 다시 재생하려면 클래스를 뗀 뒤 레이아웃을 한 번 읽고 다시 붙인다
+  input.classList.remove('attention');
+  void input.offsetWidth;
+  input.classList.add('attention');
+}
+
+//짧은 안내 메시지. 연달아 부르면 마지막 메시지 기준으로 다시 2.5초를 센다.
+function showToast(message, duration = 2500) {
+  const toast = document.getElementById('toast');
+  if (!toast) return;
+  toast.textContent = message;
+  toast.classList.add('show');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => toast.classList.remove('show'), duration);
+}
 
 /* ── 로딩 상태 표시 ── */
 
@@ -261,11 +333,9 @@ const EDGE_LEGEND = [
 
 function renderDynamicLegend(data) {
   const fileView = document.getElementById('legend-file-view');
-  const funcView = document.getElementById('legend-function-view');
-  if (!fileView || !funcView) return;
+  if (!fileView) return;
 
   fileView.textContent = '';
-  funcView.textContent = '';
 
   //1) 언어 — 분석 결과에 존재하는 언어만
   const fc = data.fileCounts || {};
@@ -287,34 +357,34 @@ function renderDynamicLegend(data) {
   if (edgeItems.length)
     fileView.appendChild(_legendSection('선 색 (마우스를 올리면 표시)', edgeItems));
 
-  //3) 진단 표시 — codeEffects.js의 테두리·글로우, graph.js의 결합도 링과 같은 기준
+  //3) 진단 표시 — codeEffects.js의 테두리·글로우와 같은 기준
   const diag = data.diagnostics || {};
   const hasCycle = ((diag.cycles && diag.cycles.files) || []).length > 0;
   //결합도 판정 (CR-RFC-2026-002) — 기준 숫자는 서버가 보낸 criteria를 그대로 쓴다
   const coupling = diag.coupling || { files: [] };
   const criteria = coupling.criteria;
   const hazardCount = coupling.files.filter((e) => e.metrics.status === 'HAZARD').length;
+  const warnCount = coupling.files.filter((e) => e.metrics.status === 'WARN').length;
   const diagItems = [];
   if (hasCycle)
     diagItems.push(_legendRow(_legendRing('#E06666'), '서로를 참조하는 파일 (순환 참조)'));
-  if (hazardCount > 0 && criteria)
+  //결합도 글로우 — 진단 탭 "파일 결합도"와 같은 판정 (숫자는 진단 탭 개수)
+  if (criteria && hazardCount > 0)
     diagItems.push(
       _legendRow(
-        _legendOuterRing(COUPLING_HAZARD_COLOR),
-        `바깥 빨간 링: 결합도 HAZARD (I > ${criteria.warnMax} 또는 Ce ≥ ${criteria.ceHazard})`,
+        _legendDot('#DC2626', true), //codeEffects.js COUPLING_GLOW_LEVELS.HAZARD와 같은 색
+        `빨간 빛: 결합도 HAZARD (I > ${criteria.warnMax}·CBO ≥ ${criteria.minCboHazard} 또는 Ce ≥ ${criteria.ceHazard})`,
         hazardCount,
       ),
     );
-  //복잡도 글로우 — codeEffects.js가 renderGraph 중에 이미 골라 두었다
-  if (typeof complexFileCount === 'function' && complexFileCount() > 0) {
+  if (criteria && warnCount > 0)
     diagItems.push(
       _legendRow(
-        _legendDot('#E68046', true),
-        '원 뒤로 빛이 나는 파일: 복잡도가 높음 (길거나 많은 함수, 결합도 HAZARD·WARN). 빛이 넓고 붉을수록 복잡',
-        complexFileCount(),
+        _legendDot('#EA580C', true), //codeEffects.js COUPLING_GLOW_LEVELS.WARN과 같은 색
+        `주황 빛: 결합도 WARN (I > ${criteria.safeMax}·CBO ≥ ${criteria.minCboWarn})`,
+        warnCount,
       ),
     );
-  }
   //판정 기준 — HAZARD가 없어도 어떤 기준으로 판정했는지는 항상 보여준다
   if (criteria)
     diagItems.push(
@@ -325,7 +395,7 @@ function renderDynamicLegend(data) {
   //4) 읽는 법
   fileView.appendChild(
     _legendSection('읽는 법', [
-      _legendRow(_legendSymbol('●'), '원이 클수록 함수가 많은 파일'),
+      _legendRow(_legendSymbol('●'), '원이 클수록 코드가 길거나 함수가 많은 파일'),
       _legendRow(_legendSymbol('─'), '선이 굵을수록 참조가 많음'),
       _legendRow(
         _legendSymbol('↗'),
@@ -349,47 +419,6 @@ function renderDynamicLegend(data) {
       ),
     ]),
   );
-
-  //함수 뷰 범례
-  const funcItems = [
-    { cls: 'tier', label: '참조 수 그룹' },
-    { cls: 'file', label: '파일' },
-    { cls: 'function', label: '함수' },
-    { cls: 'method', label: '클래스 메서드' },
-    { cls: 'edge-swatch', label: '호출 관계' },
-    { cls: 'cycle-swatch', label: '순환 참조' },
-  ];
-  //언어별 함수가 실제로 존재할 때만 추가
-  if (fc.typescript > 0) funcItems.splice(3, 0, { cls: 'ts-function', label: 'TS 함수' });
-  if (fc.cpp > 0) funcItems.splice(3, 0, { cls: 'cpp-function', label: 'C++ 함수' });
-  if (fc.csharp > 0) funcItems.splice(3, 0, { cls: 'csharp-function', label: 'C# 함수' });
-  funcView.appendChild(
-    _legendSection(
-      '함수 뷰',
-      funcItems.map((fi) => {
-        const swatch = document.createElement('span');
-        swatch.className = 'legend-swatch ' + fi.cls;
-        return _legendRow(swatch, fi.label);
-      }),
-    ),
-  );
-  funcView.appendChild(
-    _legendSection('함수 이름 옆 숫자', [
-      _legendRow(_legendSymbol('3↓', 'refs'), '이 함수를 호출하는 함수 수'),
-      _legendRow(_legendSymbol('2↑', 'refs out'), '이 함수가 호출하는 함수 수'),
-    ]),
-  );
-  //결합도 HAZARD 파일 박스 (graph.js의 함수·패키지 뷰 파일 박스 테두리와 같은 색)
-  if (hazardCount > 0)
-    funcView.appendChild(
-      _legendSection('결합도', [
-        _legendRow(
-          _legendRing(COUPLING_HAZARD_COLOR),
-          '빨간 굵은 테두리 박스: 결합도 HAZARD 파일',
-          hazardCount,
-        ),
-      ]),
-    );
 
   //범례 접기/펼치기 — 분석 직후 그래프를 가리지 않도록 기본은 접힘, 펼친 상태는 기억
   const toggle = document.getElementById('legend-toggle');
@@ -469,16 +498,6 @@ function _legendLine(color) {
   line.style.background = color;
   return line;
 }
-//결합도 HAZARD 표시용 바깥 링 (그래프에서 파일 원 밖으로 띄운 outline과 같은 모양)
-function _legendOuterRing(color) {
-  const ring = _legendRing('#6F737A');
-  ring.style.outline = `2px solid ${color}`;
-  ring.style.outlineOffset = '2px';
-  //outline은 자리를 차지하지 않으므로 옆 글자·위아래 줄과 겹치지 않게 여백을 둔다
-  ring.style.margin = '4px';
-  return ring;
-}
-
 function _legendSymbol(symbol, variant) {
   const span = document.createElement('span');
   span.className = 'legend-symbol' + (variant ? ' ' + variant : '');

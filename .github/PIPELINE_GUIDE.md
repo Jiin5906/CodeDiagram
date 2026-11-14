@@ -137,7 +137,7 @@ Cytoscape, fcose, dagre, d3, highlight.js는 CDN이 아니라 서버가 직접 �
 3. `npx jest test/unit/vendor.test.js test/integration/securityHeaders.test.js`
    - 복사본이 설치된 패키지와 다르거나, `index.html` 경로가 어긋나거나, 쓰지 않는 파일이 남으면 실패합니다.
    - Cytoscape가 실행 중에 넣는 `<style>` 내용이 바뀌면 실패합니다. 이때는 `server/middleware/securityHeaders.js`의 `CYTOSCAPE_INJECTED_STYLE`을 새 내용으로 고칩니다.
-4. `npm start` 후 브라우저에서 분석 → 파일/함수 뷰 → 진단 패널 → 코드 보기 → diff 미리보기를 한 번씩 확인합니다. 서버 콘솔에 `[csp]` 줄이 나오면 CSP에 막힌 것입니다. 확인 중에는 `.env`에 `CSP_REPORT_ONLY=true`를 두면 막지 않고 보고만 받습니다.
+4. `npm start` 후 브라우저에서 분석 → 파일 뷰 → 진단 패널 → 코드 보기 → diff 미리보기를 한 번씩 확인합니다. 서버 콘솔에 `[csp]` 줄이 나오면 CSP에 막힌 것입니다. 확인 중에는 `.env`에 `CSP_REPORT_ONLY=true`를 두면 막지 않고 보고만 받습니다.
 5. `public/vendor/`, `index.html`, `package.json`, `package-lock.json`을 함께 커밋합니다.
 
 폰트 버전을 바꿀 때는 `index.html`의 `integrity` 값을 새로 계산하고(`curl -sL <URL> | openssl dgst -sha384 -binary | openssl base64 -A`), `securityHeaders.js`의 `FONT_PACKAGES` 경로도 고칩니다. jsDelivr가 자동 생성하는 `.min.css`는 내용이 바뀔 수 있어 SRI를 쓸 수 없으니 원본 파일을 씁니다.

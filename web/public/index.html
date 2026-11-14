@@ -20,7 +20,7 @@
       integrity="sha384-/aGOjRgXetckwYWTzGw1zfJJPlG4ZNUhc+ntpCY45ZqFXbKWXJQyg4WlSYt5Aghw"
       crossorigin="anonymous"
     />
-    <link rel="stylesheet" href="css/style.css?v=28" />
+    <link rel="stylesheet" href="css/style.css?v=29" />
     <!--라이브러리는 npm run vendor로 복사한 public/vendor/를 서빙한다 (경로의 버전을 package.json과 맞출 것)-->
     <link rel="stylesheet" href="vendor/highlight.js@11.9.0/styles/github.min.css" />
     <script src="vendor/highlight.js@11.9.0/highlight.min.js"></script>
@@ -71,10 +71,12 @@
     <span id="divider-2" class="hidden"></span>
 
     <!--미리보기 배너-->
+    <!-- [미구현-보류] 리팩토링 제안 탭의 "미리보기"용 배너 — 탭을 숨겨 함께 숨김
     <div id="preview-banner" class="hidden">
       <span id="preview-banner-text">미리보기 모드</span>
       <button id="preview-restore-btn">원래대로</button>
     </div>
+    -->
 
     <div id="main-content">
       <!--좌측 리본 (아이콘 + 라벨 세로 바). data-tip은 마우스를 올리면 뜨는 설명-->
@@ -100,7 +102,7 @@
           ></span>
           <span class="ribbon-label">파일</span>
         </button>
-        <!--보기 단위 선택: 지금 어느 뷰인지 바로 보이도록 두 칸짜리 선택 버튼으로 둔다-->
+        <!--파일 뷰 버튼: 파일 상세 뷰에서 전체 파일 그래프로 돌아간다 (함수 뷰는 삭제했다)-->
         <div class="ribbon-seg" role="group" aria-label="보기 단위">
           <button
             class="ribbon-btn active"
@@ -123,29 +125,6 @@
             ></span>
             <span class="ribbon-label">파일</span>
           </button>
-          <button
-            class="ribbon-btn"
-            id="view-function-btn"
-            aria-pressed="false"
-            data-tip="함수 단위로 봅니다. 함수끼리 어떻게 호출하는지 보여줍니다"
-            aria-label="함수 뷰"
-          >
-            <span class="ribbon-icon" aria-hidden="true"
-              ><svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="1.75"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <path d="M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5a2 2 0 0 0 2 2h1" />
-                <path
-                  d="M16 21h1a2 2 0 0 0 2-2v-5a2 2 0 0 1 2-2 2 2 0 0 1-2-2V5a2 2 0 0 0-2-2h-1"
-                /></svg
-            ></span>
-            <span class="ribbon-label">함수</span>
-          </button>
         </div>
         <button
           class="ribbon-btn"
@@ -167,50 +146,8 @@
           <span class="ribbon-label">진단</span>
         </button>
         <div class="ribbon-spacer"></div>
-        <button
-          class="ribbon-btn hidden"
-          id="toggle-edges-btn"
-          data-tip="함수끼리 호출하는 선을 보여줍니다"
-          aria-label="선 보기"
-        >
-          <span class="ribbon-icon" aria-hidden="true"
-            ><svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.75"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <circle cx="18" cy="5" r="3" />
-              <circle cx="6" cy="12" r="3" />
-              <circle cx="18" cy="19" r="3" />
-              <path d="m8.59 13.51 6.83 3.98" />
-              <path d="m15.41 6.51-6.82 3.98" /></svg
-          ></span>
-          <span class="ribbon-label">선 보기</span>
-        </button>
-        <button
-          class="ribbon-btn hidden"
-          id="collapse-all-btn"
-          data-tip="모든 파일 그룹을 접거나 펼칩니다"
-          aria-label="전체 접기"
-        >
-          <span class="ribbon-icon" aria-hidden="true"
-            ><svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.75"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path d="m7 20 5-5 5 5" />
-              <path d="m7 4 5 5 5-5" /></svg
-          ></span>
-          <span class="ribbon-label">전체 접기</span>
-        </button>
         <!--API 키 등록/해제 (auth.js가 라벨을 바꾼다)-->
+        <!-- [미구현-보류] API 키 등록 버튼 — 다중 사용자 키 문제로 숨김. AI는 서버 .env 키로 동작한다.
         <button
           class="ribbon-btn"
           id="auth-btn"
@@ -233,6 +170,7 @@
           ></span>
           <span class="ribbon-label">키 등록</span>
         </button>
+        -->
       </div>
       <div id="file-tree-panel" class="collapsed">
         <div class="file-tree-header">
@@ -321,7 +259,6 @@
           <button id="legend-toggle" aria-expanded="false">범례 ▸</button>
           <div id="legend-content">
             <div id="legend-file-view"></div>
-            <div id="legend-function-view" class="hidden"></div>
             <button type="button" id="legend-shortcuts" class="legend-footer">
               단축키 보기 <kbd>?</kbd>
             </button>
@@ -397,7 +334,7 @@
           </div>
           <div>
             <dt>더블클릭</dt>
-            <dd>파일: 코드 카드 열기 · 함수 뷰의 파일 박스: 접기/펼치기</dd>
+            <dd>파일: 코드 카드 열기</dd>
           </div>
           <div>
             <dt>빈 곳 클릭</dt>
@@ -408,6 +345,7 @@
     </div>
 
     <!--Diff 비교 오버레이-->
+    <!-- [미구현-보류] Diff(전후 비교) 오버레이 — 리팩토링 제안 탭과 함께 숨김
     <div id="diff-overlay" class="hidden">
       <div class="diff-overlay-inner">
         <div class="overlay-header">
@@ -417,8 +355,10 @@
         <div id="diff-content"></div>
       </div>
     </div>
+    -->
 
     <!--API 키 등록 창. 키 입력란에 name을 두지 않아 브라우저가 폼 값으로 저장하지 않게 한다.-->
+    <!-- [미구현-보류] API 키 등록 창 — 등록 버튼과 함께 숨김
     <div
       id="login-overlay"
       class="hidden"
@@ -461,17 +401,21 @@
         </div>
       </form>
     </div>
+    -->
 
-    <script src="js/graph.js?v=27"></script>
+    <!--짧은 안내 메시지(토스트). 화면 낭독기가 읽을 수 있게 role="status"로 둔다-->
+    <div id="toast" role="status" aria-live="polite"></div>
+
+    <script src="js/graph.js?v=30"></script>
     <script src="js/forceSim.js?v=5"></script>
-    <script src="js/codeEffects.js?v=6"></script>
+    <script src="js/codeEffects.js?v=9"></script>
     <script src="js/codeViewer.js?v=16"></script>
     <script src="js/canvasCard.js?v=3"></script>
     <script src="js/localGraph.js?v=3"></script>
-    <script src="js/interactions.js?v=23"></script>
-    <script src="js/diffPreview.js?v=7"></script>
-    <script src="js/fileTree.js?v=7"></script>
-    <script src="js/auth.js?v=3"></script>
-    <script src="js/app.js?v=18"></script>
+    <script src="js/interactions.js?v=28"></script>
+    <!-- [미구현-보류] Diff·AI 리팩토링 미리보기 <script src="js/diffPreview.js?v=7"></script> -->
+    <script src="js/fileTree.js?v=8"></script>
+    <!-- [미구현-보류] API 키 등록 <script src="js/auth.js?v=3"></script> -->
+    <script src="js/app.js?v=24"></script>
   </body>
 </html>
