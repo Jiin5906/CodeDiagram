@@ -52,4 +52,14 @@ describe('graphBuilder', () => {
       buildGraph(path.join(__dirname, '..', 'fixtures', 'nonexistent_empty')),
     ).rejects.toThrow();
   });
+
+  test('파일 노드에 lineCount가 있고 size 진단이 붙는다', async () => {
+    const graph = await buildGraph(fixturesDir);
+    const fileNodes = graph.nodes.filter((n) => n.data.type === 'file');
+    expect(fileNodes.length).toBeGreaterThan(0);
+    expect(fileNodes.every((n) => n.data.lineCount > 0)).toBe(true);
+    expect(graph.diagnostics.size).toEqual(
+      expect.objectContaining({ files: expect.any(Array), classes: expect.any(Array) }),
+    );
+  });
 });

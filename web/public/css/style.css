@@ -3566,3 +3566,72 @@ kbd {
 .legend-symbol.refs.out {
   color: var(--accent-text);
 }
+
+/* ── 분석 전 안내 (수정 3-①) ── */
+
+/* 분석 전 리본 메뉴: 아직 쓸 수 없음을 흐리게 표시하고, 말풍선도 이유를 알려 준다 */
+#ribbon.needs-analysis .ribbon-btn {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+#ribbon.needs-analysis .ribbon-btn[data-tip]::after {
+  content: '먼저 분석할 프로젝트를 입력하세요';
+}
+
+/* 입력칸 강조: 강조색 테두리 + 짧게 좌우로 흔들기 (#source-input:focus보다 뒤에 있어야 이긴다) */
+#source-input.attention {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-tint);
+  animation: source-input-nudge 0.4s ease-in-out;
+}
+@keyframes source-input-nudge {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-4px);
+  }
+  75% {
+    transform: translateX(4px);
+  }
+}
+
+/* 토스트: 화면 아래쪽 가운데. 평소에는 투명하게 숨겨 두고 .show로 나타낸다 */
+#toast {
+  position: fixed;
+  left: 50%;
+  bottom: 72px;
+  transform: translate(-50%, 8px);
+  max-width: min(420px, calc(100vw - 32px));
+  padding: 10px 16px;
+  background: var(--ink);
+  color: var(--canvas);
+  border-radius: 6px;
+  box-shadow: var(--shadow-float);
+  font-size: var(--ui-font);
+  text-align: center;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  z-index: 500;
+  transition:
+    opacity 0.2s,
+    transform 0.2s,
+    visibility 0.2s;
+}
+#toast.show {
+  opacity: 1;
+  visibility: visible;
+  transform: translate(-50%, 0);
+}
+
+/* 움직임 줄이기 설정: 흔들기와 미끄러짐 없이 바로 표시 */
+@media (prefers-reduced-motion: reduce) {
+  #source-input.attention {
+    animation: none;
+  }
+  #toast {
+    transition: none;
+  }
+}
