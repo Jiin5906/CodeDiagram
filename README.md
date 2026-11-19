@@ -58,7 +58,7 @@
 | 번호 | 핵심 목표 | 측정 지표 및 달성 기준 |
 | :---: | :--- | :--- |
 | **G1** | Zero-Install 웹 아키텍처 제공 | 로컬 설치 없이 GitHub URL 또는 로컬 경로 입력 즉시 브라우저에서 구동 |
-| **G2** | 엔터프라이즈 다국어 정적 파싱 | 실무 중심 8개 언어(Java, Python, C/C++, C#, TypeScript, JavaScript, HTML, CSS) Tree-sitter AST 파싱 |
+| **G2** | 엔터프라이즈 다국어 정적 파싱 | 실무 중심 8개 언어(Java, Python, C++, C#, TypeScript, JavaScript, HTML, CSS) Tree-sitter AST 파싱 |
 | **G3** | 공인 소프트웨어 공학 결합도 진단 | Robert C. Martin의 $C_a, C_e, \text{Instability } I, CBO$ (`CR-RFC-2026-002`) 채택 및 그라데이션 시각화 |
 | **G4** | 대규모 노드 렌더링 최적화 | 100개 파일 분석 3초 이내 완료, 대규모 노드 인터랙션 시 평균 30 FPS 이상 유지 |
 | **G5** | 직관적인 AI 코드 해설 | 파일 상세 뷰에서 함수 단위 Claude AI 해설 및 결합도 위험 파일 3줄 요약 API 제공 |
@@ -67,7 +67,7 @@
 
 #### In Scope (현재 구현)
 - GitHub 원격 저장소 복제(Shallow Clone) 및 로컬 디렉토리 소스코드 수집 엔진
-- Tree-sitter 기반 8개 언어(Java, Python, C/C++, C#, TypeScript, JavaScript, HTML, CSS) AST 구문 분석
+- Tree-sitter 기반 8개 언어(Java, Python, C++, C#, TypeScript, JavaScript, HTML, CSS) AST 구문 분석
 - 외부 벤더·빌드 디렉터리(`node_modules`, `vendor`, `dist`, `build` 등) 격리 및 경로 샌드박스 보안 검증
 - 로버트 C. 마틴 패키지 결합도($C_a, C_e, I$) 및 객체 간 결합도($CBO$) 연산 엔진 (`CR-RFC-2026-002`)
 - 순환 참조(Cycle) 탐지 및 비대 코드(비대 파일 · God Class) 정적 진단 엔진
@@ -170,12 +170,13 @@ Tree-sitter 기반 다국어 파서 엔진을 탑재하여 8개 핵심 언어 �
 | 언어 | 확장자 | 주요 추출 대상 및 심볼 |
 | :--- | :--- | :--- |
 | **Java** | `.java` | 클래스, 인터페이스, 상속(`extends`), 구현(`implements`), 메서드 호출, import |
-| **C / C++** | `.c`, `.cpp`, `.h`, `.hpp` | 함수 선언/정의, 구조체, 클래스, `#include`, 호출 관계 |
+| **C++** | `.cpp`, `.cc`, `.cxx`, `.h`, `.hpp` | 함수 선언/정의, 구조체, 클래스, `#include`, 호출 관계 |
 | **Python** | `.py` | 함수, 클래스, 메서드, `import`/`from`, 변수 참조, 상속 |
 | **C#** | `.cs` | 클래스, 메서드, `using`, 인터페이스, 호출 |
 | **TypeScript** | `.ts`, `.tsx` | 함수, 클래스, 인터페이스, 타입 별칭, 제네릭, import |
-| **JavaScript** | `.js`, `.jsx` | 함수, 화살표 함수, 클래스, import, 메서드 호출 |
-| **HTML / CSS** | `.html`, `.css` | DOM 접근, CSS 셀렉터, 이벤트 바인딩 등 크로스 웹 의존성 |
+| **JavaScript** | `.js` | 함수, 화살표 함수, 클래스, import, 메서드 호출 |
+| **HTML** | `.html`, `.htm` | DOM 요소, 외부 리소스 import, 이벤트 바인딩, 인라인 스크립트·스타일 |
+| **CSS** | `.css` | CSS 셀렉터, CSS 변수·참조, import, `@keyframes` 규칙 |
 
 ---
 
@@ -251,7 +252,7 @@ CodeDiagram/
 | :--- | :--- | :--- |
 | **Frontend** | Vanilla JS, Cytoscape.js, highlight.js, d3-force | 빌드 오버헤드 없는 브라우저 직행 구동 및 대규모 그래프 렌더링 최적화 |
 | **Backend** | Node.js (v22 LTS), Express | 고성능 비동기 I/O 및 Tree-sitter 네이티브 바인딩 친화성 |
-| **AST Parser** | Tree-sitter (Java, C/C++, Python, C#, JS/TS, HTML/CSS) | 업계 표준 고속 점진적 구문 트리 파서 |
+| **AST Parser** | Tree-sitter (Java, Python, C++, C#, TypeScript, JavaScript, HTML, CSS) | 업계 표준 고속 점진적 구문 트리 파서 |
 | **Metrics Engine** | Robert C. Martin Coupling Metric Module | Clean Architecture 공인 결합도 지표 계산 (`CR-RFC-2026-002`) |
 | **AI / LLM** | Anthropic Claude API (`claude-haiku-5-5`) | 함수 단위 한국어 해설 및 결합도 진단 3줄 요약 |
 | **Testing** | Jest, Supertest | 단위·계약·통합 테스트 및 픽스처 기반 파싱 정합성 검증 |
