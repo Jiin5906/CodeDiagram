@@ -1,20 +1,20 @@
 //AI 기능 라우트 앞에 붙이는 미들웨어다.
 //쿠키의 세션ID로 로그인한 사용자의 키를 찾아 res.locals.aiApiKey에 넣는다.
-//로그인하지 않았으면 개발용 예비 키(.env)를 쓰고, 그것도 없으면 401로 로그인을 요구한다.
+//로그인하지 않았으면 서버 공용 키(.env의 ANTHROPIC_API_KEY)를 쓰고, 그것도 없으면 401을 준다.
 
 const sessionStore = require('../services/sessionStore');
 const { readSessionId } = require('../utils/cookies');
 
-//운영에서는 예비 키를 쓰지 않는다. 쓰면 로그인하지 않은 누구나 서버 주인의 키로 AI를 호출하게 된다.
-function fallbackKey() {
-  if (process.env.NODE_ENV === 'production') return null;
+//서버 공용 키. 화면에서 개인 키 등록을 뺐으므로 운영에서도 이 키 하나로 AI를 쓴다.
+//누구나 서버 주인의 비용으로 호출하게 되므로 aiRateLimit이 IP 기준으로 엄격하게 횟수를 제한한다.
+function serverKey() {
   return process.env.ANTHROPIC_API_KEY || null;
 }
 
 function requireAiKey(req, res, next) {
   const sessionKey = sessionStore.getApiKey(readSessionId(req));
-  //더미 로그인 세션은 빈 키('')라서 예비 키로 넘어간다
-  const apiKey = sessionKey || fallbackKey();
+  //더미 로그인 세션은 빈 키('')라서 공용 키로 넘어간다
+  const apiKey = sessionKey || serverKey();
   if (!apiKey && sessionKey === '') {
     return res.status(401).json({
       error:
@@ -24,7 +24,7 @@ function requireAiKey(req, res, next) {
   }
   if (!apiKey) {
     return res.status(401).json({
-      error: 'AI 기능을 쓰려면 API 키를 등록해 주세요.',
+      error: 'AI 기능이 설정되지 않았습니다. 서버의 ANTHROPIC_API_KEY를 확인해 주세요.',
       code: 'LOGIN_REQUIRED',
     });
   }
