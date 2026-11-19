@@ -72,12 +72,48 @@ describe('Anthropic Messages API contract', () => {
     );
   });
 
-  test('returns undefined when the first block is not text', async () => {
+  test('skips a leading thinking block and returns the text block', async () => {
+    mockCreate.mockResolvedValue({
+      ...response,
+      content: [
+        { type: 'thinking', thinking: '...', signature: 'sig' },
+        { type: 'text', text: '두 수를 더한다.' },
+      ],
+    });
+    await expect(loadAiService().explainFunction(input, KEY)).resolves.toBe('두 수를 더한다.');
+  });
+
+  //생각만 하다 상한에 걸리면 답변이 없다. 빈 결과를 성공으로 돌려주면 캐시·화면에 빈 해설이 남는다.
+  test('throws AI_TRUNCATED when max_tokens is hit before any text', async () => {
+    mockCreate.mockResolvedValue({
+      ...response,
+      stop_reason: 'max_tokens',
+      content: [{ type: 'thinking', thinking: '...', signature: 'sig' }],
+    });
+    await expect(loadAiService().explainFunction(input, KEY)).rejects.toMatchObject({
+      code: 'AI_TRUNCATED',
+    });
+  });
+
+  test('throws AI_EMPTY when the response has no text block', async () => {
     mockCreate.mockResolvedValue({
       ...response,
       content: [{ type: 'tool_use', id: 'toolu_01', name: 'x', input: {} }],
     });
-    await expect(loadAiService().explainFunction(input, KEY)).resolves.toBeUndefined();
+    await expect(loadAiService().explainFunction(input, KEY)).rejects.toMatchObject({
+      code: 'AI_EMPTY',
+    });
+  });
+
+  test('explainCoupling also throws when the response has no text', async () => {
+    mockCreate.mockResolvedValue({
+      ...response,
+      stop_reason: 'max_tokens',
+      content: [{ type: 'thinking', thinking: '...', signature: 'sig' }],
+    });
+    await expect(
+      loadAiService().explainCoupling({ filePath: 'a.py', code: 'x = 1' }, KEY),
+    ).rejects.toMatchObject({ code: 'AI_TRUNCATED' });
   });
 
   test('throws AI_KEY_MISSING without calling the API when no key is given', async () => {

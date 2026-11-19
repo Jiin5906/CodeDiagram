@@ -4,7 +4,7 @@
 //키를 누가 냈는지에 따라 기준을 나눈다 (requireAiKey가 res.locals.aiKeySource에 남긴다).
 //- session: 사용자가 자기 키로 로그인. 비용은 그 사용자가 내므로 세션 기준으로 넉넉하게.
 //  세션을 새로 만들어 우회하려면 진짜 키로 다시 로그인해야 하고, 그 비용도 본인이 낸다.
-//- fallback: 개발용 예비 키(.env). 서버 주인의 비용이므로 IP 기준으로 엄격하게.
+//- fallback: 서버 공용 키(.env). 운영에서도 쓰며 서버 주인의 비용이므로 IP 기준으로 엄격하게.
 
 const { createRateLimiter } = require('./rateLimit');
 const { readSessionId } = require('../utils/cookies');

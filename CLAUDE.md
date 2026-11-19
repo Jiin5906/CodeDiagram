@@ -31,7 +31,7 @@ npm run benchmark           # 대규모 코드 자동 생성 후 파싱 시간/�
 - 테스트는 날짜·랜덤·네트워크에 기대지 않게 쓴다.
 - Jest는 커스텀 환경(`test/helpers/treeSitterEnvironment.js`)으로 tree-sitter를 워커당 한 번만 로드한다. tree-sitter 0.22 래퍼가 다시 로드되면 `rootNode`이 `undefined`가 되기 때문이다.
 - 언어별 테스트 픽스처는 `web/test/fixtures/<lang>_project/`에 있다.
-- AI 해설(`/api/explain`)·리팩토링(`/api/refactor`)은 사용자가 Anthropic API 키로 로그인(`/api/auth/login`)해야 쓸 수 있다. 키는 서버 메모리 세션(`sessionStore`)에만 두고 브라우저에는 HttpOnly 쿠키로 세션ID만 준다. 로그인하지 않으면 401(`LOGIN_REQUIRED`)이고 나머지 기능은 정상 동작한다. `web/.env`의 `ANTHROPIC_API_KEY`는 개발·테스트용 예비 키이며 `NODE_ENV=production`에서는 쓰지 않는다.
+- AI 해설(`/api/explain`)·리팩토링(`/api/refactor`)은 서버 공용 키(`web/.env`의 `ANTHROPIC_API_KEY`)로 동작하며, `NODE_ENV=production`에서도 쓴다. 화면의 API 키 등록은 다중 사용자 키 문제로 숨겨 두었다(`[미구현-보류]`). 서버 쪽 로그인(`/api/auth/login`)은 남아 있어, 로그인한 세션은 자기 키를 쓰고 키는 서버 메모리 세션(`sessionStore`)에만 둔다. 공용 키는 `aiRateLimit`이 IP 기준으로 제한한다. 키가 없으면 401(`LOGIN_REQUIRED`)이고 나머지 기능은 정상 동작한다.
 - Android 앱은 루트에서 `./gradlew assembleDebug`로 빌드한다(웹 서버가 먼저 떠 있어야 의미가 있음). 현재 출시 계획이 없어 CI에서 보류 중이며, 라이브러리 버전 불일치로 빌드가 실패하는 상태다.
 
 ## 아키텍처

@@ -70,6 +70,31 @@ test('502 when the AI call fails', async () => {
   errorSpy.mockRestore();
 });
 
+describe('서버 공용 키', () => {
+  const savedNodeEnv = process.env.NODE_ENV;
+
+  afterEach(() => {
+    process.env.NODE_ENV = savedNodeEnv;
+  });
+
+  //화면에서 개인 키 등록을 뺐으므로 운영에서도 공용 키로 AI가 동작해야 한다
+  test('운영 환경에서도 로그인 없이 서버 키로 AI를 호출한다', async () => {
+    process.env.NODE_ENV = 'production';
+    jest.mocked(explainFunction).mockResolvedValue('설명');
+    const res = await request(app).post('/api/explain').send(body);
+    expect(res.status).toBe(200);
+    expect(explainFunction).toHaveBeenCalledWith(expect.any(Object), TEST_KEY);
+  });
+
+  test('서버 키가 없으면 401이고 AI를 부르지 않는다', async () => {
+    delete process.env.ANTHROPIC_API_KEY;
+    const res = await request(app).post('/api/explain').send(body);
+    expect(res.status).toBe(401);
+    expect(res.body.code).toBe('LOGIN_REQUIRED');
+    expect(explainFunction).not.toHaveBeenCalled();
+  });
+});
+
 describe('입력 검사', () => {
   test('code가 문자열이 아니면 400', async () => {
     const res = await request(app)

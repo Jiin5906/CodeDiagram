@@ -62,7 +62,11 @@ document.addEventListener('DOMContentLoaded', () => {
       const tsFuncCount = data.nodes.filter((n) => n.data.type === 'ts-function').length;
       const cppFuncCount = data.nodes.filter((n) => n.data.type === 'cpp-function').length;
       const csFuncCount = data.nodes.filter((n) => n.data.type === 'csharp-function').length;
-      const fileCount = data.nodes.filter((n) => n.data.type === 'file').length;
+      //분석한 파일 수는 서버의 언어별 집계(fileCounts) 합계를 쓴다.
+      //그래프의 file 노드 수는 인라인 <script>가 있는 HTML을 두 번 세고, 함수·관계가 없는 파일은 빼므로 실제 파일 수와 다르다.
+      const fileCount = data.fileCounts
+        ? Object.values(data.fileCounts).reduce((sum, n) => sum + (Number(n) || 0), 0)
+        : data.nodes.filter((n) => n.data.type === 'file').length;
       const tierCount = data.tiers ? data.tiers.length : 0;
 
       //언어별 파일 카운트

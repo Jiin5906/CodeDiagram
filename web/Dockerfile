@@ -43,6 +43,8 @@ COPY --from=deps-prod --chown=node:node /app/node_modules ./node_modules
 COPY --chown=node:node package.json ./
 COPY --chown=node:node server ./server
 COPY --chown=node:node public ./public
+# aiService가 서버 시작 때 AI 리팩토링 응답 스키마(schemas/ai-refactor-schema.json)를 불러온다
+COPY --chown=node:node schemas ./schemas
 # 클론 저장 위치(web/repos)는 node 사용자가 쓸 수 있어야 한다
 RUN mkdir -p repos && chown node:node repos
 USER node
