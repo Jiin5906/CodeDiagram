@@ -40,6 +40,21 @@ async function verifyApiKey(apiKey) {
 
 const DEFAULT_MODEL = process.env.ANTHROPIC_MODEL || 'claude-haiku-5-5';
 
+//함수 해설·결합도 제안의 출력 상한. 모델이 답하기 전에 생각(thinking)에 토큰을 쓰므로 넉넉히 잡는다.
+//1024로 두면 생각만 하다 상한에 걸려 답변(text) 없이 끝나는 경우가 있었다.
+const EXPLAIN_MAX_TOKENS = 4096;
+
+//응답에서 첫 번째 text 블록을 꺼낸다 (thinking 블록이 앞에 올 수 있다).
+//답변이 없으면 빈 결과가 캐시되거나 화면에 대체 문구로 보이지 않도록 에러를 던진다.
+function extractText(message) {
+  const block = message.content.find((b) => b.type === 'text');
+  if (block && block.text) return block.text;
+  if (message.stop_reason === 'max_tokens') {
+    throw aiError('AI_TRUNCATED', 'The response hit max_tokens before any text');
+  }
+  throw aiError('AI_EMPTY', 'The response had no text');
+}
+
 //Claude API로 함수 설명을 생성하는 함수다.
 async function explainFunction({ name, code, docstring, comment, filePath }, apiKey) {
   const anthropic = createClient(apiKey);
@@ -64,14 +79,12 @@ ${code}
   const message = await anthropic.messages
     .create({
       model: DEFAULT_MODEL,
-      max_tokens: 1024,
+      max_tokens: EXPLAIN_MAX_TOKENS,
       messages: [{ role: 'user', content: prompt }],
     })
     .catch(rethrowKeyError);
 
-  //thinking 블록이 앞에 올 수 있으므로 첫 번째 text 블록을 찾는다
-  const block = message.content.find((b) => b.type === 'text');
-  return block ? block.text : undefined;
+  return extractText(message);
 }
 
 //AI 리팩토링 기본 모델. .env의 ANTHROPIC_REFACTOR_MODEL로 바꿀 수 있다.
@@ -165,13 +178,12 @@ ${snippet}
   const message = await anthropic.messages
     .create({
       model: DEFAULT_MODEL,
-      max_tokens: 2048,
+      max_tokens: EXPLAIN_MAX_TOKENS,
       messages: [{ role: 'user', content: prompt }],
     })
     .catch(rethrowKeyError);
 
-  const block = message.content.find((b) => b.type === 'text');
-  return block ? block.text : undefined;
+  return extractText(message);
 }
 
 module.exports = {
