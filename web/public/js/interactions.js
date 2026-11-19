@@ -1639,15 +1639,6 @@ async function showCouplingExplanation(entry, autoFetch = false) {
   const deps = _collectFileDependencies(filePath);
   const cacheKey = `coupling::${filePath}`;
 
-  //이미 캐시된 결과가 있다면 바로 카드 표시
-  if (explainCache[cacheKey]) {
-    body.textContent = '';
-    body.appendChild(
-      _renderCouplingCard(filePath, metrics, deps, fetchAndRenderAI, explainCache[cacheKey], false),
-    );
-    return;
-  }
-
   //AI 호출 실행 함수 (버튼 클릭 시 또는 autoFetch=true일 때 호출)
   const fetchAndRenderAI = async () => {
     body.textContent = '';
@@ -1739,6 +1730,16 @@ async function showCouplingExplanation(entry, autoFetch = false) {
       );
     }
   };
+
+  //이미 캐시된 결과가 있다면 바로 카드 표시
+  //(다시 진단하기 버튼이 fetchAndRenderAI를 쓰므로 그 선언 뒤에서 확인해야 한다. 앞에 두면 ReferenceError)
+  if (explainCache[cacheKey]) {
+    body.textContent = '';
+    body.appendChild(
+      _renderCouplingCard(filePath, metrics, deps, fetchAndRenderAI, explainCache[cacheKey], false),
+    );
+    return;
+  }
 
   if (autoFetch) {
     fetchAndRenderAI();
